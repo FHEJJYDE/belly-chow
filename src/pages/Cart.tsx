@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
-import type { PaymentMethod } from '@/integrations/supabase/types';
+import type { Enums } from '@/integrations/supabase/types';
+
+type PaymentMethod = Enums<"payment_method">;
 
 const Cart = () => {
   const { items, updateQuantity, removeItem, clearCart, total, vendorId } = useCart();
@@ -35,7 +37,6 @@ const Cart = () => {
 
     setIsOrdering(true);
     try {
-      // Create order
       const { data: order, error: orderError } = await supabase.from('orders').insert({
         student_id: user.id,
         vendor_id: vendorId,
@@ -48,7 +49,6 @@ const Cart = () => {
 
       if (orderError) throw orderError;
 
-      // Insert order items
       const orderItems = items.map(i => ({
         order_id: order.id,
         menu_item_id: i.menuItem.id,
@@ -114,16 +114,11 @@ const Cart = () => {
           ))}
         </div>
 
-        {/* Delivery Details */}
         <Card className="mb-6">
           <CardContent className="space-y-4 p-4">
             <div>
               <Label>Delivery Location</Label>
-              <Input
-                placeholder="e.g. Block A, Room 204, Hostel Name"
-                value={deliveryLocation}
-                onChange={e => setDeliveryLocation(e.target.value)}
-              />
+              <Input placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
             </div>
             <div>
               <Label>Payment Method</Label>
@@ -142,7 +137,6 @@ const Cart = () => {
           </CardContent>
         </Card>
 
-        {/* Order Summary */}
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="space-y-2 text-sm">

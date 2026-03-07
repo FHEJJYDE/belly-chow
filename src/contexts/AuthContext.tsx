@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { AppRole } from '@/integrations/supabase/types';
+import type { Enums } from '@/integrations/supabase/types';
+
+type AppRole = Enums<"app_role">;
 
 interface AuthContextType {
   user: User | null;
@@ -62,14 +64,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
     if (!data.user) throw new Error('Signup failed');
 
-    // Insert role
     const { error: roleError } = await supabase.from('user_roles').insert({
       user_id: data.user.id,
       role: selectedRole,
     });
     if (roleError) throw roleError;
 
-    // If vendor, create vendor record
     if (selectedRole === 'vendor' && vendorName) {
       const { error: vendorError } = await supabase.from('vendors').insert({
         user_id: data.user.id,

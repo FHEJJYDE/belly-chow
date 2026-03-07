@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UtensilsCrossed, GraduationCap, Store, Bike } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AppRole } from '@/integrations/supabase/types';
+import type { Enums } from '@/integrations/supabase/types';
+
+type AppRole = Enums<"app_role">;
 
 const roles: { value: AppRole; label: string; icon: React.ReactNode; desc: string }[] = [
   { value: 'student', label: 'Student', icon: <GraduationCap className="h-5 w-5" />, desc: 'Order food on campus' },
@@ -65,7 +67,6 @@ const Signup = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role Selection */}
             <div className="space-y-2">
               <Label>I am a...</Label>
               <div className="grid grid-cols-3 gap-2">
