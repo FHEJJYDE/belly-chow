@@ -265,40 +265,61 @@ const AdminPayments = () => {
         </TabsContent>
 
         <TabsContent value="withdrawals" className="mt-6 space-y-4">
-          <h2 className="font-heading text-lg font-semibold">Rider Withdrawal Requests</h2>
-          {withdrawals.length === 0 ? (
-            <p className="py-10 text-center text-muted-foreground">No withdrawal requests yet</p>
-          ) : (
-            <div className="space-y-3">
-              {withdrawals.map(w => (
-                <Card key={w.id}>
-                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-medium">{w.rider_name}</p>
-                      <p className="text-lg font-bold text-primary">₦{Number(w.amount).toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">{w.bank_name} · {w.account_number} · {w.account_name}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString()}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={w.status === 'approved' ? 'default' : w.status === 'rejected' ? 'destructive' : 'secondary'}>
-                        {w.status}
-                      </Badge>
-                      {w.status === 'pending' && (
-                        <>
-                          <Button size="sm" onClick={() => updateWithdrawalStatus(w.id, 'approved')} className="gap-1">
-                            <CheckCircle className="h-3.5 w-3.5" /> Approve
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => updateWithdrawalStatus(w.id, 'rejected')} className="gap-1">
-                            <XCircle className="h-3.5 w-3.5" /> Reject
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <div className="grid gap-4 sm:grid-cols-3 mb-6">
+            <Card><CardContent className="flex items-center gap-3 p-4">
+              <CheckCircle className="h-8 w-8 text-primary" />
+              <div><p className="text-xs text-muted-foreground">Total Paid to Riders</p><p className="font-heading text-xl font-bold">₦{totalPaidToRiders.toLocaleString()}</p><p className="text-xs text-muted-foreground">{approvedWithdrawals.length} approved</p></div>
+            </CardContent></Card>
+            <Card><CardContent className="flex items-center gap-3 p-4">
+              <Clock className="h-8 w-8 text-muted-foreground" />
+              <div><p className="text-xs text-muted-foreground">Pending Payouts</p><p className="font-heading text-xl font-bold">₦{totalPendingRiderPayouts.toLocaleString()}</p><p className="text-xs text-muted-foreground">{pendingWithdrawals.length} pending</p></div>
+            </CardContent></Card>
+            <Card><CardContent className="flex items-center gap-3 p-4">
+              <Wallet className="h-8 w-8 text-muted-foreground" />
+              <div><p className="text-xs text-muted-foreground">Rider Fee per Order</p><p className="font-heading text-xl font-bold">₦{riderFee.toLocaleString()}</p><p className="text-xs text-muted-foreground">{orders.length} delivered orders</p></div>
+            </CardContent></Card>
+          </div>
+
+          <Tabs defaultValue="r-pending">
+            <TabsList>
+              <TabsTrigger value="r-pending">Pending ({pendingWithdrawals.length})</TabsTrigger>
+              <TabsTrigger value="r-approved">Approved ({approvedWithdrawals.length})</TabsTrigger>
+              <TabsTrigger value="r-rejected">Rejected ({rejectedWithdrawals.length})</TabsTrigger>
+            </TabsList>
+            {([{ key: 'r-pending', list: pendingWithdrawals }, { key: 'r-approved', list: approvedWithdrawals }, { key: 'r-rejected', list: rejectedWithdrawals }] as const).map(({ key, list }) => (
+              <TabsContent key={key} value={key} className="mt-4 space-y-3">
+                {list.length === 0 ? (
+                  <p className="py-10 text-center text-muted-foreground">No {key.replace('r-', '')} withdrawals</p>
+                ) : list.map(w => (
+                  <Card key={w.id}>
+                    <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-medium">{w.rider_name}</p>
+                        <p className="text-lg font-bold text-primary">₦{Number(w.amount).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{w.bank_name} · {w.account_number} · {w.account_name}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={w.status === 'approved' ? 'default' : w.status === 'rejected' ? 'destructive' : 'secondary'}>
+                          {w.status}
+                        </Badge>
+                        {w.status === 'pending' && (
+                          <>
+                            <Button size="sm" onClick={() => updateWithdrawalStatus(w.id, 'approved')} className="gap-1">
+                              <CheckCircle className="h-3.5 w-3.5" /> Approve
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => updateWithdrawalStatus(w.id, 'rejected')} className="gap-1">
+                              <XCircle className="h-3.5 w-3.5" /> Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </TabsContent>
+            ))}
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
