@@ -97,6 +97,27 @@ const Orders = () => {
     navigate('/cart');
   }, [orderItems, clearCart, addItem, toast, navigate]);
 
+  const handleSubmitDispute = async () => {
+    if (!disputeOrder || !user || !disputeReason) return;
+    setSubmittingDispute(true);
+    const { error } = await supabase.from('disputes').insert({
+      order_id: disputeOrder.id,
+      user_id: user.id,
+      reason: disputeReason,
+      description: disputeDesc || null,
+    } as any);
+    setSubmittingDispute(false);
+    if (error) {
+      toast({ title: 'Error filing dispute', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setDisputedOrders(prev => new Set([...prev, disputeOrder.id]));
+    setDisputeOrder(null);
+    setDisputeReason('');
+    setDisputeDesc('');
+    toast({ title: 'Dispute filed ✅', description: 'Our team will review it shortly.' });
+  };
+
   useEffect(() => {
     if (!user) return;
     const fetchOrders = async () => {
