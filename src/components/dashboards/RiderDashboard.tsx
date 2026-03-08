@@ -598,7 +598,7 @@ const RiderDashboard = () => {
                       <CardContent className="p-0">
                         <div className="bg-primary/10 px-4 py-2 flex items-center justify-between">
                           <span className="text-xs font-medium text-primary flex items-center gap-1"><DollarSign className="h-3 w-3" /> Earn</span>
-                          <span className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</span>
+                          <span className="font-bold text-primary">₦{riderFee.toLocaleString()}</span>
                         </div>
                         <div className="p-4 space-y-3">
                           <div className="space-y-2 flex-1">
