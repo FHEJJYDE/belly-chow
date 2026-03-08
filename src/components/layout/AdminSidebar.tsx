@@ -19,6 +19,7 @@ const items = [
   { title: 'Orders', url: '/admin/orders', icon: Package },
   { title: 'Payments', url: '/admin/payments', icon: CreditCard },
   { title: 'Users', url: '/admin/users', icon: Users },
+  { title: 'Disputes', url: '/admin/disputes', icon: AlertTriangle },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
