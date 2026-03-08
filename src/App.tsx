@@ -33,6 +33,11 @@ import VendorSettings from "./pages/vendor/VendorSettings";
 
 const queryClient = new QueryClient();
 
+const NotificationListener = () => {
+  useOrderNotifications();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -41,6 +46,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
+            <NotificationListener />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
