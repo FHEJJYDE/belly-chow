@@ -2,8 +2,9 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AdminSidebar } from './AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AdminLayout = () => {
