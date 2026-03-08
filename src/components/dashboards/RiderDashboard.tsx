@@ -4,19 +4,44 @@ import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { MapPin, Navigation } from 'lucide-react';
+import { MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import DeliveryMap from '@/components/maps/DeliveryMap';
+
+interface EnrichedOrder {
+  id: string;
+  status: string;
+  total: number;
+  delivery_fee: number;
+  delivery_location: string;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  rider_lat: number | null;
+  rider_lng: number | null;
+  payment_method: string;
+  payment_status: string;
+  notes: string | null;
+  created_at: string;
+  vendor_id: string;
+  student_id: string;
+  rider_id: string | null;
+  vendor_name: string;
+  vendor_address: string;
+  customer_name: string;
+  customer_phone: string;
+  items: { name: string; quantity: number; price: number }[];
+}
 
 const RiderDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOnline, setIsOnline] = useState(true);
-  const [availableOrders, setAvailableOrders] = useState<any[]>([]);
-  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [availableOrders, setAvailableOrders] = useState<EnrichedOrder[]>([]);
+  const [myOrders, setMyOrders] = useState<EnrichedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { position, error: geoError, getPosition } = useGeolocation(true);
@@ -32,6 +57,51 @@ const RiderDashboard = () => {
     });
   }, [position, myOrders, user]);
 
+  const enrichOrders = async (orders: any[]): Promise<EnrichedOrder[]> => {
+    if (orders.length === 0) return [];
+
+    // Get vendor info
+    const vendorIds = [...new Set(orders.map(o => o.vendor_id))];
+    const { data: vendors } = await supabase.from('vendors').select('id, name, address').in('id', vendorIds);
+    const vendorMap = new Map(vendors?.map(v => [v.id, v]) || []);
+
+    // Get customer profiles
+    const studentIds = [...new Set(orders.map(o => o.student_id))];
+    const { data: profiles } = await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', studentIds);
+    const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+    // Get order items with menu item names
+    const orderIds = orders.map(o => o.id);
+    const { data: orderItems } = await supabase
+      .from('order_items')
+      .select('order_id, quantity, price, menu_item_id')
+      .in('order_id', orderIds);
+
+    const menuItemIds = [...new Set(orderItems?.map(oi => oi.menu_item_id) || [])];
+    const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds.length > 0 ? menuItemIds : ['none']);
+    const menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
+
+    const itemsByOrder = new Map<string, { name: string; quantity: number; price: number }[]>();
+    orderItems?.forEach(oi => {
+      const list = itemsByOrder.get(oi.order_id) || [];
+      list.push({ name: menuMap.get(oi.menu_item_id) || 'Unknown', quantity: oi.quantity, price: oi.price });
+      itemsByOrder.set(oi.order_id, list);
+    });
+
+    return orders.map(o => {
+      const vendor = vendorMap.get(o.vendor_id);
+      const profile = profileMap.get(o.student_id);
+      return {
+        ...o,
+        vendor_name: vendor?.name || 'Unknown Vendor',
+        vendor_address: vendor?.address || '',
+        customer_name: profile?.full_name || 'Unknown',
+        customer_phone: profile?.phone || '',
+        items: itemsByOrder.get(o.id) || [],
+      };
+    });
+  };
+
   useEffect(() => {
     if (!user) return;
     const fetchOrders = async () => {
@@ -39,8 +109,14 @@ const RiderDashboard = () => {
         supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }),
         supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering']).order('created_at', { ascending: false }),
       ]);
-      setAvailableOrders(avail.data || []);
-      setMyOrders(mine.data || []);
+
+      const [enrichedAvail, enrichedMine] = await Promise.all([
+        enrichOrders(avail.data || []),
+        enrichOrders(mine.data || []),
+      ]);
+
+      setAvailableOrders(enrichedAvail);
+      setMyOrders(enrichedMine);
       setLoading(false);
     };
     fetchOrders();
@@ -82,6 +158,85 @@ const RiderDashboard = () => {
 
   const activeOrder = myOrders.find(o => o.id === selectedOrder) || myOrders[0];
 
+  const OrderInfoCard = ({ order, showActions = false }: { order: EnrichedOrder; showActions?: boolean }) => (
+    <Card className={`${showActions && selectedOrder === order.id ? 'ring-2 ring-primary' : ''}`}>
+      <CardContent className="p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-semibold text-base">Order #{order.id.slice(0, 8)}</p>
+            <Badge variant={order.status === 'picked_up' ? 'default' : 'secondary'} className="mt-1">{order.status.replace('_', ' ')}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleTimeString()}</p>
+        </div>
+
+        {/* Pickup - Vendor info */}
+        <div className="rounded-lg border p-3 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">📍 Pickup From</p>
+          <p className="flex items-center gap-1.5 font-medium text-sm"><Store className="h-3.5 w-3.5 text-primary" /> {order.vendor_name}</p>
+          {order.vendor_address && <p className="text-xs text-muted-foreground ml-5">{order.vendor_address}</p>}
+        </div>
+
+        {/* Delivery - Customer info */}
+        <div className="rounded-lg border p-3 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">📦 Deliver To</p>
+          <p className="flex items-center gap-1.5 font-medium text-sm"><User className="h-3.5 w-3.5 text-primary" /> {order.customer_name}</p>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location set'}</p>
+          {order.customer_phone && (
+            <a href={`tel:${order.customer_phone}`} className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+              <Phone className="h-3.5 w-3.5" /> {order.customer_phone}
+            </a>
+          )}
+          {order.delivery_lat && <p className="text-xs text-green-600">📍 GPS location available</p>}
+        </div>
+
+        {/* Order Items */}
+        {order.items.length > 0 && (
+          <div className="rounded-lg border p-3 space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">🛒 Items</p>
+            {order.items.map((item, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span>{item.quantity}x {item.name}</span>
+                <span className="text-muted-foreground">₦{(item.price * item.quantity).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Payment & Notes */}
+        <div className="flex flex-wrap gap-3 text-sm">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <CreditCard className="h-3.5 w-3.5" /> {order.payment_method.replace('_', ' ')}
+          </span>
+          <span className="font-medium">₦{Number(order.total).toLocaleString()} + ₦{Number(order.delivery_fee).toLocaleString()} delivery</span>
+        </div>
+        {order.notes && (
+          <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+            <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {order.notes}
+          </p>
+        )}
+
+        {/* Actions */}
+        {showActions && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {order.delivery_lat && order.delivery_lng && (
+              <Button size="sm" variant="outline" onClick={() => openInGoogleMaps(order.delivery_lat!, order.delivery_lng!)}>
+                <Navigation className="mr-1 h-3.5 w-3.5" /> Directions
+              </Button>
+            )}
+            {order.status === 'picked_up' && (
+              <Button size="sm" onClick={() => updateStatus(order.id, 'delivering')}>On the way</Button>
+            )}
+            {order.status === 'delivering' && (
+              <Button size="sm" onClick={() => updateStatus(order.id, 'delivered')}>Delivered ✓</Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setSelectedOrder(order.id)}>Show Map</Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
@@ -116,36 +271,10 @@ const RiderDashboard = () => {
         {/* Active Deliveries */}
         {myOrders.length > 0 && (
           <div className="mb-6">
-            <h2 className="mb-3 font-heading text-lg font-semibold">Active Deliveries</h2>
+            <h2 className="mb-3 font-heading text-lg font-semibold">Active Deliveries ({myOrders.length})</h2>
             <div className="space-y-3">
               {myOrders.map(order => (
-                <Card key={order.id} className={`border-primary ${selectedOrder === order.id ? 'ring-2 ring-primary' : ''}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
-                        <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location set'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">₦{Number(order.total).toLocaleString()} + ₦{Number(order.delivery_fee).toLocaleString()} delivery</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {order.delivery_lat && order.delivery_lng && (
-                          <Button size="sm" variant="outline" onClick={() => openInGoogleMaps(order.delivery_lat, order.delivery_lng)}>
-                            <Navigation className="mr-1 h-3.5 w-3.5" /> Directions
-                          </Button>
-                        )}
-                        {order.status === 'picked_up' && (
-                          <Button size="sm" onClick={() => updateStatus(order.id, 'delivering')}>On the way</Button>
-                        )}
-                        {order.status === 'delivering' && (
-                          <Button size="sm" onClick={() => updateStatus(order.id, 'delivered')}>Delivered ✓</Button>
-                        )}
-                        <Button size="sm" variant="ghost" onClick={() => setSelectedOrder(order.id)}>Show Map</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <OrderInfoCard key={order.id} order={order} showActions />
               ))}
             </div>
           </div>
@@ -161,16 +290,27 @@ const RiderDashboard = () => {
           <div className="space-y-3">
             {availableOrders.map(order => (
               <Card key={order.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
-                    <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
-                    </p>
-                    <p className="text-sm font-medium text-primary">Earn ₦{Number(order.delivery_fee).toLocaleString()}</p>
-                    {order.delivery_lat && <p className="text-xs text-muted-foreground">📍 GPS location available</p>}
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                        <Store className="h-3.5 w-3.5" /> {order.vendor_name}
+                      </p>
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
+                      </p>
+                      {order.items.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <Package className="inline h-3 w-3 mr-1" />
+                          {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                        </p>
+                      )}
+                      <p className="text-sm font-medium text-primary mt-1">Earn ₦{Number(order.delivery_fee).toLocaleString()}</p>
+                      {order.delivery_lat && <p className="text-xs text-green-600">📍 GPS location available</p>}
+                    </div>
+                    <Button onClick={() => acceptOrder(order.id)}>Accept</Button>
                   </div>
-                  <Button onClick={() => acceptOrder(order.id)}>Accept</Button>
                 </CardContent>
               </Card>
             ))}
