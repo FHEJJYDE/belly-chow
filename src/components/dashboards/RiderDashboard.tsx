@@ -68,6 +68,7 @@ const RiderDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOnline, setIsOnline] = useState(true);
+  const [riderFee, setRiderFee] = useState(500);
   const [availableOrders, setAvailableOrders] = useState<EnrichedOrder[]>([]);
   const [myOrders, setMyOrders] = useState<EnrichedOrder[]>([]);
   const [deliveryHistory, setDeliveryHistory] = useState<EnrichedOrder[]>([]);
@@ -141,10 +142,16 @@ const RiderDashboard = () => {
     });
   };
 
-  // Fetch settings
+  // Fetch settings (rider fee + rider personal settings)
   useEffect(() => {
     if (!user) return;
     const fetchSettings = async () => {
+      // Fetch platform rider_fee
+      const { data: platformData } = await supabase.from('platform_settings').select('*').limit(1).single();
+      if (platformData) {
+        setRiderFee(Number((platformData as any).rider_fee) || 500);
+      }
+      // Fetch rider personal settings
       const { data } = await (supabase.from('rider_settings') as any).select('*').eq('user_id', user.id).maybeSingle();
       if (data) {
         setRiderSettings({
@@ -308,16 +315,17 @@ const RiderDashboard = () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const calc = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).reduce((sum, o) => sum + Number(o.delivery_fee), 0);
+    // Use the fixed rider_fee per delivery, not the full delivery_fee (which includes platform cut)
+    const calc = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).length * riderFee;
     const countFrom = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).length;
     return {
       today: calc(todayStart), todayCount: countFrom(todayStart),
       week: calc(weekStart), weekCount: countFrom(weekStart),
       month: calc(monthStart), monthCount: countFrom(monthStart),
-      total: deliveryHistory.reduce((sum, o) => sum + Number(o.delivery_fee), 0),
+      total: deliveryHistory.length * riderFee,
       totalCount: deliveryHistory.length,
     };
-  }, [deliveryHistory]);
+  }, [deliveryHistory, riderFee]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
@@ -413,8 +421,8 @@ const RiderDashboard = () => {
                   <div key={i} className="flex justify-between text-sm"><span>{item.quantity}x {item.name}</span><span className="font-medium">₦{(item.price * item.quantity).toLocaleString()}</span></div>
                 ))}
                 <Separator />
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Order Total</span><span>₦{Number(activeOrder.total).toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Your Delivery Fee</span><span className="font-semibold text-primary">₦{Number(activeOrder.delivery_fee).toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Food Subtotal</span><span>₦{Number(activeOrder.total).toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Your Earnings</span><span className="font-semibold text-primary">₦{riderFee.toLocaleString()}</span></div>
               </CardContent>
             </Card>
           )}
@@ -567,7 +575,7 @@ const RiderDashboard = () => {
                           </div>
                           <div className="text-right space-y-1">
                             <Badge variant={order.status === 'delivering' ? 'default' : 'secondary'}>{order.status.replace('_', ' ')}</Badge>
-                            <p className="text-sm font-medium text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p>
+                            <p className="text-sm font-medium text-primary">₦{riderFee.toLocaleString()}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -590,7 +598,7 @@ const RiderDashboard = () => {
                       <CardContent className="p-0">
                         <div className="bg-primary/10 px-4 py-2 flex items-center justify-between">
                           <span className="text-xs font-medium text-primary flex items-center gap-1"><DollarSign className="h-3 w-3" /> Earn</span>
-                          <span className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</span>
+                          <span className="font-bold text-primary">₦{riderFee.toLocaleString()}</span>
                         </div>
                         <div className="p-4 space-y-3">
                           <div className="space-y-2 flex-1">
@@ -645,7 +653,7 @@ const RiderDashboard = () => {
                         <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'N/A'}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(order.created_at).toLocaleDateString()} · {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
-                      <div className="text-right"><p className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p><p className="text-xs text-muted-foreground">earned</p></div>
+                      <div className="text-right"><p className="font-bold text-primary">₦{riderFee.toLocaleString()}</p><p className="text-xs text-muted-foreground">earned</p></div>
                     </div>
                   </CardContent>
                 </Card>
