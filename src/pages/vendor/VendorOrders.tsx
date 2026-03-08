@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import DeliveryChat from '@/components/chat/DeliveryChat';
 import type { Database } from '@/integrations/supabase/types';
 
 type Order = Database['public']['Tables']['orders']['Row'];
@@ -126,6 +127,11 @@ const VendorOrders = () => {
 
           {order.notes && (
             <p className="text-xs text-muted-foreground italic">Note: {order.notes}</p>
+          )}
+
+          {/* Chat for active orders (picked_up, delivering, preparing, ready) */}
+          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(order.status) && (
+            <DeliveryChat orderId={order.id} otherName="Rider & Student" />
           )}
         </CardContent>
       </Card>

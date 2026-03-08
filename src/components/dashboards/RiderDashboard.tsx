@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
@@ -8,9 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package, ArrowLeft, Clock, CheckCircle2, Truck } from 'lucide-react';
+import {
+  MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package,
+  ArrowLeft, Clock, CheckCircle2, Truck, Wallet, History, Settings,
+  Home, Bike, TrendingUp, Calendar, DollarSign, Hash
+} from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import DeliveryChat from '@/components/chat/DeliveryChat';
 import DeliveryMap from '@/components/maps/DeliveryMap';
@@ -34,9 +41,18 @@ interface EnrichedOrder {
   rider_id: string | null;
   vendor_name: string;
   vendor_address: string;
+  vendor_user_id: string;
   customer_name: string;
   customer_phone: string;
   items: { name: string; quantity: number; price: number }[];
+}
+
+interface RiderSettings {
+  vehicle_type: string;
+  plate_number: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
 }
 
 const RiderDashboard = () => {
@@ -45,9 +61,17 @@ const RiderDashboard = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [availableOrders, setAvailableOrders] = useState<EnrichedOrder[]>([]);
   const [myOrders, setMyOrders] = useState<EnrichedOrder[]>([]);
+  const [deliveryHistory, setDeliveryHistory] = useState<EnrichedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeDeliveryId, setActiveDeliveryId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('home');
   const { position, error: geoError } = useGeolocation(true);
+
+  // Rider settings state
+  const [riderSettings, setRiderSettings] = useState<RiderSettings>({
+    vehicle_type: 'motorcycle', plate_number: '', bank_name: '', account_number: '', account_name: ''
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Update rider location in active orders
   useEffect(() => {
@@ -64,7 +88,7 @@ const RiderDashboard = () => {
     if (orders.length === 0) return [];
 
     const vendorIds = [...new Set(orders.map(o => o.vendor_id))];
-    const { data: vendors } = await supabase.from('vendors').select('id, name, address').in('id', vendorIds);
+    const { data: vendors } = await supabase.from('vendors').select('id, name, address, user_id').in('id', vendorIds);
     const vendorMap = new Map(vendors?.map(v => [v.id, v]) || []);
 
     const studentIds = [...new Set(orders.map(o => o.student_id))];
@@ -98,6 +122,7 @@ const RiderDashboard = () => {
         ...o,
         vendor_name: vendor?.name || 'Unknown Vendor',
         vendor_address: vendor?.address || '',
+        vendor_user_id: vendor?.user_id || '',
         customer_name: profile?.full_name || 'Unknown',
         customer_phone: profile?.phone || '',
         items: itemsByOrder.get(o.id) || [],
@@ -105,24 +130,45 @@ const RiderDashboard = () => {
     });
   };
 
+  // Fetch settings
+  useEffect(() => {
+    if (!user) return;
+    const fetchSettings = async () => {
+      const { data } = await (supabase.from('rider_settings') as any)
+        .select('*').eq('user_id', user.id).maybeSingle();
+      if (data) {
+        setRiderSettings({
+          vehicle_type: data.vehicle_type || 'motorcycle',
+          plate_number: data.plate_number || '',
+          bank_name: data.bank_name || '',
+          account_number: data.account_number || '',
+          account_name: data.account_name || '',
+        });
+      }
+    };
+    fetchSettings();
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const fetchOrders = async () => {
-      const [avail, mine] = await Promise.all([
+      const [avail, mine, history] = await Promise.all([
         supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }),
         supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering']).order('created_at', { ascending: false }),
+        supabase.from('orders').select('*').eq('rider_id', user.id).eq('status', 'delivered').order('created_at', { ascending: false }).limit(50),
       ]);
 
-      const [enrichedAvail, enrichedMine] = await Promise.all([
+      const [enrichedAvail, enrichedMine, enrichedHistory] = await Promise.all([
         enrichOrders(avail.data || []),
         enrichOrders(mine.data || []),
+        enrichOrders(history.data || []),
       ]);
 
       setAvailableOrders(enrichedAvail);
       setMyOrders(enrichedMine);
+      setDeliveryHistory(enrichedHistory);
       setLoading(false);
 
-      // Auto-open active delivery view if there's an active order
       if (enrichedMine.length > 0 && !activeDeliveryId) {
         setActiveDeliveryId(enrichedMine[0].id);
       }
@@ -162,12 +208,57 @@ const RiderDashboard = () => {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
   };
 
+  const saveSettings = async () => {
+    if (!user) return;
+    setSavingSettings(true);
+    const { data: existing } = await (supabase.from('rider_settings') as any)
+      .select('id').eq('user_id', user.id).maybeSingle();
+
+    if (existing) {
+      await (supabase.from('rider_settings') as any)
+        .update(riderSettings).eq('user_id', user.id);
+    } else {
+      await (supabase.from('rider_settings') as any)
+        .insert({ ...riderSettings, user_id: user.id });
+    }
+    setSavingSettings(false);
+    toast({ title: 'Settings saved ✓' });
+  };
+
+  // Earnings calculations
+  const earnings = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const calc = (from: Date) =>
+      deliveryHistory
+        .filter(o => new Date(o.created_at) >= from)
+        .reduce((sum, o) => sum + Number(o.delivery_fee), 0);
+
+    const countFrom = (from: Date) =>
+      deliveryHistory.filter(o => new Date(o.created_at) >= from).length;
+
+    return {
+      today: calc(todayStart),
+      todayCount: countFrom(todayStart),
+      week: calc(weekStart),
+      weekCount: countFrom(weekStart),
+      month: calc(monthStart),
+      monthCount: countFrom(monthStart),
+      total: deliveryHistory.reduce((sum, o) => sum + Number(o.delivery_fee), 0),
+      totalCount: deliveryHistory.length,
+    };
+  }, [deliveryHistory]);
+
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
   const activeOrder = myOrders.find(o => o.id === activeDeliveryId);
 
   // ──────────────────────────────────────────────
-  // ACTIVE DELIVERY VIEW — full-screen focused UI
+  // ACTIVE DELIVERY VIEW
   // ──────────────────────────────────────────────
   if (activeOrder) {
     const statusSteps = [
@@ -176,6 +267,12 @@ const RiderDashboard = () => {
       { key: 'delivered', label: 'Delivered', icon: CheckCircle2 },
     ];
     const currentStepIndex = statusSteps.findIndex(s => s.key === activeOrder.status);
+
+    // Build chat participants
+    const chatParticipants = [
+      { id: activeOrder.student_id, name: activeOrder.customer_name, role: 'student' },
+      ...(activeOrder.vendor_user_id ? [{ id: activeOrder.vendor_user_id, name: activeOrder.vendor_name, role: 'vendor' }] : []),
+    ].filter(p => p.id !== user?.id);
 
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -195,7 +292,7 @@ const RiderDashboard = () => {
           </Badge>
         </div>
 
-        {/* Map — takes prominent space */}
+        {/* Map */}
         <div className="relative">
           <DeliveryMap
             riderLat={position?.lat}
@@ -242,7 +339,7 @@ const RiderDashboard = () => {
           </div>
         </div>
 
-        {/* Order details scrollable area */}
+        {/* Order details */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {/* Pickup */}
           <Card>
@@ -280,7 +377,7 @@ const RiderDashboard = () => {
             <Card>
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Package className="h-4 w-4 text-primary" /> Order Items
+                  <Package className="h-4 w-4 text-primary" /> Order Items ({activeOrder.items.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-2">
@@ -292,7 +389,7 @@ const RiderDashboard = () => {
                 ))}
                 <Separator />
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">Order Total</span>
                   <span>₦{Number(activeOrder.total).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -321,11 +418,13 @@ const RiderDashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Chat — inline in detail view */}
+          <DeliveryChat orderId={activeOrder.id} otherName="Customer" participants={chatParticipants} />
         </div>
 
         {/* Sticky bottom action bar */}
         <div className="sticky bottom-0 z-30 bg-card border-t p-4 flex gap-3">
-          <DeliveryChat orderId={activeOrder.id} otherName="Customer" />
           {activeOrder.status === 'picked_up' && (
             <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivering')}>
               <Truck className="h-5 w-5" /> I'm On the Way
@@ -360,12 +459,13 @@ const RiderDashboard = () => {
   }
 
   // ──────────────────────────────────────────
-  // DEFAULT VIEW — order list / available
+  // TABBED DEFAULT VIEW
   // ──────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
       <div className="container py-6">
+        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="font-heading text-2xl font-bold">Rider Dashboard 🏍️</h1>
@@ -376,81 +476,342 @@ const RiderDashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Label>Online</Label>
+            <Label className="text-sm">Online</Label>
             <Switch checked={isOnline} onCheckedChange={setIsOnline} />
           </div>
         </div>
 
-        {/* Active Deliveries — compact cards that open detail view */}
-        {myOrders.length > 0 && (
-          <div className="mb-6">
-            <h2 className="mb-3 font-heading text-lg font-semibold">Active Deliveries ({myOrders.length})</h2>
-            <div className="space-y-3">
-              {myOrders.map(order => (
-                <Card key={order.id} className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" onClick={() => setActiveDeliveryId(order.id)}>
+        {/* Quick earnings bar */}
+        <div className="mb-6 grid grid-cols-3 gap-3">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Today</p>
+              <p className="text-lg font-bold text-primary">₦{earnings.today.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{earnings.todayCount} deliveries</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">This Week</p>
+              <p className="text-lg font-bold">₦{earnings.week.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{earnings.weekCount} deliveries</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">This Month</p>
+              <p className="text-lg font-bold">₦{earnings.month.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{earnings.monthCount} deliveries</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4 mb-4">
+            <TabsTrigger value="home" className="gap-1 text-xs"><Home className="h-3.5 w-3.5" /> Home</TabsTrigger>
+            <TabsTrigger value="history" className="gap-1 text-xs"><History className="h-3.5 w-3.5" /> History</TabsTrigger>
+            <TabsTrigger value="earnings" className="gap-1 text-xs"><Wallet className="h-3.5 w-3.5" /> Earnings</TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1 text-xs"><Settings className="h-3.5 w-3.5" /> Settings</TabsTrigger>
+          </TabsList>
+
+          {/* ═══════ HOME TAB ═══════ */}
+          <TabsContent value="home" className="space-y-4">
+            {/* Active Deliveries */}
+            {myOrders.length > 0 && (
+              <div>
+                <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2">
+                  <Truck className="h-5 w-5 text-primary" /> Active Deliveries ({myOrders.length})
+                </h2>
+                <div className="space-y-3">
+                  {myOrders.map(order => (
+                    <Card key={order.id} className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" onClick={() => setActiveDeliveryId(order.id)}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Store className="h-3.5 w-3.5" /> {order.vendor_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
+                            </p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Package className="h-3 w-3" /> {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <Badge variant={order.status === 'delivering' ? 'default' : 'secondary'}>{order.status.replace('_', ' ')}</Badge>
+                            <p className="text-sm font-medium text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Available Orders */}
+            <div>
+              <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2">
+                <Package className="h-5 w-5 text-muted-foreground" /> Available Orders ({availableOrders.length})
+              </h2>
+              {!isOnline ? (
+                <Card><CardContent className="py-10 text-center text-muted-foreground">Go online to see available orders</CardContent></Card>
+              ) : availableOrders.length === 0 ? (
+                <Card><CardContent className="py-10 text-center text-muted-foreground">No orders available right now. Hang tight! 🍕</CardContent></Card>
+              ) : (
+                <div className="space-y-3">
+                  {availableOrders.map(order => (
+                    <Card key={order.id} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        {/* Earn banner */}
+                        <div className="bg-primary/10 px-4 py-2 flex items-center justify-between">
+                          <span className="text-xs font-medium text-primary flex items-center gap-1"><DollarSign className="h-3 w-3" /> Earn</span>
+                          <span className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-2 flex-1">
+                              <div className="flex items-center gap-2">
+                                <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-semibold text-sm">{order.id.slice(0, 8)}</span>
+                                <span className="text-xs text-muted-foreground">· {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              {/* Pickup */}
+                              <div className="flex items-start gap-2">
+                                <div className="mt-1 h-2 w-2 rounded-full bg-accent shrink-0" />
+                                <div>
+                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Pickup</p>
+                                  <p className="text-sm font-medium">{order.vendor_name}</p>
+                                  {order.vendor_address && <p className="text-xs text-muted-foreground">{order.vendor_address}</p>}
+                                </div>
+                              </div>
+                              {/* Drop-off */}
+                              <div className="flex items-start gap-2">
+                                <div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                                <div>
+                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Drop-off</p>
+                                  <p className="text-sm font-medium">{order.customer_name}</p>
+                                  <p className="text-xs text-muted-foreground">{order.delivery_location || 'No location'}</p>
+                                </div>
+                              </div>
+                              {/* Items summary */}
+                              {order.items.length > 0 && (
+                                <div className="rounded-md bg-muted/50 px-3 py-2">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">📦 {order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                                  {order.items.map((item, i) => (
+                                    <p key={i} className="text-xs">{item.quantity}x {item.name}</p>
+                                  ))}
+                                </div>
+                              )}
+                              {/* GPS link */}
+                              {order.delivery_lat && (
+                                <p className="text-xs text-primary flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" /> GPS available —{' '}
+                                  <button className="underline font-medium" onClick={(e) => { e.stopPropagation(); openInGoogleMaps(order.delivery_lat!, order.delivery_lng!); }}>
+                                    Preview route
+                                  </button>
+                                </p>
+                              )}
+                              {/* Payment info */}
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> {order.payment_method.replace('_', ' ')}</span>
+                                <span>₦{Number(order.total).toLocaleString()} order</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Button className="w-full gap-2" onClick={() => acceptOrder(order.id)}>
+                            <Bike className="h-4 w-4" /> Accept Delivery
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ═══════ HISTORY TAB ═══════ */}
+          <TabsContent value="history" className="space-y-3">
+            <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+              <History className="h-5 w-5 text-muted-foreground" /> Delivery History
+            </h2>
+            {deliveryHistory.length === 0 ? (
+              <Card><CardContent className="py-10 text-center text-muted-foreground">No completed deliveries yet. Start riding! 🏍️</CardContent></Card>
+            ) : (
+              deliveryHistory.map(order => (
+                <Card key={order.id}>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm">#{order.id.slice(0, 8)}</p>
+                          <Badge variant="outline" className="text-[10px]">delivered</Badge>
+                        </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Store className="h-3.5 w-3.5" /> {order.vendor_name}
                         </p>
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
+                          <User className="h-3.5 w-3.5" /> {order.customer_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'N/A'}
+                        </p>
+                        {order.items.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" /> {new Date(order.created_at).toLocaleDateString()} · {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                      <div className="text-right space-y-1">
-                        <Badge variant={order.status === 'delivering' ? 'default' : 'secondary'}>{order.status.replace('_', ' ')}</Badge>
-                        <p className="text-sm font-medium text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p>
+                      <div className="text-right">
+                        <p className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">earned</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* ═══════ EARNINGS TAB ═══════ */}
+          <TabsContent value="earnings" className="space-y-4">
+            <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" /> Earnings Overview
+            </h2>
+
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="p-5 text-center">
+                <p className="text-sm text-muted-foreground">Total Earned</p>
+                <p className="text-3xl font-bold text-primary mt-1">₦{earnings.total.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-1">{earnings.totalCount} deliveries completed</p>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { label: "Today's Earnings", amount: earnings.today, count: earnings.todayCount, icon: Clock },
+                { label: 'This Week', amount: earnings.week, count: earnings.weekCount, icon: Calendar },
+                { label: 'This Month', amount: earnings.month, count: earnings.monthCount, icon: TrendingUp },
+              ].map(({ label, amount, count, icon: Icon }) => (
+                <Card key={label}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                        <Icon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{count} deliveries</p>
+                      </div>
+                    </div>
+                    <p className="text-lg font-bold">₦{amount.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Available Orders */}
-        <h2 className="mb-3 font-heading text-lg font-semibold">Available Orders ({availableOrders.length})</h2>
-        {!isOnline ? (
-          <p className="py-10 text-center text-muted-foreground">Go online to see available orders</p>
-        ) : availableOrders.length === 0 ? (
-          <p className="py-10 text-center text-muted-foreground">No orders available right now. Hang tight! 🍕</p>
-        ) : (
-          <div className="space-y-3">
-            {availableOrders.map(order => (
-              <Card key={order.id}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
-                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Store className="h-3.5 w-3.5" /> {order.vendor_name}
-                      </p>
-                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
-                      </p>
-                      {order.items.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          <Package className="inline h-3 w-3 mr-1" />
-                          {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
-                        </p>
-                      )}
-                      {order.delivery_lat && (
-                        <p className="text-xs text-accent">
-                          📍 GPS — <button className="underline" onClick={(e) => { e.stopPropagation(); openInGoogleMaps(order.delivery_lat!, order.delivery_lng!); }}>Navigate</button>
-                        </p>
-                      )}
-                      <p className="text-sm font-medium text-primary mt-1">Earn ₦{Number(order.delivery_fee).toLocaleString()}</p>
+            {/* Recent earnings list */}
+            {deliveryHistory.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-2">Recent</h3>
+                <div className="space-y-1">
+                  {deliveryHistory.slice(0, 10).map(order => (
+                    <div key={order.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-accent" />
+                        <div>
+                          <p className="text-sm font-medium">{order.vendor_name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(order.created_at).toLocaleDateString()} · #{order.id.slice(0, 8)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-primary">+₦{Number(order.delivery_fee).toLocaleString()}</p>
                     </div>
-                    <Button onClick={() => acceptOrder(order.id)}>Accept</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ═══════ SETTINGS TAB ═══════ */}
+          <TabsContent value="settings" className="space-y-4">
+            <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+              <Settings className="h-5 w-5 text-muted-foreground" /> Rider Settings
+            </h2>
+
+            {/* Vehicle Info */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-1.5"><Bike className="h-4 w-4 text-primary" /> Vehicle Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Vehicle Type</Label>
+                  <Select value={riderSettings.vehicle_type} onValueChange={v => setRiderSettings(s => ({ ...s, vehicle_type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="motorcycle">Motorcycle 🏍️</SelectItem>
+                      <SelectItem value="bicycle">Bicycle 🚲</SelectItem>
+                      <SelectItem value="car">Car 🚗</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Plate Number</Label>
+                  <Input
+                    value={riderSettings.plate_number}
+                    onChange={e => setRiderSettings(s => ({ ...s, plate_number: e.target.value }))}
+                    placeholder="e.g. LAG-123-AB"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Bank Details */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-1.5"><Wallet className="h-4 w-4 text-primary" /> Payout Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Bank Name</Label>
+                  <Input
+                    value={riderSettings.bank_name}
+                    onChange={e => setRiderSettings(s => ({ ...s, bank_name: e.target.value }))}
+                    placeholder="e.g. GTBank"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Account Number</Label>
+                  <Input
+                    value={riderSettings.account_number}
+                    onChange={e => setRiderSettings(s => ({ ...s, account_number: e.target.value }))}
+                    placeholder="0123456789"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Account Name</Label>
+                  <Input
+                    value={riderSettings.account_name}
+                    onChange={e => setRiderSettings(s => ({ ...s, account_name: e.target.value }))}
+                    placeholder="Your full name"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button className="w-full" onClick={saveSettings} disabled={savingSettings}>
+              {savingSettings ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
