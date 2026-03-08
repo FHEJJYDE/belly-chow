@@ -181,17 +181,6 @@ const Cart = () => {
       }
 
       const orderItems = items.map(i => ({
-        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
-        notes,
-      };
-      if (position) {
-        orderData.delivery_lat = position.lat;
-        orderData.delivery_lng = position.lng;
-      }
-      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
-      if (orderError) throw orderError;
-
-      const orderItems = items.map(i => ({
         order_id: order.id,
         menu_item_id: i.menuItem.id,
         quantity: i.quantity,
