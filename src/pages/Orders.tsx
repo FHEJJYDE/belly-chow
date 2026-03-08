@@ -280,7 +280,7 @@ const Orders = () => {
             {/* Past Orders */}
             {pastOrders.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Past Orders</h2>
+                <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground mb-3">Past orders</h2>
                 <div className="space-y-3">
                   {pastOrders.map(order => {
                     const items = orderItems[order.id] || [];
