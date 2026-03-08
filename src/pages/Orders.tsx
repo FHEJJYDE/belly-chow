@@ -32,6 +32,9 @@ const statusColors: Record<string, string> = {
 
 const Orders = () => {
   const { user } = useAuth();
+  const { addItem, clearCart } = useCart();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [loading, setLoading] = useState(true);
