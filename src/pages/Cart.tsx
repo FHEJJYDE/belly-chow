@@ -126,6 +126,11 @@ const Cart = () => {
             <div>
               <Label>Delivery Location</Label>
               <Input placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={getPosition} disabled={geoLoading}>
+                <MapPin className="mr-1 h-3.5 w-3.5" />
+                {position ? '📍 Location captured' : geoLoading ? 'Getting location...' : 'Share my GPS location'}
+              </Button>
+              {position && <p className="mt-1 text-xs text-muted-foreground">GPS coordinates will be shared with rider for directions</p>}
             </div>
             <div>
               <Label>Payment Method</Label>
