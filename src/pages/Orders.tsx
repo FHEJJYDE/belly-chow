@@ -165,6 +165,11 @@ const Orders = () => {
                             <Star className="h-3.5 w-3.5" /> Rate
                           </Button>
                         )}
+                        {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
+                          <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
+                            <RotateCcw className="h-3.5 w-3.5" /> Reorder
+                          </Button>
+                        )}
                       </div>
                     </div>
 
