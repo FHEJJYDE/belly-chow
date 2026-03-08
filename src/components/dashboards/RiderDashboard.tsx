@@ -575,7 +575,7 @@ const RiderDashboard = () => {
                           </div>
                           <div className="text-right space-y-1">
                             <Badge variant={order.status === 'delivering' ? 'default' : 'secondary'}>{order.status.replace('_', ' ')}</Badge>
-                            <p className="text-sm font-medium text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p>
+                            <p className="text-sm font-medium text-primary">₦{riderFee.toLocaleString()}</p>
                           </div>
                         </div>
                       </CardContent>
