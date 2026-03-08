@@ -158,6 +158,9 @@ export type Database = {
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_status: Database["public"]["Enums"]["payment_status"]
+          refund_amount: number | null
+          refund_notes: string | null
+          refund_status: Database["public"]["Enums"]["refund_status"]
           rider_id: string | null
           rider_lat: number | null
           rider_lng: number | null
@@ -177,6 +180,9 @@ export type Database = {
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          refund_amount?: number | null
+          refund_notes?: string | null
+          refund_status?: Database["public"]["Enums"]["refund_status"]
           rider_id?: string | null
           rider_lat?: number | null
           rider_lng?: number | null
@@ -196,6 +202,9 @@ export type Database = {
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          refund_amount?: number | null
+          refund_notes?: string | null
+          refund_status?: Database["public"]["Enums"]["refund_status"]
           rider_id?: string | null
           rider_lat?: number | null
           rider_lng?: number | null
@@ -427,6 +436,12 @@ export type Database = {
         | "rejected"
       payment_method: "pay_on_delivery" | "bank_transfer"
       payment_status: "pending" | "confirmed" | "failed"
+      refund_status:
+        | "none"
+        | "requested"
+        | "approved"
+        | "processed"
+        | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -569,6 +584,7 @@ export const Constants = {
       ],
       payment_method: ["pay_on_delivery", "bank_transfer"],
       payment_status: ["pending", "confirmed", "failed"],
+      refund_status: ["none", "requested", "approved", "processed", "rejected"],
     },
   },
 } as const
