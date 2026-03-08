@@ -13,10 +13,10 @@ import {
 } from '@/components/ui/sidebar';
 
 const items = [
-  { title: 'Overview', url: '/vendor', icon: LayoutDashboard },
-  { title: 'Orders', url: '/vendor/orders', icon: Package },
-  { title: 'Menu', url: '/vendor/menu', icon: UtensilsCrossed },
-  { title: 'Settings', url: '/vendor/settings', icon: Settings },
+  { title: 'Overview', url: '/vendor-panel', icon: LayoutDashboard },
+  { title: 'Orders', url: '/vendor-panel/orders', icon: Package },
+  { title: 'Menu', url: '/vendor-panel/menu', icon: UtensilsCrossed },
+  { title: 'Settings', url: '/vendor-panel/settings', icon: Settings },
 ];
 
 export function VendorSidebar() {
