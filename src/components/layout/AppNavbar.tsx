@@ -10,7 +10,7 @@ import logo from '@/assets/belly_chow_logo.png';
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
   const { itemCount } = useCart();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-lg">
