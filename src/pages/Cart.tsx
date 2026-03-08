@@ -97,7 +97,7 @@ const Cart = () => {
     return urlData.publicUrl || path;
   };
 
-
+  const applyPromo = async () => {
     if (!promoInput.trim()) return;
     setPromoLoading(true);
     const { data, error } = await supabase
