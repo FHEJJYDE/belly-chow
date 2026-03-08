@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 
 const VendorLayout = () => {
   const { signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <SidebarProvider>
