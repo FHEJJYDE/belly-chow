@@ -89,6 +89,35 @@ const Orders = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  // Realtime rider location tracking
+  useEffect(() => {
+    if (!trackingOrderId) {
+      setLiveRiderPos(null);
+      return;
+    }
+    const order = orders.find(o => o.id === trackingOrderId);
+    if (order?.rider_lat && order?.rider_lng) {
+      setLiveRiderPos({ lat: order.rider_lat, lng: order.rider_lng });
+    }
+
+    const channel = supabase.channel(`track-${trackingOrderId}`).on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${trackingOrderId}` },
+      (payload) => {
+        const updated = payload.new as any;
+        if (updated.rider_lat && updated.rider_lng) {
+          setLiveRiderPos({ lat: updated.rider_lat, lng: updated.rider_lng });
+        }
+        // Stop tracking if delivered/cancelled
+        if (['delivered', 'cancelled', 'rejected'].includes(updated.status)) {
+          setTrackingOrderId(null);
+        }
+      }
+    ).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [trackingOrderId, orders]);
+
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
   return (
