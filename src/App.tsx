@@ -29,6 +29,7 @@ import AdminDisputes from "./pages/admin/AdminDisputes";
 import AdminRefunds from "./pages/admin/AdminRefunds";
 import AdminVerifications from "./pages/admin/AdminVerifications";
 import AdminTickets from "./pages/admin/AdminTickets";
+import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import Support from "./pages/Support";
 
 // Vendor pages
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="refunds" element={<AdminRefunds />} />
                 <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="tickets" element={<AdminTickets />} />
+                <Route path="promo-codes" element={<AdminPromoCodes />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
