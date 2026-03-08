@@ -35,6 +35,8 @@ const Orders = () => {
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
