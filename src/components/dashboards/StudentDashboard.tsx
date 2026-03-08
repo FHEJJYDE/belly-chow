@@ -1,42 +1,88 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Star, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Star, Clock, X, UtensilsCrossed } from 'lucide-react';
 import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
+type MenuItem = Database['public']['Tables']['menu_items']['Row'];
+
+type MenuItemWithVendor = MenuItem & { vendor: Pick<Vendor, 'id' | 'name' | 'logo_url' | 'opening_time' | 'closing_time' | 'is_active'> };
 
 const StudentDashboard = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItemWithVendor[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchVendors = async () => {
-      const { data } = await supabase
-        .from('vendors')
-        .select('*')
-        .eq('is_approved', true)
-        .order('name');
-      setVendors(data || []);
+    const fetchData = async () => {
+      const [vendorRes, menuRes] = await Promise.all([
+        supabase.from('vendors').select('*').eq('is_approved', true).order('name'),
+        supabase.from('menu_items').select('*, vendor:vendors!menu_items_vendor_id_fkey(id, name, logo_url, opening_time, closing_time, is_active)').eq('is_available', true),
+      ]);
+      setVendors(vendorRes.data || []);
+      setMenuItems((menuRes.data as unknown as MenuItemWithVendor[]) || []);
       setLoading(false);
     };
-    fetchVendors();
+    fetchData();
   }, []);
 
-  const filtered = vendors
-    .filter(v => v.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
-      const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
-      if (aOpen === bOpen) return 0;
-      return aOpen ? -1 : 1;
+  // Extract unique categories from menu items
+  const categories = useMemo(() => {
+    const cats = new Set(menuItems.map(item => item.category));
+    return Array.from(cats).sort();
+  }, [menuItems]);
+
+  const query = search.toLowerCase().trim();
+  const isSearching = query.length > 0 || selectedCategory !== null;
+
+  // Filter menu items when searching or filtering by category
+  const filteredMenuItems = useMemo(() => {
+    if (!isSearching) return [];
+    return menuItems.filter(item => {
+      const matchesSearch = !query || item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query) || item.vendor?.name?.toLowerCase().includes(query);
+      const matchesCategory = !selectedCategory || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
     });
+  }, [menuItems, query, selectedCategory, isSearching]);
+
+  // Group filtered menu items by vendor
+  const itemsByVendor = useMemo(() => {
+    const grouped: Record<string, { vendor: MenuItemWithVendor['vendor']; items: MenuItemWithVendor[] }> = {};
+    filteredMenuItems.forEach(item => {
+      if (!item.vendor) return;
+      if (!grouped[item.vendor.id]) {
+        grouped[item.vendor.id] = { vendor: item.vendor, items: [] };
+      }
+      grouped[item.vendor.id].items.push(item);
+    });
+    return Object.values(grouped);
+  }, [filteredMenuItems]);
+
+  // Default vendor list (no search)
+  const filteredVendors = useMemo(() => {
+    return vendors
+      .filter(v => v.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
+        const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
+        if (aOpen === bOpen) return 0;
+        return aOpen ? -1 : 1;
+      });
+  }, [vendors, query]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedCategory(null);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,15 +91,46 @@ const StudentDashboard = () => {
         <h1 className="mb-1 font-heading text-2xl font-bold">What are you craving? 🍕</h1>
         <p className="mb-6 text-muted-foreground">Browse campus vendors and order now</p>
 
-        <div className="relative mb-6">
+        {/* Search */}
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search vendors..."
-            className="pl-10"
+            placeholder="Search food, drinks, vendors..."
+            className="pl-10 pr-10"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {/* Category chips */}
+        {categories.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={selectedCategory === null ? 'default' : 'outline'}
+              className="rounded-full"
+              onClick={() => setSelectedCategory(null)}
+            >
+              All
+            </Button>
+            {categories.map(cat => (
+              <Button
+                key={cat}
+                size="sm"
+                variant={selectedCategory === cat ? 'default' : 'outline'}
+                className="rounded-full"
+                onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}
+              >
+                {cat}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -61,15 +138,62 @@ const StudentDashboard = () => {
               <div key={i} className="h-48 animate-pulse rounded-xl bg-muted" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : isSearching ? (
+          /* Search results — show matching menu items grouped by vendor */
+          filteredMenuItems.length === 0 ? (
+            <div className="py-20 text-center">
+              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="text-lg text-muted-foreground">No results found</p>
+              <Button variant="link" onClick={clearFilters} className="mt-2">Clear filters</Button>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <p className="text-sm text-muted-foreground">{filteredMenuItems.length} item{filteredMenuItems.length !== 1 ? 's' : ''} found</p>
+              {itemsByVendor.map(({ vendor, items }) => {
+                const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
+                return (
+                  <div key={vendor.id}>
+                    <Link to={`/vendor/${vendor.id}`} className="mb-3 flex items-center gap-2 hover:underline">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-lg">
+                        {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-lg object-cover" /> : '🍽️'}
+                      </div>
+                      <span className="font-heading font-semibold">{vendor.name}</span>
+                      <Badge variant={open ? 'default' : 'secondary'} className="text-xs">
+                        {open ? 'Open' : 'Closed'}
+                      </Badge>
+                    </Link>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {items.map(item => (
+                        <Link key={item.id} to={`/vendor/${vendor.id}`}>
+                          <Card className={`overflow-hidden transition-shadow hover:shadow-md ${!open ? 'opacity-60' : ''}`}>
+                            <CardContent className="flex items-center gap-3 p-3">
+                              {item.image_url ? (
+                                <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-lg object-cover" />
+                              ) : (
+                                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-secondary text-xl">🍛</div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium truncate">{item.name}</h4>
+                                <p className="text-xs text-muted-foreground truncate">{item.category}</p>
+                                <p className="font-heading font-bold text-primary text-sm">₦{Number(item.price).toLocaleString()}</p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : filteredVendors.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-lg text-muted-foreground">
-              {search ? 'No vendors found' : 'No vendors available yet. Check back soon!'}
-            </p>
+            <p className="text-lg text-muted-foreground">No vendors available yet. Check back soon!</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(vendor => {
+            {filteredVendors.map(vendor => {
               const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
               return (
                 <Link key={vendor.id} to={`/vendor/${vendor.id}`}>
@@ -82,9 +206,7 @@ const StudentDashboard = () => {
                       )}
                       {!open && (
                         <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                          <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">
-                            Closed
-                          </span>
+                          <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">Closed</span>
                         </div>
                       )}
                     </div>
