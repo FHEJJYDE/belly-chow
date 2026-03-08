@@ -403,7 +403,7 @@ const Orders = () => {
       <Dialog open={!!disputeOrder} onOpenChange={open => { if (!open) setDisputeOrder(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Report an Issue — Order #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
+            <DialogTitle className="font-heading">Report issue — #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
