@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, Send, X, Users } from 'lucide-react';
+import { MessageCircle, Send, X, Users, Trash2 } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -23,7 +23,6 @@ interface Participant {
 interface DeliveryChatProps {
   orderId: string;
   otherName?: string;
-  /** Pass vendor user_id so vendor can also be shown */
   participants?: Participant[];
 }
 
@@ -40,7 +39,7 @@ const DeliveryChat = ({ orderId, otherName = 'Chat', participants = [] }: Delive
   const participantMap = new Map(participants.map(p => [p.id, p]));
 
   const getSenderLabel = (senderId: string) => {
-    if (senderId === user?.id) return null; // "You" is implied
+    if (senderId === user?.id) return null;
     const p = participantMap.get(senderId);
     if (p) return p.role === 'vendor' ? `🍳 ${p.name}` : p.role === 'rider' ? `🏍️ ${p.name}` : `👤 ${p.name}`;
     return null;
@@ -58,17 +57,29 @@ const DeliveryChat = ({ orderId, otherName = 'Chat', participants = [] }: Delive
     };
     fetchMessages();
 
-    const channel = supabase.channel(`chat-${orderId}`).on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
-      (payload: any) => {
-        const msg = payload.new as Message;
-        setMessages(prev => [...prev, msg]);
-        if (!wasOpen.current && msg.sender_id !== user.id) {
-          setUnread(prev => prev + 1);
+    const channel = supabase.channel(`chat-${orderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
+        (payload: any) => {
+          const msg = payload.new as Message;
+          setMessages(prev => [...prev, msg]);
+          if (!wasOpen.current && msg.sender_id !== user.id) {
+            setUnread(prev => prev + 1);
+          }
         }
-      }
-    ).subscribe();
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
+        (payload: any) => {
+          const deletedId = payload.old?.id;
+          if (deletedId) {
+            setMessages(prev => prev.filter(m => m.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [orderId, user]);
@@ -91,6 +102,11 @@ const DeliveryChat = ({ orderId, otherName = 'Chat', participants = [] }: Delive
     });
     setInput('');
     setSending(false);
+  };
+
+  const deleteMessage = async (msgId: string) => {
+    await (supabase.from('messages') as any).delete().eq('id', msgId);
+    setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
   if (!isOpen) {
@@ -128,7 +144,6 @@ const DeliveryChat = ({ orderId, otherName = 'Chat', participants = [] }: Delive
         </button>
       </div>
 
-      {/* Participant chips */}
       {participants.length > 0 && (
         <div className="flex gap-1.5 px-3 py-2 border-b flex-wrap">
           <Badge variant="secondary" className="text-[10px]">You</Badge>
@@ -149,15 +164,26 @@ const DeliveryChat = ({ orderId, otherName = 'Chat', participants = [] }: Delive
             const isMe = msg.sender_id === user?.id;
             const senderLabel = getSenderLabel(msg.sender_id);
             return (
-              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] rounded-lg px-3 py-1.5 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card border'}`}>
+              <div key={msg.id} className={`group flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`relative max-w-[75%] rounded-lg px-3 py-1.5 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card border'}`}>
                   {!isMe && senderLabel && (
                     <p className="text-[10px] font-semibold mb-0.5 opacity-80">{senderLabel}</p>
                   )}
                   <p>{msg.content}</p>
-                  <p className={`text-[10px] mt-0.5 ${isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className={`text-[10px] ${isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {isMe && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete message"
+                      >
+                        <Trash2 className={`h-3 w-3 ${isMe ? 'text-primary-foreground/60 hover:text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
