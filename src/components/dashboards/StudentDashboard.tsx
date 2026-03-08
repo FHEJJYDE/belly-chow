@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Star, Clock } from 'lucide-react';
+import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -28,9 +29,14 @@ const StudentDashboard = () => {
     fetchVendors();
   }, []);
 
-  const filtered = vendors.filter(v =>
-    v.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = vendors
+    .filter(v => v.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
+      const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
+      if (aOpen === bOpen) return 0;
+      return aOpen ? -1 : 1;
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,40 +69,50 @@ const StudentDashboard = () => {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(vendor => (
-              <Link key={vendor.id} to={`/vendor/${vendor.id}`}>
-                <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-                  <div className="h-32 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                    {vendor.logo_url ? (
-                      <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-4xl">🍽️</span>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-heading font-semibold">{vendor.name}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Delicious campus food'}</p>
+            {filtered.map(vendor => {
+              const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
+              return (
+                <Link key={vendor.id} to={`/vendor/${vendor.id}`}>
+                  <Card className={`overflow-hidden transition-shadow hover:shadow-lg ${!open ? 'opacity-60' : ''}`}>
+                    <div className="relative h-32 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                      {vendor.logo_url ? (
+                        <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-4xl">🍽️</span>
+                      )}
+                      {!open && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                          <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">
+                            Closed
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-heading font-semibold">{vendor.name}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Delicious campus food'}</p>
+                        </div>
+                        <Badge variant={open ? 'default' : 'secondary'} className="shrink-0">
+                          {open ? '🟢 Open' : 'Closed'}
+                        </Badge>
                       </div>
-                      <Badge variant={vendor.is_active ? 'default' : 'secondary'} className="shrink-0">
-                        {vendor.is_active ? 'Open' : 'Closed'}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                        {vendor.rating > 0 ? vendor.rating.toFixed(1) : 'New'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {vendor.opening_time?.slice(0, 5)} - {vendor.closing_time?.slice(0, 5)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                      <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                          {vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : 'New'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
