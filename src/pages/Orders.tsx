@@ -16,6 +16,7 @@ import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
 
 const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
+import DeliveryChat from '@/components/chat/DeliveryChat';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
