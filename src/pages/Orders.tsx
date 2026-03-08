@@ -1,10 +1,13 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -29,6 +32,9 @@ const statusColors: Record<string, string> = {
 
 const Orders = () => {
   const { user } = useAuth();
+  const { addItem, clearCart } = useCart();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [loading, setLoading] = useState(true);
@@ -45,6 +51,43 @@ const Orders = () => {
       return next;
     });
   };
+
+  const handleReorder = useCallback(async (orderId: string, vendorId: string) => {
+    const items = orderItems[orderId] || [];
+    if (items.length === 0) {
+      toast({ title: 'No items found for this order', variant: 'destructive' });
+      return;
+    }
+    // Fetch current menu items to ensure they still exist and are available
+    const menuItemIds = items.map(i => i.menu_item_id);
+    const { data: currentItems } = await supabase
+      .from('menu_items')
+      .select('*')
+      .in('id', menuItemIds)
+      .eq('is_available', true);
+
+    if (!currentItems || currentItems.length === 0) {
+      toast({ title: 'These items are no longer available', variant: 'destructive' });
+      return;
+    }
+
+    clearCart();
+    currentItems.forEach(menuItem => {
+      const originalItem = items.find(i => i.menu_item_id === menuItem.id);
+      const qty = originalItem?.quantity || 1;
+      for (let i = 0; i < qty; i++) {
+        addItem(menuItem);
+      }
+    });
+
+    const unavailable = menuItemIds.length - currentItems.length;
+    if (unavailable > 0) {
+      toast({ title: `${unavailable} item${unavailable > 1 ? 's' : ''} no longer available — the rest were added to your cart` });
+    } else {
+      toast({ title: 'Items added to cart! 🛒' });
+    }
+    navigate('/cart');
+  }, [orderItems, clearCart, addItem, toast, navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -157,6 +200,11 @@ const Orders = () => {
                         {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
                           <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="gap-1">
                             <Star className="h-3.5 w-3.5" /> Rate
+                          </Button>
+                        )}
+                        {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
+                          <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
+                            <RotateCcw className="h-3.5 w-3.5" /> Reorder
                           </Button>
                         )}
                       </div>
