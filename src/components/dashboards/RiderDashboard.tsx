@@ -68,6 +68,7 @@ const RiderDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOnline, setIsOnline] = useState(true);
+  const [riderFee, setRiderFee] = useState(500);
   const [availableOrders, setAvailableOrders] = useState<EnrichedOrder[]>([]);
   const [myOrders, setMyOrders] = useState<EnrichedOrder[]>([]);
   const [deliveryHistory, setDeliveryHistory] = useState<EnrichedOrder[]>([]);
