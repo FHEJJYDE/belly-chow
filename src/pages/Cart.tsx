@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import type { Enums } from '@/integrations/supabase/types';
 
@@ -29,6 +29,10 @@ const Cart = () => {
   const { position, loading: geoLoading, getPosition } = useGeolocation();
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bank_account_name: string; bank_account_number: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fees from platform settings
   const [platformFee, setPlatformFee] = useState(500);
@@ -65,6 +69,32 @@ const Cart = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Max 5MB allowed', variant: 'destructive' });
+      return;
+    }
+    setPaymentProof(file);
+    setPaymentProofPreview(URL.createObjectURL(file));
+  };
+
+  const uploadPaymentProof = async (orderId: string): Promise<string | null> => {
+    if (!paymentProof || !user) return null;
+    setUploadingProof(true);
+    const ext = paymentProof.name.split('.').pop();
+    const path = `${user.id}/${orderId}.${ext}`;
+    const { error } = await supabase.storage.from('payment-proofs').upload(path, paymentProof, { upsert: true });
+    setUploadingProof(false);
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+    return urlData.publicUrl || path;
   };
 
   const applyPromo = async () => {
@@ -117,6 +147,11 @@ const Cart = () => {
       return;
     }
 
+    if (paymentMethod === 'bank_transfer' && !paymentProof) {
+      toast({ title: 'Please upload proof of payment', description: 'A screenshot of your transfer receipt is required', variant: 'destructive' });
+      return;
+    }
+
     setIsOrdering(true);
     try {
       const orderData: any = {
@@ -136,6 +171,14 @@ const Cart = () => {
       }
       const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
       if (orderError) throw orderError;
+
+      // Upload payment proof if bank transfer
+      if (paymentMethod === 'bank_transfer' && paymentProof) {
+        const proofUrl = await uploadPaymentProof(order.id);
+        if (proofUrl) {
+          await supabase.from('orders').update({ payment_proof_url: proofUrl } as any).eq('id', order.id);
+        }
+      }
 
       const orderItems = items.map(i => ({
         order_id: order.id,
@@ -283,7 +326,44 @@ const Cart = () => {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and place your order.</p>
+                <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and upload your receipt below.</p>
+              </div>
+            )}
+
+            {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Upload className="h-4 w-4" /> Upload Payment Proof <span className="text-destructive">*</span>
+                </Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProofSelect}
+                />
+                {paymentProofPreview ? (
+                  <div className="relative rounded-lg border overflow-hidden">
+                    <img src={paymentProofPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted" />
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentProof(null); setPaymentProofPreview(null); }}
+                      className="absolute top-2 right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    <ImageIcon className="h-8 w-8" />
+                    <span className="text-sm font-medium">Tap to upload transfer receipt</span>
+                    <span className="text-xs">JPG, PNG — max 5MB</span>
+                  </button>
+                )}
               </div>
             )}
 
