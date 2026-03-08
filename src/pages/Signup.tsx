@@ -58,9 +58,7 @@ const Signup = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Link to="/" className="mx-auto mb-4 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Belly-Chow" className="h-9 w-9 rounded-lg object-contain" />
             <span className="font-heading text-xl font-bold">Belly-Chow</span>
           </Link>
           <CardTitle className="font-heading text-2xl">Create your account</CardTitle>
