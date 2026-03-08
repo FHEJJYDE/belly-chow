@@ -234,7 +234,7 @@ const Orders = () => {
             {/* Active Orders */}
             {activeOrders.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Active Orders</h2>
+                <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground mb-3">Active orders</h2>
                 <div className="space-y-3">
                   {activeOrders.map(order => (
                     <Card
