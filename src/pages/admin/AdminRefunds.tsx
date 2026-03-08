@@ -45,9 +45,9 @@ const AdminRefunds = () => {
     const { data } = await supabase
       .from('orders')
       .select('*')
-      .neq('refund_status' as any, 'none')
+      .neq('refund_status', 'none' as any)
       .order('created_at', { ascending: false });
-    setOrders((data as unknown as RefundOrder[]) || []);
+    setOrders((data as any as RefundOrder[]) || []);
     setLoading(false);
   };
 
