@@ -78,7 +78,11 @@ const RiderDashboard = () => {
       .in('order_id', orderIds);
 
     const menuItemIds = [...new Set(orderItems?.map(oi => oi.menu_item_id) || [])];
-    const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds.length > 0 ? menuItemIds : ['none']);
+    let menuMap = new Map<string, string>();
+    if (menuItemIds.length > 0) {
+      const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds);
+      menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
+    }
     const menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
 
     const itemsByOrder = new Map<string, { name: string; quantity: number; price: number }[]>();
