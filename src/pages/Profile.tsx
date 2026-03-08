@@ -81,6 +81,13 @@ const Profile = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Verification for riders and vendors */}
+        {(role === 'rider' || role === 'vendor') && (
+          <div className="mt-4">
+            <VerificationUpload />
+          </div>
+        )}
       </div>
     </div>
   );
