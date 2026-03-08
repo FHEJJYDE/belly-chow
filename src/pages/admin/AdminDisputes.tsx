@@ -30,6 +30,7 @@ const statusColors: Record<string, string> = {
 };
 
 const AdminDisputes = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
