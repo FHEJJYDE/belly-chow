@@ -202,7 +202,19 @@ const Orders = () => {
     return () => { supabase.removeChannel(channel); };
   }, [trackingOrderId, orders]);
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-background">
+      <AppNavbar />
+      <div className="container max-w-2xl py-6">
+        <div className="mb-6 flex items-center gap-3">
+          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => <OrderCardSkeleton key={i} />)}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -214,10 +226,11 @@ const Orders = () => {
         </div>
 
         {orders.length === 0 ? (
-          <div className="py-20 text-center">
-            <Package className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
-            <p className="text-lg text-muted-foreground">No orders yet</p>
-          </div>
+          <EmptyState
+            emoji="📦"
+            title="No orders yet"
+            description="Browse vendors and place your first order!"
+          />
         ) : (
           <div className="space-y-3">
             {orders.map(order => {
