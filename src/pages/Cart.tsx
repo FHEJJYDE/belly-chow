@@ -147,6 +147,11 @@ const Cart = () => {
       return;
     }
 
+    if (paymentMethod === 'bank_transfer' && !paymentProof) {
+      toast({ title: 'Please upload proof of payment', description: 'A screenshot of your transfer receipt is required', variant: 'destructive' });
+      return;
+    }
+
     setIsOrdering(true);
     try {
       const orderData: any = {
@@ -157,6 +162,25 @@ const Cart = () => {
         discount: discount,
         promo_code: appliedPromo?.code || null,
         payment_method: paymentMethod,
+        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
+        notes,
+      };
+      if (position) {
+        orderData.delivery_lat = position.lat;
+        orderData.delivery_lng = position.lng;
+      }
+      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
+      if (orderError) throw orderError;
+
+      // Upload payment proof if bank transfer
+      if (paymentMethod === 'bank_transfer' && paymentProof) {
+        const proofUrl = await uploadPaymentProof(order.id);
+        if (proofUrl) {
+          await supabase.from('orders').update({ payment_proof_url: proofUrl } as any).eq('id', order.id);
+        }
+      }
+
+      const orderItems = items.map(i => ({
         delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
         notes,
       };
