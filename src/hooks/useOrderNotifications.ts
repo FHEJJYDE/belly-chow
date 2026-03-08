@@ -57,15 +57,16 @@ function playNotificationSound(type: 'new_order' | 'status_update' = 'status_upd
 
 export function useOrderNotifications() {
   const { user, role, loading } = useAuth();
-  const knownOrders = useRef<Set<string>>(new Set());
   const vendorIdRef = useRef<string | null>(null);
   const recentNotifications = useRef<Set<string>>(new Set());
+  // Track last known status per order to avoid duplicate notifications
+  const orderStatuses = useRef<Map<string, string>>(new Map());
 
   const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update', dedupeKey?: string) => {
     const key = dedupeKey || `${title}-${description}`;
     if (recentNotifications.current.has(key)) return;
     recentNotifications.current.add(key);
-    setTimeout(() => recentNotifications.current.delete(key), 5000);
+    setTimeout(() => recentNotifications.current.delete(key), 30000); // 30s cooldown
 
     toast({ title, description });
     playNotificationSound(sound);
@@ -86,18 +87,18 @@ export function useOrderNotifications() {
 
     const init = async () => {
       if (role === 'student') {
-        const { data } = await supabase.from('orders').select('id').eq('student_id', user.id);
-        data?.forEach(o => knownOrders.current.add(o.id));
+        const { data } = await supabase.from('orders').select('id, status').eq('student_id', user.id);
+        data?.forEach(o => orderStatuses.current.set(o.id, o.status));
       } else if (role === 'vendor') {
         const { data: v } = await supabase.from('vendors').select('id').eq('user_id', user.id).single();
         if (v) {
           vendorIdRef.current = v.id;
-          const { data } = await supabase.from('orders').select('id').eq('vendor_id', v.id);
-          data?.forEach(o => knownOrders.current.add(o.id));
+          const { data } = await supabase.from('orders').select('id, status').eq('vendor_id', v.id);
+          data?.forEach(o => orderStatuses.current.set(o.id, o.status));
         }
       } else if (role === 'rider') {
-        const { data } = await supabase.from('orders').select('id').or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`);
-        data?.forEach(o => knownOrders.current.add(o.id));
+        const { data } = await supabase.from('orders').select('id, status').or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`);
+        data?.forEach(o => orderStatuses.current.set(o.id, o.status));
       }
     };
     init();
@@ -107,8 +108,13 @@ export function useOrderNotifications() {
       { event: 'UPDATE', schema: 'public', table: 'orders' },
       (payload) => {
         const order = payload.new as any;
-        const oldOrder = payload.old as any;
-        if (order.status === oldOrder.status) return;
+        const previousStatus = orderStatuses.current.get(order.id);
+
+        // Only notify if status actually changed (compare against our local tracking)
+        if (order.status === previousStatus) return;
+
+        // Update our local tracking
+        orderStatuses.current.set(order.id, order.status);
 
         if (role === 'student' && order.student_id === user.id) {
           const msg = statusMessages[order.status];
@@ -130,13 +136,16 @@ export function useOrderNotifications() {
       { event: 'INSERT', schema: 'public', table: 'orders' },
       (payload) => {
         const order = payload.new as any;
-        if (role === 'vendor' && !knownOrders.current.has(order.id)) {
-          knownOrders.current.add(order.id);
+        if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
+          orderStatuses.current.set(order.id, order.status);
           notify('🔔 New Order!', `New order #${order.id.slice(0, 8)} — check your orders tab!`, 'new_order', `new-order-${order.id}`);
         }
       }
     ).subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      orderStatuses.current.clear();
+    };
   }, [user, role, loading, notify]);
 }
