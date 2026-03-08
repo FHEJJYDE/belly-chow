@@ -265,7 +265,7 @@ const Orders = () => {
                             const isActive = i <= currentIdx;
                             return (
                               <div key={step} className="flex flex-1 items-center">
-                                <div className={`h-2 w-full rounded-full ${isActive ? 'bg-primary' : 'bg-muted'}`} />
+                                <div className={`h-1.5 w-full rounded-full ${isActive ? 'bg-foreground' : 'bg-muted'}`} />
                               </div>
                             );
                           })}
