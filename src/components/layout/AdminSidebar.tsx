@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package, Users, Settings, Crown, CreditCard, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Store, Package, Users, Settings, Crown, CreditCard, AlertTriangle, RefreshCw } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -20,6 +20,7 @@ const items = [
   { title: 'Payments', url: '/admin/payments', icon: CreditCard },
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Disputes', url: '/admin/disputes', icon: AlertTriangle },
+  { title: 'Refunds', url: '/admin/refunds', icon: RefreshCw },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
