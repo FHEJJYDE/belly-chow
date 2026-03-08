@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package, ArrowLeft, Clock, CheckCircle2, Truck } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -331,9 +332,27 @@ const RiderDashboard = () => {
             </Button>
           )}
           {activeOrder.status === 'delivering' && (
-            <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivered')}>
-              <CheckCircle2 className="h-5 w-5" /> Mark Delivered ✓
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="flex-1 h-12 text-base gap-2">
+                  <CheckCircle2 className="h-5 w-5" /> Mark Delivered ✓
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure this order has been delivered to the customer? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => updateStatus(activeOrder.id, 'delivered')}>
+                    Yes, Delivered ✓
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
