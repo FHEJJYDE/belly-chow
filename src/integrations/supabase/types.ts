@@ -105,6 +105,38 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          order_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          order_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -154,10 +186,12 @@ export type Database = {
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_location: string
+          discount: number
           id: string
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_status: Database["public"]["Enums"]["payment_status"]
+          promo_code: string | null
           refund_amount: number | null
           refund_notes: string | null
           refund_status: Database["public"]["Enums"]["refund_status"]
@@ -176,10 +210,12 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
+          discount?: number
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          promo_code?: string | null
           refund_amount?: number | null
           refund_notes?: string | null
           refund_status?: Database["public"]["Enums"]["refund_status"]
@@ -198,10 +234,12 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
+          discount?: number
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          promo_code?: string | null
           refund_amount?: number | null
           refund_notes?: string | null
           refund_status?: Database["public"]["Enums"]["refund_status"]
@@ -232,6 +270,8 @@ export type Database = {
           commission_rate: number
           delivery_fee: number
           id: string
+          platform_fee: number
+          rider_fee: number
           updated_at: string
         }
         Insert: {
@@ -241,6 +281,8 @@ export type Database = {
           commission_rate?: number
           delivery_fee?: number
           id?: string
+          platform_fee?: number
+          rider_fee?: number
           updated_at?: string
         }
         Update: {
@@ -250,6 +292,8 @@ export type Database = {
           commission_rate?: number
           delivery_fee?: number
           id?: string
+          platform_fee?: number
+          rider_fee?: number
           updated_at?: string
         }
         Relationships: []
@@ -284,6 +328,42 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          discount_amount: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number
+          min_order: number
+          used_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_amount?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          min_order?: number
+          used_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_amount?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          min_order?: number
+          used_count?: number
         }
         Relationships: []
       }
