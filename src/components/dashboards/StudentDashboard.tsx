@@ -1,26 +1,32 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Star, Clock, X, UtensilsCrossed } from 'lucide-react';
+import { Search, Star, Clock, X, UtensilsCrossed, Heart } from 'lucide-react';
 import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
+import { useFavourites } from '@/hooks/useFavourites';
+import { VendorCardSkeleton } from '@/components/Skeletons';
+import EmptyState from '@/components/EmptyState';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
 type MenuItem = Database['public']['Tables']['menu_items']['Row'];
-
 type MenuItemWithVendor = MenuItem & { vendor: Pick<Vendor, 'id' | 'name' | 'logo_url' | 'opening_time' | 'closing_time' | 'is_active'> };
 
 const StudentDashboard = () => {
+  const { user } = useAuth();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemWithVendor[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showFavourites, setShowFavourites] = useState(false);
+  const { isFavourite, toggleFavourite, favouriteVendorIds } = useFavourites();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,7 +41,6 @@ const StudentDashboard = () => {
     fetchData();
   }, []);
 
-  // Extract unique categories from menu items
   const categories = useMemo(() => {
     const cats = new Set(menuItems.map(item => item.category));
     return Array.from(cats).sort();
@@ -44,7 +49,6 @@ const StudentDashboard = () => {
   const query = search.toLowerCase().trim();
   const isSearching = query.length > 0 || selectedCategory !== null;
 
-  // Filter menu items when searching or filtering by category
   const filteredMenuItems = useMemo(() => {
     if (!isSearching) return [];
     return menuItems.filter(item => {
@@ -54,34 +58,81 @@ const StudentDashboard = () => {
     });
   }, [menuItems, query, selectedCategory, isSearching]);
 
-  // Group filtered menu items by vendor
   const itemsByVendor = useMemo(() => {
     const grouped: Record<string, { vendor: MenuItemWithVendor['vendor']; items: MenuItemWithVendor[] }> = {};
     filteredMenuItems.forEach(item => {
       if (!item.vendor) return;
-      if (!grouped[item.vendor.id]) {
-        grouped[item.vendor.id] = { vendor: item.vendor, items: [] };
-      }
+      if (!grouped[item.vendor.id]) grouped[item.vendor.id] = { vendor: item.vendor, items: [] };
       grouped[item.vendor.id].items.push(item);
     });
     return Object.values(grouped);
   }, [filteredMenuItems]);
 
-  // Default vendor list (no search)
   const filteredVendors = useMemo(() => {
-    return vendors
-      .filter(v => v.name.toLowerCase().includes(query))
-      .sort((a, b) => {
-        const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
-        const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
-        if (aOpen === bOpen) return 0;
-        return aOpen ? -1 : 1;
-      });
-  }, [vendors, query]);
+    let list = vendors.filter(v => v.name.toLowerCase().includes(query));
+    if (showFavourites) list = list.filter(v => favouriteVendorIds.has(v.id));
+    return list.sort((a, b) => {
+      const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
+      const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
+      if (aOpen === bOpen) return 0;
+      return aOpen ? -1 : 1;
+    });
+  }, [vendors, query, showFavourites, favouriteVendorIds]);
 
-  const clearFilters = () => {
-    setSearch('');
-    setSelectedCategory(null);
+  const clearFilters = () => { setSearch(''); setSelectedCategory(null); };
+
+  const VendorCard = ({ vendor }: { vendor: Vendor }) => {
+    const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
+    const fav = isFavourite(vendor.id);
+    return (
+      <div className="relative">
+        <Link to={`/vendor/${vendor.id}`}>
+          <Card className={`overflow-hidden transition-shadow hover:shadow-lg ${!open ? 'opacity-60' : ''}`}>
+            <div className="relative h-32 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+              {vendor.logo_url ? (
+                <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-4xl">🍽️</span>
+              )}
+              {!open && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                  <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">Closed</span>
+                </div>
+              )}
+            </div>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-heading font-semibold">{vendor.name}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Delicious campus food'}</p>
+                </div>
+                <Badge variant={open ? 'default' : 'secondary'} className="shrink-0">
+                  {open ? '🟢 Open' : 'Closed'}
+                </Badge>
+              </div>
+              <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                  {vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : 'New'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        {user && (
+          <button
+            onClick={(e) => { e.preventDefault(); toggleFavourite(vendor.id); }}
+            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+          >
+            <Heart className={`h-4 w-4 ${fav ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -94,12 +145,7 @@ const StudentDashboard = () => {
         {/* Search */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search food, drinks, vendors..."
-            className="pl-10 pr-10"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <Input placeholder="Search food, drinks, vendors..." className="pl-10 pr-10" value={search} onChange={e => setSearch(e.target.value)} />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
@@ -107,45 +153,32 @@ const StudentDashboard = () => {
           )}
         </div>
 
-        {/* Category chips */}
-        {categories.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={selectedCategory === null ? 'default' : 'outline'}
-              className="rounded-full"
-              onClick={() => setSelectedCategory(null)}
-            >
-              All
+        {/* Filter chips */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {user && (
+            <Button size="sm" variant={showFavourites ? 'default' : 'outline'} className="rounded-full gap-1" onClick={() => setShowFavourites(!showFavourites)}>
+              <Heart className={`h-3.5 w-3.5 ${showFavourites ? 'fill-primary-foreground' : ''}`} /> Favourites
             </Button>
-            {categories.map(cat => (
-              <Button
-                key={cat}
-                size="sm"
-                variant={selectedCategory === cat ? 'default' : 'outline'}
-                className="rounded-full"
-                onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-        )}
+          )}
+          {categories.length > 0 && (
+            <>
+              <Button size="sm" variant={selectedCategory === null ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedCategory(null)}>All</Button>
+              {categories.map(cat => (
+                <Button key={cat} size="sm" variant={selectedCategory === cat ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}>
+                  {cat}
+                </Button>
+              ))}
+            </>
+          )}
+        </div>
 
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-48 animate-pulse rounded-xl bg-muted" />
-            ))}
+            {[1, 2, 3, 4, 5, 6].map(i => <VendorCardSkeleton key={i} />)}
           </div>
         ) : isSearching ? (
-          /* Search results — show matching menu items grouped by vendor */
           filteredMenuItems.length === 0 ? (
-            <div className="py-20 text-center">
-              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-lg text-muted-foreground">No results found</p>
-              <Button variant="link" onClick={clearFilters} className="mt-2">Clear filters</Button>
-            </div>
+            <EmptyState emoji="🔍" title="No results found" description="Try a different search term or category" action={<Button variant="link" onClick={clearFilters}>Clear filters</Button>} />
           ) : (
             <div className="space-y-8">
               <p className="text-sm text-muted-foreground">{filteredMenuItems.length} item{filteredMenuItems.length !== 1 ? 's' : ''} found</p>
@@ -158,9 +191,7 @@ const StudentDashboard = () => {
                         {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-lg object-cover" /> : '🍽️'}
                       </div>
                       <span className="font-heading font-semibold">{vendor.name}</span>
-                      <Badge variant={open ? 'default' : 'secondary'} className="text-xs">
-                        {open ? 'Open' : 'Closed'}
-                      </Badge>
+                      <Badge variant={open ? 'default' : 'secondary'} className="text-xs">{open ? 'Open' : 'Closed'}</Badge>
                     </Link>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map(item => (
@@ -188,53 +219,15 @@ const StudentDashboard = () => {
             </div>
           )
         ) : filteredVendors.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-lg text-muted-foreground">No vendors available yet. Check back soon!</p>
-          </div>
+          <EmptyState
+            emoji={showFavourites ? '💔' : '🍽️'}
+            title={showFavourites ? 'No favourite vendors yet' : 'No vendors available yet'}
+            description={showFavourites ? 'Tap the heart icon on any vendor to save them here' : 'Check back soon!'}
+            action={showFavourites ? <Button variant="link" onClick={() => setShowFavourites(false)}>Browse all vendors</Button> : undefined}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredVendors.map(vendor => {
-              const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
-              return (
-                <Link key={vendor.id} to={`/vendor/${vendor.id}`}>
-                  <Card className={`overflow-hidden transition-shadow hover:shadow-lg ${!open ? 'opacity-60' : ''}`}>
-                    <div className="relative h-32 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      {vendor.logo_url ? (
-                        <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-4xl">🍽️</span>
-                      )}
-                      {!open && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                          <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">Closed</span>
-                        </div>
-                      )}
-                    </div>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-heading font-semibold">{vendor.name}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Delicious campus food'}</p>
-                        </div>
-                        <Badge variant={open ? 'default' : 'secondary'} className="shrink-0">
-                          {open ? '🟢 Open' : 'Closed'}
-                        </Badge>
-                      </div>
-                      <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                          {vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : 'New'}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          {formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
+            {filteredVendors.map(vendor => <VendorCard key={vendor.id} vendor={vendor} />)}
           </div>
         )}
       </div>

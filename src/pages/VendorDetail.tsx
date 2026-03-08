@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Star, Clock, AlertCircle, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Plus, Star, Clock, AlertCircle, MessageSquare, Heart } from 'lucide-react';
 import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
+import { useFavourites } from '@/hooks/useFavourites';
+import { MenuItemSkeleton } from '@/components/Skeletons';
+import EmptyState from '@/components/EmptyState';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -24,12 +28,14 @@ interface Review {
 
 const VendorDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const { addItem } = useCart();
   const { toast } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isFavourite, toggleFavourite } = useFavourites();
 
   useEffect(() => {
     const fetch = async () => {
@@ -42,18 +48,13 @@ const VendorDetail = () => {
       setVendor(v.data);
       setItems(m.data || []);
 
-      // Fetch profile names for reviews
       const reviewData = r.data || [];
       if (reviewData.length > 0) {
         const userIds = [...new Set(reviewData.map((rev: any) => rev.user_id))];
         const { data: profiles } = await supabase.from('profiles').select('user_id, full_name').in('user_id', userIds);
         const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-        setReviews(reviewData.map((rev: any) => ({
-          ...rev,
-          profiles: profileMap.get(rev.user_id) || null,
-        })));
+        setReviews(reviewData.map((rev: any) => ({ ...rev, profiles: profileMap.get(rev.user_id) || null })));
       }
-
       setLoading(false);
     };
     fetch();
@@ -69,11 +70,29 @@ const VendorDetail = () => {
     return acc;
   }, {});
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
-  if (!vendor) return <div className="flex min-h-screen items-center justify-center"><p>Vendor not found</p></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-background">
+      <AppNavbar />
+      <div className="container py-6 space-y-4">
+        <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+        <div className="h-32 animate-pulse rounded-2xl bg-muted" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[1, 2, 3, 4].map(i => <MenuItemSkeleton key={i} />)}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!vendor) return (
+    <div className="min-h-screen bg-background">
+      <AppNavbar />
+      <EmptyState emoji="🔍" title="Vendor not found" description="This vendor may have been removed or doesn't exist" action={<Link to="/dashboard"><Button>Back to vendors</Button></Link>} />
+    </div>
+  );
 
   const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
   const avgRating = vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : null;
+  const fav = isFavourite(vendor.id);
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,7 +109,14 @@ const VendorDetail = () => {
               {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-xl object-cover" /> : '🍽️'}
             </div>
             <div className="flex-1">
-              <h1 className="font-heading text-2xl font-bold">{vendor.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-heading text-2xl font-bold">{vendor.name}</h1>
+                {user && (
+                  <button onClick={() => toggleFavourite(vendor.id)} className="rounded-full p-1.5 transition-colors hover:bg-muted">
+                    <Heart className={`h-5 w-5 ${fav ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
+                  </button>
+                )}
+              </div>
               <p className="text-muted-foreground">{vendor.description || 'Delicious campus food'}</p>
               <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
@@ -107,7 +133,6 @@ const VendorDetail = () => {
           </div>
         </div>
 
-        {/* Closed banner */}
         {!open && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
             <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
@@ -122,7 +147,7 @@ const VendorDetail = () => {
 
         {/* Menu */}
         {items.length === 0 ? (
-          <p className="py-10 text-center text-muted-foreground">No menu items available</p>
+          <EmptyState emoji="📋" title="No menu items available" description="This vendor hasn't added any items yet" />
         ) : (
           Object.entries(categories).map(([category, catItems]) => (
             <div key={category} className="mb-8">
@@ -147,7 +172,7 @@ const VendorDetail = () => {
           ))
         )}
 
-        {/* Reviews Section */}
+        {/* Reviews */}
         <div className="mt-4 mb-8">
           <div className="mb-4 flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
@@ -158,7 +183,7 @@ const VendorDetail = () => {
           </div>
 
           {reviews.length === 0 ? (
-            <p className="py-6 text-center text-muted-foreground">No reviews yet. Be the first to review!</p>
+            <EmptyState emoji="💬" title="No reviews yet" description="Be the first to review this vendor!" />
           ) : (
             <div className="space-y-3">
               {reviews.map(review => (
@@ -175,9 +200,7 @@ const VendorDetail = () => {
                         ))}
                       </div>
                     </div>
-                    {review.comment && (
-                      <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>
-                    )}
+                    {review.comment && <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>}
                   </CardContent>
                 </Card>
               ))}
