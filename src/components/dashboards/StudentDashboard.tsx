@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Star, Clock, X, UtensilsCrossed, Heart } from 'lucide-react';
+import { Search, Star, Clock, X, Heart } from 'lucide-react';
 import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
 import { useFavourites } from '@/hooks/useFavourites';
 import { VendorCardSkeleton } from '@/components/Skeletons';
@@ -85,40 +85,38 @@ const StudentDashboard = () => {
     const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
     const fav = isFavourite(vendor.id);
     return (
-      <div className="relative">
+      <div className="relative group">
         <Link to={`/vendor/${vendor.id}`}>
-          <Card className={`overflow-hidden transition-shadow hover:shadow-lg ${!open ? 'opacity-60' : ''}`}>
-            <div className="relative h-32 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+          <Card className={`overflow-hidden transition-all hover:ring-1 hover:ring-border ${!open ? 'opacity-50' : ''}`}>
+            <div className="relative h-36 bg-muted flex items-center justify-center">
               {vendor.logo_url ? (
                 <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-4xl">🍽️</span>
+                <span className="text-4xl text-muted-foreground/40">🍽️</span>
               )}
               {!open && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                  <span className="rounded-full bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">Closed</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-background/70">
+                  <span className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">Closed</span>
                 </div>
               )}
             </div>
             <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-heading font-semibold">{vendor.name}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Delicious campus food'}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-heading font-semibold truncate">{vendor.name}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{vendor.description || 'Campus food vendor'}</p>
                 </div>
-                <Badge variant={open ? 'default' : 'secondary'} className="shrink-0">
-                  {open ? '🟢 Open' : 'Closed'}
-                </Badge>
               </div>
-              <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                  <Star className="h-3 w-3 fill-foreground text-foreground" />
                   {vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : 'New'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}
+                  <Clock className="h-3 w-3" />
+                  {formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}
                 </span>
+                {open && <span className="ml-auto text-xs font-medium text-foreground">Open</span>}
               </div>
             </CardContent>
           </Card>
@@ -128,7 +126,7 @@ const StudentDashboard = () => {
             onClick={(e) => { e.preventDefault(); toggleFavourite(vendor.id); }}
             className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
           >
-            <Heart className={`h-4 w-4 ${fav ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
+            <Heart className={`h-4 w-4 ${fav ? 'fill-foreground text-foreground' : 'text-muted-foreground'}`} />
           </button>
         )}
       </div>
@@ -136,14 +134,14 @@ const StudentDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container py-6">
-        <h1 className="mb-1 font-heading text-2xl font-bold">What are you craving? 🍕</h1>
-        <p className="mb-6 text-muted-foreground">Browse campus vendors and order now</p>
+      <div className="container py-8">
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Browse</p>
+        <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">Campus vendors</h1>
 
         {/* Search */}
-        <div className="relative mb-4">
+        <div className="relative mt-6 mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search food, drinks, vendors..." className="pl-10 pr-10" value={search} onChange={e => setSearch(e.target.value)} />
           {search && (
@@ -154,17 +152,17 @@ const StudentDashboard = () => {
         </div>
 
         {/* Filter chips */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-8 flex flex-wrap gap-2">
           {user && (
-            <Button size="sm" variant={showFavourites ? 'default' : 'outline'} className="rounded-full gap-1" onClick={() => setShowFavourites(!showFavourites)}>
-              <Heart className={`h-3.5 w-3.5 ${showFavourites ? 'fill-primary-foreground' : ''}`} /> Favourites
+            <Button size="sm" variant={showFavourites ? 'default' : 'outline'} className="rounded-full gap-1 h-8 text-xs" onClick={() => setShowFavourites(!showFavourites)}>
+              <Heart className={`h-3 w-3 ${showFavourites ? 'fill-primary-foreground' : ''}`} /> Favourites
             </Button>
           )}
           {categories.length > 0 && (
             <>
-              <Button size="sm" variant={selectedCategory === null ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedCategory(null)}>All</Button>
+              <Button size="sm" variant={selectedCategory === null ? 'default' : 'outline'} className="rounded-full h-8 text-xs" onClick={() => setSelectedCategory(null)}>All</Button>
               {categories.map(cat => (
-                <Button key={cat} size="sm" variant={selectedCategory === cat ? 'default' : 'outline'} className="rounded-full" onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}>
+                <Button key={cat} size="sm" variant={selectedCategory === cat ? 'default' : 'outline'} className="rounded-full h-8 text-xs" onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}>
                   {cat}
                 </Button>
               ))}
@@ -180,33 +178,33 @@ const StudentDashboard = () => {
           filteredMenuItems.length === 0 ? (
             <EmptyState emoji="🔍" title="No results found" description="Try a different search term or category" action={<Button variant="link" onClick={clearFilters}>Clear filters</Button>} />
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-10">
               <p className="text-sm text-muted-foreground">{filteredMenuItems.length} item{filteredMenuItems.length !== 1 ? 's' : ''} found</p>
               {itemsByVendor.map(({ vendor, items }) => {
                 const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
                 return (
                   <div key={vendor.id}>
                     <Link to={`/vendor/${vendor.id}`} className="mb-3 flex items-center gap-2 hover:underline">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-lg">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-lg">
                         {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-lg object-cover" /> : '🍽️'}
                       </div>
                       <span className="font-heading font-semibold">{vendor.name}</span>
-                      <Badge variant={open ? 'default' : 'secondary'} className="text-xs">{open ? 'Open' : 'Closed'}</Badge>
+                      {!open && <span className="text-xs text-muted-foreground">Closed</span>}
                     </Link>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map(item => (
                         <Link key={item.id} to={`/vendor/${vendor.id}`}>
-                          <Card className={`overflow-hidden transition-shadow hover:shadow-md ${!open ? 'opacity-60' : ''}`}>
+                          <Card className={`overflow-hidden transition-all hover:ring-1 hover:ring-border ${!open ? 'opacity-50' : ''}`}>
                             <CardContent className="flex items-center gap-3 p-3">
                               {item.image_url ? (
                                 <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-lg object-cover" />
                               ) : (
-                                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-secondary text-xl">🍛</div>
+                                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-muted text-muted-foreground/40 text-xl">🍛</div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium truncate">{item.name}</h4>
+                                <h4 className="font-medium truncate text-sm">{item.name}</h4>
                                 <p className="text-xs text-muted-foreground truncate">{item.category}</p>
-                                <p className="font-heading font-bold text-primary text-sm">₦{Number(item.price).toLocaleString()}</p>
+                                <p className="font-heading font-bold text-sm mt-0.5">₦{Number(item.price).toLocaleString()}</p>
                               </div>
                             </CardContent>
                           </Card>
@@ -222,7 +220,7 @@ const StudentDashboard = () => {
           <EmptyState
             emoji={showFavourites ? '💔' : '🍽️'}
             title={showFavourites ? 'No favourite vendors yet' : 'No vendors available yet'}
-            description={showFavourites ? 'Tap the heart icon on any vendor to save them here' : 'Check back soon!'}
+            description={showFavourites ? 'Tap the heart icon on any vendor to save them here' : 'Check back soon'}
             action={showFavourites ? <Button variant="link" onClick={() => setShowFavourites(false)}>Browse all vendors</Button> : undefined}
           />
         ) : (

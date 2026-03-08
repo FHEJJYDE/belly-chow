@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/belly_chow_logo.png';
 
@@ -34,36 +33,59 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Link to="/" className="mx-auto mb-4 flex items-center gap-2">
-            <img src={logo} alt="Belly-Chow" className="h-9 w-9 rounded-lg object-contain" />
-            <span className="font-heading text-xl font-bold">Belly-Chow</span>
+    <div className="flex min-h-screen">
+      {/* Left panel — branding */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between border-r bg-muted/30 p-12">
+        <Link to="/" className="flex items-center gap-2.5">
+          <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
+          <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+        </Link>
+        <div>
+          <h1 className="font-heading text-4xl font-bold leading-tight tracking-tight">
+            Your campus food,
+            <br />
+            <span className="text-primary">delivered fast.</span>
+          </h1>
+          <p className="mt-4 max-w-sm text-muted-foreground leading-relaxed">
+            Browse menus, place orders, and track your delivery in real‑time.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Belly-Chow</p>
+      </div>
+
+      {/* Right panel — form */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
+          <Link to="/" className="mb-10 flex items-center gap-2 lg:hidden">
+            <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
           </Link>
-          <CardTitle className="font-heading text-2xl">Welcome back</CardTitle>
-          <CardDescription>Log in to your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Welcome back</p>
+          <h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Log in to your account</h2>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input id="email" type="email" placeholder="you@university.edu" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <Input id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Log in'}
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link to="/signup" className="font-medium text-primary hover:underline">Sign up</Link>
-          </p>
-        </CardContent>
-      </Card>
+
+          <div className="mt-8 border-t pt-6">
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account?{' '}
+              <Link to="/signup" className="font-medium text-foreground hover:text-primary transition-colors">Sign up</Link>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

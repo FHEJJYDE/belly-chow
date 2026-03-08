@@ -34,12 +34,10 @@ const Cart = () => {
   const [uploadingProof, setUploadingProof] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fees from platform settings
   const [platformFee, setPlatformFee] = useState(500);
   const [riderFee, setRiderFee] = useState(500);
   const serviceFee = platformFee + riderFee;
 
-  // Promo code state
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount_amount: number } | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
@@ -89,10 +87,7 @@ const Cart = () => {
     const path = `${user.id}/${orderId}.${ext}`;
     const { error } = await supabase.storage.from('payment-proofs').upload(path, paymentProof, { upsert: true });
     setUploadingProof(false);
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+    if (error) { console.error('Upload error:', error); return null; }
     const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
     return urlData.publicUrl || path;
   };
@@ -100,106 +95,52 @@ const Cart = () => {
   const applyPromo = async () => {
     if (!promoInput.trim()) return;
     setPromoLoading(true);
-    const { data, error } = await supabase
-      .from('promo_codes')
-      .select('*')
-      .eq('code', promoInput.trim().toUpperCase())
-      .eq('is_active', true)
-      .single();
-
-    if (error || !data) {
-      toast({ title: 'Invalid promo code', variant: 'destructive' });
-      setPromoLoading(false);
-      return;
-    }
-
+    const { data, error } = await supabase.from('promo_codes').select('*').eq('code', promoInput.trim().toUpperCase()).eq('is_active', true).single();
+    if (error || !data) { toast({ title: 'Invalid promo code', variant: 'destructive' }); setPromoLoading(false); return; }
     const promo = data as any;
-    if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) {
-      toast({ title: 'This promo code has been fully used', variant: 'destructive' });
-      setPromoLoading(false);
-      return;
-    }
-    if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
-      toast({ title: 'This promo code has expired', variant: 'destructive' });
-      setPromoLoading(false);
-      return;
-    }
-    if (total < Number(promo.min_order)) {
-      toast({ title: `Minimum order of ₦${Number(promo.min_order).toLocaleString()} required`, variant: 'destructive' });
-      setPromoLoading(false);
-      return;
-    }
-
+    if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) { toast({ title: 'This promo code has been fully used', variant: 'destructive' }); setPromoLoading(false); return; }
+    if (promo.expires_at && new Date(promo.expires_at) < new Date()) { toast({ title: 'This promo code has expired', variant: 'destructive' }); setPromoLoading(false); return; }
+    if (total < Number(promo.min_order)) { toast({ title: `Minimum order of ₦${Number(promo.min_order).toLocaleString()} required`, variant: 'destructive' }); setPromoLoading(false); return; }
     setAppliedPromo({ code: promo.code, discount_amount: Number(promo.discount_amount) });
-    toast({ title: `Promo applied! -₦${Number(promo.discount_amount).toLocaleString()} 🎉` });
+    toast({ title: `Promo applied — ₦${Number(promo.discount_amount).toLocaleString()} off` });
     setPromoLoading(false);
   };
 
-  const removePromo = () => {
-    setAppliedPromo(null);
-    setPromoInput('');
-  };
+  const removePromo = () => { setAppliedPromo(null); setPromoInput(''); };
 
   const placeOrder = async () => {
     if (!user || !vendorId || items.length === 0) return;
-    if (!position && !deliveryLocation.trim()) {
-      toast({ title: 'Please share GPS location or enter delivery address', variant: 'destructive' });
-      return;
-    }
-
-    if (paymentMethod === 'bank_transfer' && !paymentProof) {
-      toast({ title: 'Please upload proof of payment', description: 'A screenshot of your transfer receipt is required', variant: 'destructive' });
-      return;
-    }
+    if (!position && !deliveryLocation.trim()) { toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' }); return; }
+    if (paymentMethod === 'bank_transfer' && !paymentProof) { toast({ title: 'Please upload proof of payment', variant: 'destructive' }); return; }
 
     setIsOrdering(true);
     try {
       const orderData: any = {
-        student_id: user.id,
-        vendor_id: vendorId,
-        total: total,
-        delivery_fee: serviceFee,
-        discount: discount,
-        promo_code: appliedPromo?.code || null,
-        payment_method: paymentMethod,
-        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
-        notes,
+        student_id: user.id, vendor_id: vendorId, total, delivery_fee: serviceFee, discount,
+        promo_code: appliedPromo?.code || null, payment_method: paymentMethod,
+        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''), notes,
       };
-      if (position) {
-        orderData.delivery_lat = position.lat;
-        orderData.delivery_lng = position.lng;
-      }
+      if (position) { orderData.delivery_lat = position.lat; orderData.delivery_lng = position.lng; }
       const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
       if (orderError) throw orderError;
 
-      // Upload payment proof if bank transfer
       if (paymentMethod === 'bank_transfer' && paymentProof) {
         const proofUrl = await uploadPaymentProof(order.id);
-        if (proofUrl) {
-          await supabase.from('orders').update({ payment_proof_url: proofUrl } as any).eq('id', order.id);
-        }
+        if (proofUrl) await supabase.from('orders').update({ payment_proof_url: proofUrl } as any).eq('id', order.id);
       }
 
-      const orderItems = items.map(i => ({
-        order_id: order.id,
-        menu_item_id: i.menuItem.id,
-        quantity: i.quantity,
-        price: i.menuItem.price,
-      }));
+      const orderItems = items.map(i => ({ order_id: order.id, menu_item_id: i.menuItem.id, quantity: i.quantity, price: i.menuItem.price }));
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) throw itemsError;
 
-      // Increment promo used_count
       if (appliedPromo) {
         try {
-          await (supabase.from('promo_codes') as any)
-            .update({ used_count: (await (supabase.from('promo_codes') as any).select('used_count').eq('code', appliedPromo.code).single()).data?.used_count + 1 || 1 })
-            .eq('code', appliedPromo.code);
+          await (supabase.from('promo_codes') as any).update({ used_count: (await (supabase.from('promo_codes') as any).select('used_count').eq('code', appliedPromo.code).single()).data?.used_count + 1 || 1 }).eq('code', appliedPromo.code);
         } catch {}
       }
 
       clearCart();
-      toast({ title: 'Order placed! 🎉', description: 'Your food is on its way soon.' });
+      toast({ title: 'Order placed', description: 'Your food is on its way soon.' });
       navigate('/orders');
     } catch (error: any) {
       toast({ title: 'Failed to place order', description: error.message, variant: 'destructive' });
@@ -213,198 +154,166 @@ const Cart = () => {
       <div className="min-h-screen bg-background">
         <AppNavbar />
         <div className="container flex flex-col items-center py-20">
-          <ShoppingCart className="mb-4 h-16 w-16 text-muted-foreground" />
-          <h1 className="font-heading text-2xl font-bold">Your cart is empty</h1>
-          <p className="text-muted-foreground">Browse vendors and add some food!</p>
-          <Button className="mt-6" onClick={() => navigate('/dashboard')}>Browse Vendors</Button>
+          <ShoppingCart className="mb-4 h-12 w-12 text-muted-foreground/40" />
+          <h1 className="font-heading text-xl font-bold">Your cart is empty</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Browse vendors and add some food</p>
+          <Button className="mt-6" variant="outline" onClick={() => navigate('/dashboard')}>Browse vendors</Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container max-w-2xl py-6">
-        <h1 className="mb-6 font-heading text-2xl font-bold">Your Cart 🛒</h1>
+      <div className="container max-w-2xl py-8">
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Checkout</p>
+        <h1 className="mt-1 mb-8 font-heading text-2xl font-bold tracking-tight">Your cart</h1>
 
-        <div className="space-y-3 mb-6">
+        {/* Items */}
+        <div className="space-y-2 mb-8">
           {items.map(({ menuItem, quantity }) => (
-            <Card key={menuItem.id}>
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex-1">
-                  <h3 className="font-medium">{menuItem.name}</h3>
-                  <p className="text-sm text-primary font-medium">₦{Number(menuItem.price).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(menuItem.id, quantity - 1)}>
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-8 text-center font-medium">{quantity}</span>
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(menuItem.id, quantity + 1)}>
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(menuItem.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={menuItem.id} className="flex items-center justify-between border-b pb-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm">{menuItem.name}</h3>
+                <p className="text-sm text-muted-foreground">₦{Number(menuItem.price).toLocaleString()}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(menuItem.id, quantity - 1)}>
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="w-6 text-center text-sm font-medium">{quantity}</span>
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(menuItem.id, quantity + 1)}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(menuItem.id)}>
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
 
         {/* Promo Code */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            {appliedPromo ? (
-              <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/5 p-3">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">{appliedPromo.code}</span>
-                  <span className="text-sm text-green-600">-₦{appliedPromo.discount_amount.toLocaleString()}</span>
-                </div>
-                <button onClick={removePromo} className="text-muted-foreground hover:text-foreground">
-                  <X className="h-4 w-4" />
-                </button>
+        <div className="mb-8">
+          {appliedPromo ? (
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{appliedPromo.code}</span>
+                <span className="text-muted-foreground">−₦{appliedPromo.discount_amount.toLocaleString()}</span>
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter promo code"
-                  value={promoInput}
-                  onChange={e => setPromoInput(e.target.value.toUpperCase())}
-                  className="uppercase"
-                />
-                <Button variant="outline" onClick={applyPromo} disabled={promoLoading || !promoInput.trim()}>
-                  {promoLoading ? '...' : 'Apply'}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mb-6">
-          <CardContent className="space-y-4 p-4">
-            <div>
-              <Label>Delivery Location</Label>
-              <div className="flex gap-2 mt-1">
-                <Button type="button" variant={position ? 'default' : 'outline'} size="sm" onClick={() => {
-                  getPosition();
-                  if (!navigator.geolocation) {
-                    toast({ title: 'GPS not supported', description: 'Your browser does not support location services.', variant: 'destructive' });
-                  }
-                }} disabled={geoLoading} className="shrink-0">
-                  <MapPin className="mr-1 h-3.5 w-3.5" />
-                  {position ? '📍 GPS Shared' : geoLoading ? 'Getting location...' : 'Use GPS Location'}
-                </Button>
-                <span className="text-xs text-muted-foreground self-center">or type below</span>
-              </div>
-              {position && <p className="mt-1 text-xs text-green-600">✅ GPS coordinates captured — rider will get map directions to you</p>}
-              {!position && geoError && (
-                <p className="mt-1 text-xs text-destructive">
-                  ⚠️ {geoError.includes('denied') ? 'Location access denied. Please enable location in your browser/device settings and try again.' : geoError}
-                </p>
-              )}
-              {!position && (
-                <Input className="mt-2" placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
-              )}
+              <button onClick={removePromo} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
-            <div>
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={v => setPaymentMethod(v as PaymentMethod)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pay_on_delivery">Pay on Delivery (Cash)</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="flex gap-2">
+              <Input placeholder="Promo code" value={promoInput} onChange={e => setPromoInput(e.target.value.toUpperCase())} className="uppercase" />
+              <Button variant="outline" onClick={applyPromo} disabled={promoLoading || !promoInput.trim()}>
+                {promoLoading ? '...' : 'Apply'}
+              </Button>
             </div>
+          )}
+        </div>
 
-            {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
-                <p className="text-sm font-semibold text-foreground">💳 Transfer to this account:</p>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{bankDetails.bank_name}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Account Name</span><span className="font-medium">{bankDetails.bank_account_name}</span></div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Account Number</span>
-                    <span className="flex items-center gap-1.5 font-medium">
-                      {bankDetails.bank_account_number}
-                      <button onClick={copyAccountNumber} className="rounded p-1 hover:bg-muted transition-colors" type="button">
-                        {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </button>
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and upload your receipt below.</p>
-              </div>
-            )}
+        {/* Delivery & Payment */}
+        <div className="space-y-6 mb-8">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Delivery location</Label>
+            <div className="flex gap-2">
+              <Button type="button" variant={position ? 'default' : 'outline'} size="sm" onClick={() => {
+                getPosition();
+                if (!navigator.geolocation) toast({ title: 'GPS not supported', variant: 'destructive' });
+              }} disabled={geoLoading} className="shrink-0 gap-1.5">
+                <MapPin className="h-3.5 w-3.5" />
+                {position ? 'GPS shared' : geoLoading ? 'Getting location...' : 'Use GPS'}
+              </Button>
+              <span className="text-xs text-muted-foreground self-center">or type below</span>
+            </div>
+            {position && <p className="text-xs text-muted-foreground">GPS coordinates captured — rider will get directions</p>}
+            {!position && geoError && <p className="text-xs text-destructive">{geoError.includes('denied') ? 'Location access denied. Enable in settings.' : geoError}</p>}
+            {!position && <Input className="mt-2" placeholder="e.g. Block A, Room 204" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />}
+          </div>
 
-            {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <Upload className="h-4 w-4" /> Upload Payment Proof <span className="text-destructive">*</span>
-                </Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleProofSelect}
-                />
-                {paymentProofPreview ? (
-                  <div className="relative rounded-lg border overflow-hidden">
-                    <img src={paymentProofPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted" />
-                    <button
-                      type="button"
-                      onClick={() => { setPaymentProof(null); setPaymentProofPreview(null); }}
-                      className="absolute top-2 right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm hover:bg-destructive/90"
-                    >
-                      <X className="h-3.5 w-3.5" />
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Payment method</Label>
+            <Select value={paymentMethod} onValueChange={v => setPaymentMethod(v as PaymentMethod)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pay_on_delivery">Pay on Delivery (Cash)</SelectItem>
+                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
+            <div className="rounded-lg border p-4 space-y-2">
+              <p className="text-sm font-semibold">Transfer details</p>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{bankDetails.bank_name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{bankDetails.bank_account_name}</span></div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Number</span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    {bankDetails.bank_account_number}
+                    <button onClick={copyAccountNumber} className="rounded p-1 hover:bg-muted transition-colors" type="button">
+                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                  >
-                    <ImageIcon className="h-8 w-8" />
-                    <span className="text-sm font-medium">Tap to upload transfer receipt</span>
-                    <span className="text-xs">JPG, PNG — max 5MB</span>
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and upload receipt below.</p>
+            </div>
+          )}
+
+          {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Upload className="h-4 w-4" /> Payment proof <span className="text-destructive">*</span>
+              </Label>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofSelect} />
+              {paymentProofPreview ? (
+                <div className="relative rounded-lg border overflow-hidden">
+                  <img src={paymentProofPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted" />
+                  <button type="button" onClick={() => { setPaymentProof(null); setPaymentProofPreview(null); }}
+                    className="absolute top-2 right-2 rounded-full bg-foreground p-1 text-background shadow-sm hover:opacity-80">
+                    <X className="h-3.5 w-3.5" />
                   </button>
-                )}
-              </div>
-            )}
-
-            {paymentMethod === 'bank_transfer' && (!bankDetails || !bankDetails.bank_account_number) && (
-              <p className="text-sm text-destructive">Bank transfer details haven't been configured yet. Please choose Pay on Delivery.</p>
-            )}
-
-            <div>
-              <Label>Notes (optional)</Label>
-              <Textarea placeholder="Any special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₦{total.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Service Fee (Platform + Rider)</span><span>₦{serviceFee.toLocaleString()}</span></div>
-              {discount > 0 && (
-                <div className="flex justify-between text-green-600"><span>Promo Discount</span><span>-₦{discount.toLocaleString()}</span></div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors">
+                  <ImageIcon className="h-6 w-6" />
+                  <span className="text-sm font-medium">Upload transfer receipt</span>
+                  <span className="text-xs">JPG, PNG — max 5MB</span>
+                </button>
               )}
-              <div className="flex justify-between border-t pt-2 font-heading text-lg font-bold">
-                <span>Total</span><span className="text-primary">₦{grandTotal.toLocaleString()}</span>
-              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        <Button className="w-full" size="lg" onClick={placeOrder} disabled={isOrdering}>
-          {isOrdering ? 'Placing Order...' : `Place Order · ₦${grandTotal.toLocaleString()}`}
+          {paymentMethod === 'bank_transfer' && (!bankDetails || !bankDetails.bank_account_number) && (
+            <p className="text-sm text-destructive">Bank transfer details not configured. Choose Pay on Delivery.</p>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Notes (optional)</Label>
+            <Textarea placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="border-t pt-6 mb-6">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₦{total.toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Service fee</span><span>₦{serviceFee.toLocaleString()}</span></div>
+            {discount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>−₦{discount.toLocaleString()}</span></div>}
+            <div className="flex justify-between border-t pt-2 font-heading font-bold text-base">
+              <span>Total</span><span>₦{grandTotal.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <Button className="w-full" onClick={placeOrder} disabled={isOrdering || uploadingProof}>
+          {isOrdering ? 'Placing order...' : `Place order — ₦${grandTotal.toLocaleString()}`}
         </Button>
       </div>
     </div>
