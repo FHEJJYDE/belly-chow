@@ -59,8 +59,14 @@ export function useOrderNotifications() {
   const { user, role, loading } = useAuth();
   const knownOrders = useRef<Set<string>>(new Set());
   const vendorIdRef = useRef<string | null>(null);
+  const recentNotifications = useRef<Set<string>>(new Set());
 
-  const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update') => {
+  const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update', dedupeKey?: string) => {
+    const key = dedupeKey || `${title}-${description}`;
+    if (recentNotifications.current.has(key)) return;
+    recentNotifications.current.add(key);
+    setTimeout(() => recentNotifications.current.delete(key), 5000);
+
     toast({ title, description });
     playNotificationSound(sound);
 
@@ -106,17 +112,17 @@ export function useOrderNotifications() {
 
         if (role === 'student' && order.student_id === user.id) {
           const msg = statusMessages[order.status];
-          if (msg) notify(msg.title, msg.description);
+          if (msg) notify(msg.title, msg.description, 'status_update', `student-${order.id}-${order.status}`);
         }
 
         if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current) {
           const msg = vendorStatusMessages[order.status];
-          if (msg) notify(msg.title, msg.description, order.status === 'pending' ? 'new_order' : 'status_update');
+          if (msg) notify(msg.title, msg.description, order.status === 'pending' ? 'new_order' : 'status_update', `vendor-${order.id}-${order.status}`);
         }
 
         if (role === 'rider' && (order.rider_id === user.id || order.status === 'ready')) {
           const msg = riderStatusMessages[order.status];
-          if (msg) notify(msg.title, msg.description, 'new_order');
+          if (msg) notify(msg.title, msg.description, 'new_order', `rider-${order.id}-${order.status}`);
         }
       }
     ).on(
@@ -126,7 +132,7 @@ export function useOrderNotifications() {
         const order = payload.new as any;
         if (role === 'vendor' && !knownOrders.current.has(order.id)) {
           knownOrders.current.add(order.id);
-          notify('🔔 New Order!', `New order #${order.id.slice(0, 8)} — check your orders tab!`, 'new_order');
+          notify('🔔 New Order!', `New order #${order.id.slice(0, 8)} — check your orders tab!`, 'new_order', `new-order-${order.id}`);
         }
       }
     ).subscribe();
