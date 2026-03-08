@@ -137,7 +137,10 @@ const AdminPayments = () => {
   const bankFailed = bankOrders.filter(o => o.payment_status === 'failed');
 
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
-  const processedWithdrawals = withdrawals.filter(w => w.status !== 'pending');
+  const approvedWithdrawals = withdrawals.filter(w => w.status === 'approved');
+  const rejectedWithdrawals = withdrawals.filter(w => w.status === 'rejected');
+  const totalPaidToRiders = approvedWithdrawals.reduce((s, w) => s + Number(w.amount), 0);
+  const totalPendingRiderPayouts = pendingWithdrawals.reduce((s, w) => s + Number(w.amount), 0);
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
