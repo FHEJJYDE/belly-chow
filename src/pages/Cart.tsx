@@ -148,7 +148,11 @@ const Cart = () => {
 
       // Increment promo used_count
       if (appliedPromo) {
-        await supabase.rpc('increment_promo_usage' as any, { promo_code_value: appliedPromo.code }).catch(() => {});
+        try {
+          await (supabase.from('promo_codes') as any)
+            .update({ used_count: (await (supabase.from('promo_codes') as any).select('used_count').eq('code', appliedPromo.code).single()).data?.used_count + 1 || 1 })
+            .eq('code', appliedPromo.code);
+        } catch {}
       }
 
       clearCart();
