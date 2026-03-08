@@ -142,10 +142,16 @@ const RiderDashboard = () => {
     });
   };
 
-  // Fetch settings
+  // Fetch settings (rider fee + rider personal settings)
   useEffect(() => {
     if (!user) return;
     const fetchSettings = async () => {
+      // Fetch platform rider_fee
+      const { data: platformData } = await supabase.from('platform_settings').select('*').limit(1).single();
+      if (platformData) {
+        setRiderFee(Number((platformData as any).rider_fee) || 500);
+      }
+      // Fetch rider personal settings
       const { data } = await (supabase.from('rider_settings') as any).select('*').eq('user_id', user.id).maybeSingle();
       if (data) {
         setRiderSettings({
