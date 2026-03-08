@@ -1,10 +1,13 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
 
