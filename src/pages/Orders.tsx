@@ -355,6 +355,43 @@ const Orders = () => {
           }}
         />
       )}
+
+      {/* Dispute dialog */}
+      <Dialog open={!!disputeOrder} onOpenChange={open => { if (!open) setDisputeOrder(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report an Issue — Order #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 text-sm font-medium">What went wrong?</p>
+              <Select value={disputeReason} onValueChange={setDisputeReason}>
+                <SelectTrigger><SelectValue placeholder="Select a reason" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Wrong items received">Wrong items received</SelectItem>
+                  <SelectItem value="Missing items">Missing items</SelectItem>
+                  <SelectItem value="Food quality issue">Food quality issue</SelectItem>
+                  <SelectItem value="Late delivery">Late delivery</SelectItem>
+                  <SelectItem value="Order never delivered">Order never delivered</SelectItem>
+                  <SelectItem value="Overcharged">Overcharged</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium">Details (optional)</p>
+              <Textarea
+                value={disputeDesc}
+                onChange={e => setDisputeDesc(e.target.value)}
+                placeholder="Describe the issue in more detail..."
+              />
+            </div>
+            <Button onClick={handleSubmitDispute} disabled={!disputeReason || submittingDispute} className="w-full">
+              {submittingDispute ? 'Submitting...' : 'Submit Dispute'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
