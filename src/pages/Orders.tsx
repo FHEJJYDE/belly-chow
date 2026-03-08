@@ -244,6 +244,11 @@ const Orders = () => {
                             <Star className="h-3.5 w-3.5" /> Rate
                           </Button>
                         )}
+                        {order.status === 'delivered' && (
+                          <Button size="sm" variant="outline" onClick={() => setReceiptOrder(order)} className="gap-1">
+                            <Receipt className="h-3.5 w-3.5" /> Receipt
+                          </Button>
+                        )}
                         {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
                           <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
                             <RotateCcw className="h-3.5 w-3.5" /> Reorder
