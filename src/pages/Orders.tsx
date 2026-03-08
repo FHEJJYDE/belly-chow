@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw, AlertTriangle, Receipt } from 'lucide-react';
+import OrderReceipt from '@/components/OrderReceipt';
 import LivePulse from '@/components/LivePulse';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +54,7 @@ const Orders = () => {
   const [disputeDesc, setDisputeDesc] = useState('');
   const [disputedOrders, setDisputedOrders] = useState<Set<string>>(new Set());
   const [submittingDispute, setSubmittingDispute] = useState(false);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
@@ -242,6 +244,11 @@ const Orders = () => {
                             <Star className="h-3.5 w-3.5" /> Rate
                           </Button>
                         )}
+                        {order.status === 'delivered' && (
+                          <Button size="sm" variant="outline" onClick={() => setReceiptOrder(order)} className="gap-1">
+                            <Receipt className="h-3.5 w-3.5" /> Receipt
+                          </Button>
+                        )}
                         {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
                           <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
                             <RotateCcw className="h-3.5 w-3.5" /> Reorder
@@ -362,6 +369,20 @@ const Orders = () => {
             setReviewedOrders(prev => new Set([...prev, reviewOrder.id]));
             setReviewOrder(null);
           }}
+        />
+      )}
+
+      {/* Receipt dialog */}
+      {receiptOrder && (
+        <OrderReceipt
+          open={!!receiptOrder}
+          onOpenChange={(open) => { if (!open) setReceiptOrder(null); }}
+          order={receiptOrder as any}
+          items={(orderItems[receiptOrder.id] || []).map(i => ({
+            name: i.menu_items?.name || 'Item',
+            quantity: i.quantity,
+            price: Number(i.price),
+          }))}
         />
       )}
 
