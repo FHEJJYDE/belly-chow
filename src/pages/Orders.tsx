@@ -25,15 +25,15 @@ type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
 };
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-700',
-  accepted: 'bg-blue-500/10 text-blue-700',
-  preparing: 'bg-orange-500/10 text-orange-700',
-  ready: 'bg-purple-500/10 text-purple-700',
-  picked_up: 'bg-indigo-500/10 text-indigo-700',
-  delivering: 'bg-cyan-500/10 text-cyan-700',
-  delivered: 'bg-green-500/10 text-green-700',
-  cancelled: 'bg-red-500/10 text-red-700',
-  rejected: 'bg-red-500/10 text-red-700',
+  pending: 'border bg-muted/50 text-foreground',
+  accepted: 'border bg-muted/50 text-foreground',
+  preparing: 'border bg-muted/50 text-foreground',
+  ready: 'border bg-muted/50 text-foreground',
+  picked_up: 'border bg-muted/50 text-foreground',
+  delivering: 'border bg-muted/50 text-foreground',
+  delivered: 'border bg-muted/50 text-foreground',
+  cancelled: 'border bg-destructive/5 text-destructive',
+  rejected: 'border bg-destructive/5 text-destructive',
 };
 
 const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering'];
