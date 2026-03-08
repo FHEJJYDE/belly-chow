@@ -26,7 +26,7 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pay_on_delivery');
   const [notes, setNotes] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
-  const { position, loading: geoLoading, getPosition } = useGeolocation();
+  const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bank_account_name: string; bank_account_number: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
