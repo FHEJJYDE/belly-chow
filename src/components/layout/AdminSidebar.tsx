@@ -22,6 +22,7 @@ const items = [
   { title: 'Disputes', url: '/admin/disputes', icon: AlertTriangle },
   { title: 'Refunds', url: '/admin/refunds', icon: RefreshCw },
   { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
+  { title: 'Tickets', url: '/admin/tickets', icon: MessageSquare },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
