@@ -26,6 +26,7 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pay_on_delivery');
   const [notes, setNotes] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
+  const { position, loading: geoLoading, getPosition } = useGeolocation();
 
   const deliveryFee = 200;
 
