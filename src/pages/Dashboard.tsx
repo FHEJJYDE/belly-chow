@@ -1,9 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
-import VendorDashboard from '@/components/dashboards/VendorDashboard';
 import RiderDashboard from '@/components/dashboards/RiderDashboard';
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
 
 const Dashboard = () => {
   const { user, role, loading } = useAuth();
@@ -19,12 +17,12 @@ const Dashboard = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   switch (role) {
+    case 'admin':
+      return <Navigate to="/admin" replace />;
     case 'vendor':
-      return <VendorDashboard />;
+      return <Navigate to="/vendor-panel" replace />;
     case 'rider':
       return <RiderDashboard />;
-    case 'admin':
-      return <AdminDashboard />;
     default:
       return <StudentDashboard />;
   }

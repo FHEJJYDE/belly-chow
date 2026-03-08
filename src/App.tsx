@@ -15,6 +15,21 @@ import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
+// Admin pages
+import AdminLayout from "./components/layout/AdminLayout";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminVendors from "./pages/admin/AdminVendors";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminSettings from "./pages/admin/AdminSettings";
+
+// Vendor pages
+import VendorLayout from "./components/layout/VendorLayout";
+import VendorOverview from "./pages/vendor/VendorOverview";
+import VendorOrdersPage from "./pages/vendor/VendorOrders";
+import VendorMenu from "./pages/vendor/VendorMenu";
+import VendorSettings from "./pages/vendor/VendorSettings";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,6 +49,24 @@ const App = () => (
               <Route path="/cart" element={<Cart />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/profile" element={<Profile />} />
+
+              {/* Admin panel */}
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminOverview />} />
+                <Route path="vendors" element={<AdminVendors />} />
+                <Route path="orders" element={<AdminOrders />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="settings" element={<AdminSettings />} />
+              </Route>
+
+              {/* Vendor panel */}
+              <Route path="/vendor-panel" element={<VendorLayout />}>
+                <Route index element={<VendorOverview />} />
+                <Route path="orders" element={<VendorOrdersPage />} />
+                <Route path="menu" element={<VendorMenu />} />
+                <Route path="settings" element={<VendorSettings />} />
+              </Route>
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </CartProvider>
