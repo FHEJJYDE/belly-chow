@@ -57,8 +57,8 @@ const Cart = () => {
 
   const placeOrder = async () => {
     if (!user || !vendorId || items.length === 0) return;
-    if (!deliveryLocation.trim()) {
-      toast({ title: 'Please enter delivery location', variant: 'destructive' });
+    if (!position && !deliveryLocation.trim()) {
+      toast({ title: 'Please share GPS location or enter delivery address', variant: 'destructive' });
       return;
     }
 
