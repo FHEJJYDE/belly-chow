@@ -22,8 +22,6 @@ const Profile = () => {
   const [campusLocation, setCampusLocation] = useState('');
   const [saving, setSaving] = useState(false);
 
-  if (!loading && !user) return <Navigate to="/login" replace />;
-
   useEffect(() => {
     if (!user) return;
     supabase.from('profiles').select('*').eq('user_id', user.id).single()
