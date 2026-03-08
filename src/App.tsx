@@ -31,6 +31,7 @@ import AdminVerifications from "./pages/admin/AdminVerifications";
 import AdminTickets from "./pages/admin/AdminTickets";
 import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import Support from "./pages/Support";
+import Install from "./pages/Install";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
@@ -66,6 +67,7 @@ const App = () => (
               <Route path="/orders" element={<Orders />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/install" element={<Install />} />
 
               {/* Admin panel */}
               <Route path="/admin" element={<AdminLayout />}>
