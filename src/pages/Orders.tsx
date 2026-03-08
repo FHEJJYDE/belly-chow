@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
+
+const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
