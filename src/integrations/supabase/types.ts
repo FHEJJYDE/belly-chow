@@ -256,7 +256,9 @@ export type Database = {
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_location: string
+          delivery_proof_url: string | null
           discount: number
+          estimated_ready_at: string | null
           id: string
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
@@ -281,7 +283,9 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
+          delivery_proof_url?: string | null
           discount?: number
+          estimated_ready_at?: string | null
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
@@ -306,7 +310,9 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
+          delivery_proof_url?: string | null
           discount?: number
+          estimated_ready_at?: string | null
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
@@ -334,6 +340,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payout_records: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          rider_id: string | null
+          status: string
+          vendor_id: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          rider_id?: string | null
+          status?: string
+          vendor_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          rider_id?: string | null
+          status?: string
+          vendor_id?: string | null
+        }
+        Relationships: []
       }
       platform_settings: {
         Row: {
@@ -378,7 +420,9 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_suspended: boolean
           phone: string | null
+          suspension_reason: string | null
           updated_at: string
           user_id: string
         }
@@ -388,7 +432,9 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          is_suspended?: boolean
           phone?: string | null
+          suspension_reason?: string | null
           updated_at?: string
           user_id: string
         }
@@ -398,7 +444,9 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          is_suspended?: boolean
           phone?: string | null
+          suspension_reason?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -660,6 +708,45 @@ export type Database = {
           document_url?: string
           id?: string
           status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      withdrawal_requests: {
+        Row: {
+          account_name: string
+          account_number: string
+          admin_notes: string | null
+          amount: number
+          bank_name: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string
+          account_number?: string
+          admin_notes?: string | null
+          amount?: number
+          bank_name?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          admin_notes?: string | null
+          amount?: number
+          bank_name?: string
+          created_at?: string
+          id?: string
+          status?: string
           updated_at?: string
           user_id?: string
         }
