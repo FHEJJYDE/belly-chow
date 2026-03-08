@@ -67,6 +67,7 @@ const App = () => (
               <Route path="/orders" element={<Orders />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/install" element={<Install />} />
 
               {/* Admin panel */}
               <Route path="/admin" element={<AdminLayout />}>
