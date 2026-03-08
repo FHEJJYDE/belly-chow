@@ -421,8 +421,8 @@ const RiderDashboard = () => {
                   <div key={i} className="flex justify-between text-sm"><span>{item.quantity}x {item.name}</span><span className="font-medium">₦{(item.price * item.quantity).toLocaleString()}</span></div>
                 ))}
                 <Separator />
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Order Total</span><span>₦{Number(activeOrder.total).toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Your Delivery Fee</span><span className="font-semibold text-primary">₦{Number(activeOrder.delivery_fee).toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Food Subtotal</span><span>₦{Number(activeOrder.total).toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Your Earnings</span><span className="font-semibold text-primary">₦{riderFee.toLocaleString()}</span></div>
               </CardContent>
             </Card>
           )}
