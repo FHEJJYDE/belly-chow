@@ -54,6 +54,7 @@ const App = () => (
         <AuthProvider>
           <CartProvider>
             <NotificationListener />
+            <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
