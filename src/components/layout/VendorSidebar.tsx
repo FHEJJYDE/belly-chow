@@ -28,7 +28,7 @@ export function VendorSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="flex items-center gap-2 px-4 py-4">
-          <UtensilsCrossed className="h-6 w-6 shrink-0 text-primary" />
+          <img src={logo} alt="Belly-Chow" className="h-8 w-8 shrink-0 rounded-lg object-contain" />
           {!collapsed && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
         </div>
         <SidebarGroup>

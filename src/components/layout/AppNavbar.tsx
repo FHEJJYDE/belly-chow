@@ -14,9 +14,7 @@ const AppNavbar = () => {
     <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between">
         <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <UtensilsCrossed className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
           <span className="font-heading text-lg font-bold">Belly-Chow</span>
         </Link>
 
