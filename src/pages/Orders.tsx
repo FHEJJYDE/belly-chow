@@ -203,7 +203,10 @@ const Orders = () => {
     <div className="min-h-screen bg-background">
       <AppNavbar />
       <div className="container max-w-2xl py-6">
-        <h1 className="mb-6 font-heading text-2xl font-bold">My Orders 📦</h1>
+        <div className="mb-6 flex items-center gap-3">
+          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
+          <LivePulse />
+        </div>
 
         {orders.length === 0 ? (
           <div className="py-20 text-center">
