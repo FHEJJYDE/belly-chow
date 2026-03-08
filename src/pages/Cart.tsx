@@ -288,13 +288,23 @@ const Cart = () => {
             <div>
               <Label>Delivery Location</Label>
               <div className="flex gap-2 mt-1">
-                <Button type="button" variant={position ? 'default' : 'outline'} size="sm" onClick={() => getPosition()} disabled={geoLoading} className="shrink-0">
+                <Button type="button" variant={position ? 'default' : 'outline'} size="sm" onClick={() => {
+                  getPosition();
+                  if (!navigator.geolocation) {
+                    toast({ title: 'GPS not supported', description: 'Your browser does not support location services.', variant: 'destructive' });
+                  }
+                }} disabled={geoLoading} className="shrink-0">
                   <MapPin className="mr-1 h-3.5 w-3.5" />
-                  {position ? '📍 GPS Shared' : geoLoading ? 'Getting...' : 'Use GPS Location'}
+                  {position ? '📍 GPS Shared' : geoLoading ? 'Getting location...' : 'Use GPS Location'}
                 </Button>
                 <span className="text-xs text-muted-foreground self-center">or type below</span>
               </div>
               {position && <p className="mt-1 text-xs text-green-600">✅ GPS coordinates captured — rider will get map directions to you</p>}
+              {!position && geoError && (
+                <p className="mt-1 text-xs text-destructive">
+                  ⚠️ {geoError.includes('denied') ? 'Location access denied. Please enable location in your browser/device settings and try again.' : geoError}
+                </p>
+              )}
               {!position && (
                 <Input className="mt-2" placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
               )}
