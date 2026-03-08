@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 
 const AdminLayout = () => {
   const { signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
