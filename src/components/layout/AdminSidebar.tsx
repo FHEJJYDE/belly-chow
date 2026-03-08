@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package, Users, Settings, Crown, CreditCard, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Store, Package, Users, Settings, Crown, CreditCard, AlertTriangle, RefreshCw, ShieldCheck, MessageSquare } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
