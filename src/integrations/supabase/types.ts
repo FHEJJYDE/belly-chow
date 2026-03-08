@@ -335,6 +335,45 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          admin_notes: string | null
+          category: string
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          category: string
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
