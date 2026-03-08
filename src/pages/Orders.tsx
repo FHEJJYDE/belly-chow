@@ -239,7 +239,7 @@ const Orders = () => {
                   {activeOrders.map(order => (
                     <Card
                       key={order.id}
-                      className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                      className="cursor-pointer hover:ring-1 hover:ring-border transition-all"
                       onClick={() => setTrackingOrderId(order.id)}
                     >
                       <CardContent className="p-4">
