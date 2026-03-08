@@ -35,6 +35,8 @@ const Profile = () => {
       });
   }, [user]);
 
+  if (!loading && !user) return <Navigate to="/login" replace />;
+
   const save = async () => {
     if (!user) return;
     setSaving(true);
