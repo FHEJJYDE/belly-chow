@@ -6,7 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
@@ -43,6 +46,11 @@ const Orders = () => {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [disputeOrder, setDisputeOrder] = useState<Order | null>(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [disputedOrders, setDisputedOrders] = useState<Set<string>>(new Set());
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
@@ -89,6 +97,27 @@ const Orders = () => {
     navigate('/cart');
   }, [orderItems, clearCart, addItem, toast, navigate]);
 
+  const handleSubmitDispute = async () => {
+    if (!disputeOrder || !user || !disputeReason) return;
+    setSubmittingDispute(true);
+    const { error } = await supabase.from('disputes').insert({
+      order_id: disputeOrder.id,
+      user_id: user.id,
+      reason: disputeReason,
+      description: disputeDesc || null,
+    } as any);
+    setSubmittingDispute(false);
+    if (error) {
+      toast({ title: 'Error filing dispute', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setDisputedOrders(prev => new Set([...prev, disputeOrder.id]));
+    setDisputeOrder(null);
+    setDisputeReason('');
+    setDisputeDesc('');
+    toast({ title: 'Dispute filed ✅', description: 'Our team will review it shortly.' });
+  };
+
   useEffect(() => {
     if (!user) return;
     const fetchOrders = async () => {
@@ -120,8 +149,14 @@ const Orders = () => {
       setReviewedOrders(new Set(data?.map(r => r.order_id) || []));
     };
 
+    const fetchDisputes = async () => {
+      const { data } = await supabase.from('disputes').select('order_id').eq('user_id', user.id);
+      setDisputedOrders(new Set(data?.map((d: any) => d.order_id) || []));
+    };
+
     fetchOrders();
     fetchReviews();
+    fetchDisputes();
 
     const channel = supabase.channel('my-orders').on(
       'postgres_changes',
@@ -206,6 +241,14 @@ const Orders = () => {
                           <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
                             <RotateCcw className="h-3.5 w-3.5" /> Reorder
                           </Button>
+                        )}
+                        {!['pending'].includes(order.status) && !disputedOrders.has(order.id) && (
+                          <Button size="sm" variant="ghost" onClick={() => setDisputeOrder(order)} className="gap-1 text-destructive hover:text-destructive">
+                            <AlertTriangle className="h-3.5 w-3.5" /> Report Issue
+                          </Button>
+                        )}
+                        {disputedOrders.has(order.id) && (
+                          <span className="text-xs text-muted-foreground">⚠️ Dispute filed</span>
                         )}
                       </div>
                     </div>
@@ -312,6 +355,43 @@ const Orders = () => {
           }}
         />
       )}
+
+      {/* Dispute dialog */}
+      <Dialog open={!!disputeOrder} onOpenChange={open => { if (!open) setDisputeOrder(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report an Issue — Order #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 text-sm font-medium">What went wrong?</p>
+              <Select value={disputeReason} onValueChange={setDisputeReason}>
+                <SelectTrigger><SelectValue placeholder="Select a reason" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Wrong items received">Wrong items received</SelectItem>
+                  <SelectItem value="Missing items">Missing items</SelectItem>
+                  <SelectItem value="Food quality issue">Food quality issue</SelectItem>
+                  <SelectItem value="Late delivery">Late delivery</SelectItem>
+                  <SelectItem value="Order never delivered">Order never delivered</SelectItem>
+                  <SelectItem value="Overcharged">Overcharged</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium">Details (optional)</p>
+              <Textarea
+                value={disputeDesc}
+                onChange={e => setDisputeDesc(e.target.value)}
+                placeholder="Describe the issue in more detail..."
+              />
+            </div>
+            <Button onClick={handleSubmitDispute} disabled={!disputeReason || submittingDispute} className="w-full">
+              {submittingDispute ? 'Submitting...' : 'Submit Dispute'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

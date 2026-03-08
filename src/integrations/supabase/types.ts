@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      disputes: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          description: string | null
+          id: string
+          order_id: string
+          reason: string
+          status: Database["public"]["Enums"]["dispute_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_id: string
+          reason: string
+          status?: Database["public"]["Enums"]["dispute_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_id?: string
+          reason?: string
+          status?: Database["public"]["Enums"]["dispute_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_items: {
         Row: {
           category: string
@@ -370,6 +414,7 @@ export type Database = {
     }
     Enums: {
       app_role: "student" | "vendor" | "rider" | "admin"
+      dispute_status: "open" | "investigating" | "resolved" | "dismissed"
       order_status:
         | "pending"
         | "accepted"
@@ -510,6 +555,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["student", "vendor", "rider", "admin"],
+      dispute_status: ["open", "investigating", "resolved", "dismissed"],
       order_status: [
         "pending",
         "accepted",
