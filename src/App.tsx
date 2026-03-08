@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
+import BottomNav from "./components/layout/BottomNav";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -53,6 +54,7 @@ const App = () => (
         <AuthProvider>
           <CartProvider>
             <NotificationListener />
+            <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
@@ -88,6 +90,8 @@ const App = () => (
 
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </div>
+            <BottomNav />
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>
