@@ -23,7 +23,7 @@ const AppNavbar = () => {
             <>
               <NotificationCenter />
               {role === 'student' && (
-                <>
+                <div className="hidden md:flex items-center gap-1">
                   <Link to="/orders">
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                       <Package className="h-5 w-5" />
@@ -39,9 +39,9 @@ const AppNavbar = () => {
                       )}
                     </Button>
                   </Link>
-                </>
+                </div>
               )}
-              <Link to="/profile">
+              <Link to="/profile" className="hidden md:inline-flex">
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                   <User className="h-5 w-5" />
                 </Button>
