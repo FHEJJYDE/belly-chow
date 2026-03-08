@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin } from 'lucide-react';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import type { Enums } from '@/integrations/supabase/types';
 
 type PaymentMethod = Enums<"payment_method">;
@@ -25,6 +26,7 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pay_on_delivery');
   const [notes, setNotes] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
+  const { position, loading: geoLoading, getPosition } = useGeolocation();
 
   const deliveryFee = 200;
 
@@ -37,7 +39,7 @@ const Cart = () => {
 
     setIsOrdering(true);
     try {
-      const { data: order, error: orderError } = await supabase.from('orders').insert({
+      const orderData: any = {
         student_id: user.id,
         vendor_id: vendorId,
         total: total,
@@ -45,7 +47,12 @@ const Cart = () => {
         payment_method: paymentMethod,
         delivery_location: deliveryLocation,
         notes,
-      }).select().single();
+      };
+      if (position) {
+        orderData.delivery_lat = position.lat;
+        orderData.delivery_lng = position.lng;
+      }
+      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
 
       if (orderError) throw orderError;
 
@@ -119,6 +126,11 @@ const Cart = () => {
             <div>
               <Label>Delivery Location</Label>
               <Input placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={getPosition} disabled={geoLoading}>
+                <MapPin className="mr-1 h-3.5 w-3.5" />
+                {position ? '📍 Location captured' : geoLoading ? 'Getting location...' : 'Share my GPS location'}
+              </Button>
+              {position && <p className="mt-1 text-xs text-muted-foreground">GPS coordinates will be shared with rider for directions</p>}
             </div>
             <div>
               <Label>Payment Method</Label>

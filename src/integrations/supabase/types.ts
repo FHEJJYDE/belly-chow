@@ -107,12 +107,16 @@ export type Database = {
         Row: {
           created_at: string
           delivery_fee: number
+          delivery_lat: number | null
+          delivery_lng: number | null
           delivery_location: string
           id: string
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_status: Database["public"]["Enums"]["payment_status"]
           rider_id: string | null
+          rider_lat: number | null
+          rider_lng: number | null
           status: Database["public"]["Enums"]["order_status"]
           student_id: string
           total: number
@@ -122,12 +126,16 @@ export type Database = {
         Insert: {
           created_at?: string
           delivery_fee?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           delivery_location?: string
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
           rider_id?: string | null
+          rider_lat?: number | null
+          rider_lng?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           student_id: string
           total?: number
@@ -137,12 +145,16 @@ export type Database = {
         Update: {
           created_at?: string
           delivery_fee?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           delivery_location?: string
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: Database["public"]["Enums"]["payment_status"]
           rider_id?: string | null
+          rider_lat?: number | null
+          rider_lng?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           student_id?: string
           total?: number
