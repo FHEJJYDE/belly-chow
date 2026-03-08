@@ -128,6 +128,11 @@ const VendorOrders = () => {
           {order.notes && (
             <p className="text-xs text-muted-foreground italic">Note: {order.notes}</p>
           )}
+
+          {/* Chat for active orders (picked_up, delivering, preparing, ready) */}
+          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(order.status) && (
+            <DeliveryChat orderId={order.id} otherName="Rider & Student" />
+          )}
         </CardContent>
       </Card>
     );
