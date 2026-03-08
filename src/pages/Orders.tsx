@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Package, Star } from 'lucide-react';
+import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
 
 type Order = Database['public']['Tables']['orders']['Row'];
@@ -25,6 +26,8 @@ const Orders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -37,7 +40,14 @@ const Orders = () => {
       setOrders(data || []);
       setLoading(false);
     };
+
+    const fetchReviews = async () => {
+      const { data } = await supabase.from('reviews').select('order_id').eq('user_id', user.id);
+      setReviewedOrders(new Set(data?.map(r => r.order_id) || []));
+    };
+
     fetchOrders();
+    fetchReviews();
 
     const channel = supabase.channel('my-orders').on(
       'postgres_changes',
@@ -77,9 +87,16 @@ const Orders = () => {
                         <p className="mt-1 text-xs text-muted-foreground">📍 {order.delivery_location}</p>
                       )}
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
-                      {order.status.replace('_', ' ')}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
+                        {order.status.replace('_', ' ')}
+                      </span>
+                      {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
+                        <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="gap-1">
+                          <Star className="h-3.5 w-3.5" /> Rate
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status tracker for active orders */}
@@ -102,6 +119,20 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {reviewOrder && (
+        <ReviewDialog
+          open={!!reviewOrder}
+          onOpenChange={(open) => { if (!open) setReviewOrder(null); }}
+          orderId={reviewOrder.id}
+          vendorId={reviewOrder.vendor_id}
+          riderId={reviewOrder.rider_id}
+          onReviewed={() => {
+            setReviewedOrders(prev => new Set([...prev, reviewOrder.id]));
+            setReviewOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 };
