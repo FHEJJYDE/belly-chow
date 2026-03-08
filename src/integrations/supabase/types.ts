@@ -173,18 +173,27 @@ export type Database = {
       }
       platform_settings: {
         Row: {
+          bank_account_name: string
+          bank_account_number: string
+          bank_name: string
           commission_rate: number
           delivery_fee: number
           id: string
           updated_at: string
         }
         Insert: {
+          bank_account_name?: string
+          bank_account_number?: string
+          bank_name?: string
           commission_rate?: number
           delivery_fee?: number
           id?: string
           updated_at?: string
         }
         Update: {
+          bank_account_name?: string
+          bank_account_number?: string
+          bank_name?: string
           commission_rate?: number
           delivery_fee?: number
           id?: string

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import type { Enums } from '@/integrations/supabase/types';
 
@@ -27,8 +27,33 @@ const Cart = () => {
   const [notes, setNotes] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
   const { position, loading: geoLoading, getPosition } = useGeolocation();
+  const [bankDetails, setBankDetails] = useState<{ bank_name: string; bank_account_name: string; bank_account_number: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const deliveryFee = 200;
+
+  // Fetch bank details for bank transfer option
+  useEffect(() => {
+    const fetchBankDetails = async () => {
+      const { data } = await supabase.from('platform_settings').select('*').limit(1).single();
+      if (data) {
+        setBankDetails({
+          bank_name: (data as any).bank_name || '',
+          bank_account_name: (data as any).bank_account_name || '',
+          bank_account_number: (data as any).bank_account_number || '',
+        });
+      }
+    };
+    fetchBankDetails();
+  }, []);
+
+  const copyAccountNumber = () => {
+    if (bankDetails?.bank_account_number) {
+      navigator.clipboard.writeText(bankDetails.bank_account_number);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const placeOrder = async () => {
     if (!user || !vendorId || items.length === 0) return;
@@ -142,6 +167,40 @@ const Cart = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Bank Transfer Details */}
+            {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+                <p className="text-sm font-semibold text-foreground">💳 Transfer to this account:</p>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bank</span>
+                    <span className="font-medium">{bankDetails.bank_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Account Name</span>
+                    <span className="font-medium">{bankDetails.bank_account_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Account Number</span>
+                    <span className="flex items-center gap-1.5 font-medium">
+                      {bankDetails.bank_account_number}
+                      <button onClick={copyAccountNumber} className="rounded p-1 hover:bg-muted transition-colors" type="button">
+                        {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+                      </button>
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Transfer ₦{(total + deliveryFee).toLocaleString()} and place your order. Payment will be confirmed by the admin.
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'bank_transfer' && (!bankDetails || !bankDetails.bank_account_number) && (
+              <p className="text-sm text-destructive">Bank transfer details haven't been configured yet. Please choose Pay on Delivery.</p>
+            )}
+
             <div>
               <Label>Notes (optional)</Label>
               <Textarea placeholder="Any special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
