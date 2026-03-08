@@ -21,6 +21,7 @@ const items = [
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Disputes', url: '/admin/disputes', icon: AlertTriangle },
   { title: 'Refunds', url: '/admin/refunds', icon: RefreshCw },
+  { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
