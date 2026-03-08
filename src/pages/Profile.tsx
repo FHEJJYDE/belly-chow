@@ -14,13 +14,15 @@ import type { Database } from '@/integrations/supabase/types';
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
 const Profile = () => {
-  const { user, role } = useAuth();
+  const { user, role, loading } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [campusLocation, setCampusLocation] = useState('');
   const [saving, setSaving] = useState(false);
+
+  if (!loading && !user) return <Navigate to="/login" replace />;
 
   useEffect(() => {
     if (!user) return;
