@@ -162,7 +162,20 @@ const AdminDisputes = () => {
                 <p className="mb-1 text-sm font-medium text-muted-foreground">Admin Notes</p>
                 <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Add resolution notes..." />
               </div>
-              <Button onClick={handleUpdate} className="w-full">Save Changes</Button>
+              <div className="flex gap-2">
+                <Button onClick={handleUpdate} className="flex-1">Save Changes</Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await supabase.from('orders').update({ refund_status: 'requested' as any, refund_amount: 0 }).eq('id', selected.order_id);
+                    toast({ title: 'Refund requested for this order' });
+                    setSelected(null);
+                    navigate('/admin/refunds');
+                  }}
+                >
+                  Issue Refund
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
