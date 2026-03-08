@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
-import { UtensilsCrossed, ShoppingCart, LogOut, User, Package } from 'lucide-react';
+import { ShoppingCart, LogOut, User, Package } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
+import logo from '@/assets/belly_chow_logo.png';
 
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
