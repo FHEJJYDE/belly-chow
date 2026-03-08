@@ -70,7 +70,7 @@ const Cart = () => {
         total: total,
         delivery_fee: deliveryFee,
         payment_method: paymentMethod,
-        delivery_location: deliveryLocation,
+        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
         notes,
       };
       if (position) {

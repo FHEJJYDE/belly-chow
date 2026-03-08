@@ -187,7 +187,16 @@ const RiderDashboard = () => {
               <Phone className="h-3.5 w-3.5" /> {order.customer_phone}
             </a>
           )}
-          {order.delivery_lat && <p className="text-xs text-green-600">📍 GPS location available</p>}
+          {order.delivery_lat && order.delivery_lng && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1 gap-1"
+              onClick={() => openInGoogleMaps(order.delivery_lat!, order.delivery_lng!)}
+            >
+              <Navigation className="h-3.5 w-3.5" /> Navigate to Customer
+            </Button>
+          )}
         </div>
 
         {/* Order Items */}

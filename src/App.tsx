@@ -63,6 +63,7 @@ const App = () => (
                 <Route index element={<AdminOverview />} />
                 <Route path="vendors" element={<AdminVendors />} />
                 <Route path="orders" element={<AdminOrders />} />
+                <Route path="payments" element={<AdminPayments />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
