@@ -1,4 +1,5 @@
-import { LayoutDashboard, UtensilsCrossed, Package, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, UtensilsCrossed } from 'lucide-react';
+import logo from '@/assets/belly_chow_logo.png';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar,
