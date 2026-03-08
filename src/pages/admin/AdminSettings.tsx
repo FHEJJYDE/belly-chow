@@ -9,8 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 const AdminSettings = () => {
   const { toast } = useToast();
   const [settings, setSettings] = useState({
-    delivery_fee: 0,
-    commission_rate: 0,
+    platform_fee: 500,
+    rider_fee: 500,
     bank_name: '',
     bank_account_name: '',
     bank_account_number: '',
@@ -23,12 +23,13 @@ const AdminSettings = () => {
     const fetch = async () => {
       const { data } = await supabase.from('platform_settings').select('*').limit(1).single();
       if (data) {
+        const d = data as any;
         setSettings({
-          delivery_fee: data.delivery_fee,
-          commission_rate: data.commission_rate,
-          bank_name: (data as any).bank_name || '',
-          bank_account_name: (data as any).bank_account_name || '',
-          bank_account_number: (data as any).bank_account_number || '',
+          platform_fee: Number(d.platform_fee) || 500,
+          rider_fee: Number(d.rider_fee) || 500,
+          bank_name: d.bank_name || '',
+          bank_account_name: d.bank_account_name || '',
+          bank_account_number: d.bank_account_number || '',
         });
         setSettingsId(data.id);
       }
@@ -40,8 +41,8 @@ const AdminSettings = () => {
   const save = async () => {
     setSaving(true);
     const payload: any = {
-      delivery_fee: settings.delivery_fee,
-      commission_rate: settings.commission_rate,
+      platform_fee: settings.platform_fee,
+      rider_fee: settings.rider_fee,
       bank_name: settings.bank_name,
       bank_account_name: settings.bank_account_name,
       bank_account_number: settings.bank_account_number,
@@ -66,25 +67,34 @@ const AdminSettings = () => {
 
       <div className="max-w-lg space-y-6">
         <Card>
-          <CardHeader><CardTitle>Pricing</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Fixed Fee Model</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              A fixed service fee is added on top of every order. This fee is split between the platform and the rider.
+            </p>
             <div>
-              <Label>Default Delivery Fee (₦)</Label>
+              <Label>Platform Fee (₦)</Label>
               <Input
                 type="number"
-                value={settings.delivery_fee}
-                onChange={e => setSettings({ ...settings, delivery_fee: parseFloat(e.target.value) || 0 })}
+                value={settings.platform_fee}
+                onChange={e => setSettings({ ...settings, platform_fee: parseFloat(e.target.value) || 0 })}
               />
+              <p className="mt-1 text-xs text-muted-foreground">Your earnings per order</p>
             </div>
             <div>
-              <Label>Commission Rate (%)</Label>
+              <Label>Rider Fee (₦)</Label>
               <Input
                 type="number"
-                step="0.1"
-                value={settings.commission_rate}
-                onChange={e => setSettings({ ...settings, commission_rate: parseFloat(e.target.value) || 0 })}
+                value={settings.rider_fee}
+                onChange={e => setSettings({ ...settings, rider_fee: parseFloat(e.target.value) || 0 })}
               />
-              <p className="mt-1 text-xs text-muted-foreground">Percentage taken from each order</p>
+              <p className="mt-1 text-xs text-muted-foreground">Rider earnings per delivery</p>
+            </div>
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-sm font-medium">Total service fee per order: <span className="text-primary">₦{(settings.platform_fee + settings.rider_fee).toLocaleString()}</span></p>
+              <p className="text-xs text-muted-foreground mt-1">
+                e.g. ₦2,500 food → customer pays ₦{(2500 + settings.platform_fee + settings.rider_fee).toLocaleString()} total
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -92,32 +102,18 @@ const AdminSettings = () => {
         <Card>
           <CardHeader><CardTitle>Bank Account Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Students will see these details when paying via bank transfer.
-            </p>
+            <p className="text-sm text-muted-foreground">Students will see these details when paying via bank transfer.</p>
             <div>
               <Label>Bank Name</Label>
-              <Input
-                placeholder="e.g. GTBank, Access Bank"
-                value={settings.bank_name}
-                onChange={e => setSettings({ ...settings, bank_name: e.target.value })}
-              />
+              <Input placeholder="e.g. GTBank, Access Bank" value={settings.bank_name} onChange={e => setSettings({ ...settings, bank_name: e.target.value })} />
             </div>
             <div>
               <Label>Account Name</Label>
-              <Input
-                placeholder="e.g. BellyChow Ltd"
-                value={settings.bank_account_name}
-                onChange={e => setSettings({ ...settings, bank_account_name: e.target.value })}
-              />
+              <Input placeholder="e.g. BellyChow Ltd" value={settings.bank_account_name} onChange={e => setSettings({ ...settings, bank_account_name: e.target.value })} />
             </div>
             <div>
               <Label>Account Number</Label>
-              <Input
-                placeholder="e.g. 0123456789"
-                value={settings.bank_account_number}
-                onChange={e => setSettings({ ...settings, bank_account_number: e.target.value })}
-              />
+              <Input placeholder="e.g. 0123456789" value={settings.bank_account_number} onChange={e => setSettings({ ...settings, bank_account_number: e.target.value })} />
             </div>
           </CardContent>
         </Card>

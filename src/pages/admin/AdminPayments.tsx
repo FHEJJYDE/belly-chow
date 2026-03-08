@@ -15,29 +15,33 @@ type Vendor = Database['public']['Tables']['vendors']['Row'];
 interface VendorPayout {
   vendor: Vendor;
   totalRevenue: number;
-  commission: number;
+  platformFees: number;
+  riderFees: number;
   netPayout: number;
   deliveredOrders: number;
-  pendingPayment: number;
-  confirmedPayment: number;
 }
 
 const AdminPayments = () => {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [commissionRate, setCommissionRate] = useState(0.1);
+  const [platformFee, setPlatformFee] = useState(500);
+  const [riderFee, setRiderFee] = useState(500);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     const [ordersRes, vendorsRes, settingsRes] = await Promise.all([
       supabase.from('orders').select('*').eq('status', 'delivered').order('created_at', { ascending: false }),
       supabase.from('vendors').select('*').order('name'),
-      supabase.from('platform_settings').select('commission_rate').limit(1).single(),
+      supabase.from('platform_settings').select('*').limit(1).single(),
     ]);
     setOrders(ordersRes.data || []);
     setVendors(vendorsRes.data || []);
-    if (settingsRes.data) setCommissionRate(settingsRes.data.commission_rate);
+    if (settingsRes.data) {
+      const d = settingsRes.data as any;
+      setPlatformFee(Number(d.platform_fee) || 500);
+      setRiderFee(Number(d.rider_fee) || 500);
+    }
     setLoading(false);
   };
 
@@ -47,30 +51,28 @@ const AdminPayments = () => {
     return vendors.map(vendor => {
       const vendorOrders = orders.filter(o => o.vendor_id === vendor.id);
       const totalRevenue = vendorOrders.reduce((s, o) => s + Number(o.total), 0);
-      const commission = totalRevenue * commissionRate;
-      const netPayout = totalRevenue - commission;
-      const pendingPayment = vendorOrders.filter(o => o.payment_status === 'pending').reduce((s, o) => s + Number(o.total), 0);
-      const confirmedPayment = vendorOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + Number(o.total), 0);
+      const orderCount = vendorOrders.length;
+      const totalPlatformFees = orderCount * platformFee;
+      const totalRiderFees = orderCount * riderFee;
       return {
         vendor,
         totalRevenue,
-        commission,
-        netPayout,
-        deliveredOrders: vendorOrders.length,
-        pendingPayment,
-        confirmedPayment,
+        platformFees: totalPlatformFees,
+        riderFees: totalRiderFees,
+        netPayout: totalRevenue, // Vendor gets full food price — fees are on top
+        deliveredOrders: orderCount,
       };
     }).filter(p => p.deliveredOrders > 0).sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [orders, vendors, commissionRate]);
+  }, [orders, vendors, platformFee, riderFee]);
 
   const totals = useMemo(() => ({
     revenue: payouts.reduce((s, p) => s + p.totalRevenue, 0),
-    commission: payouts.reduce((s, p) => s + p.commission, 0),
-    netPayout: payouts.reduce((s, p) => s + p.netPayout, 0),
-    pendingPayment: payouts.reduce((s, p) => s + p.pendingPayment, 0),
+    platformFees: payouts.reduce((s, p) => s + p.platformFees, 0),
+    riderFees: payouts.reduce((s, p) => s + p.riderFees, 0),
+    vendorPayout: payouts.reduce((s, p) => s + p.netPayout, 0),
   }), [payouts]);
 
-  // --- Bank transfer payment confirmation (original functionality) ---
+  // Bank transfer payment confirmation
   const [bankOrders, setBankOrders] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -101,29 +103,26 @@ const AdminPayments = () => {
           <TabsTrigger value="confirmations">Payment Confirmations ({bankPending.length})</TabsTrigger>
         </TabsList>
 
-        {/* ─── Vendor Payouts Tab ─── */}
         <TabsContent value="payouts" className="mt-6 space-y-6">
-          {/* Summary cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card><CardContent className="flex items-center gap-3 p-4">
               <DollarSign className="h-8 w-8 text-primary" />
-              <div><p className="text-xs text-muted-foreground">Total Revenue</p><p className="font-heading text-xl font-bold">₦{totals.revenue.toLocaleString()}</p></div>
+              <div><p className="text-xs text-muted-foreground">Total Food Revenue</p><p className="font-heading text-xl font-bold">₦{totals.revenue.toLocaleString()}</p></div>
             </CardContent></Card>
             <Card><CardContent className="flex items-center gap-3 p-4">
-              <TrendingUp className="h-8 w-8 text-primary" />
-              <div><p className="text-xs text-muted-foreground">Platform Commission ({(commissionRate * 100).toFixed(0)}%)</p><p className="font-heading text-xl font-bold">₦{totals.commission.toLocaleString()}</p></div>
+              <TrendingUp className="h-8 w-8 text-green-500" />
+              <div><p className="text-xs text-muted-foreground">Platform Earnings (₦{platformFee}/order)</p><p className="font-heading text-xl font-bold">₦{totals.platformFees.toLocaleString()}</p></div>
             </CardContent></Card>
             <Card><CardContent className="flex items-center gap-3 p-4">
-              <Store className="h-8 w-8 text-primary" />
-              <div><p className="text-xs text-muted-foreground">Net Vendor Payouts</p><p className="font-heading text-xl font-bold">₦{totals.netPayout.toLocaleString()}</p></div>
+              <Wallet className="h-8 w-8 text-blue-500" />
+              <div><p className="text-xs text-muted-foreground">Rider Earnings (₦{riderFee}/order)</p><p className="font-heading text-xl font-bold">₦{totals.riderFees.toLocaleString()}</p></div>
             </CardContent></Card>
             <Card><CardContent className="flex items-center gap-3 p-4">
-              <Wallet className="h-8 w-8 text-destructive" />
-              <div><p className="text-xs text-muted-foreground">Pending Settlement</p><p className="font-heading text-xl font-bold">₦{totals.pendingPayment.toLocaleString()}</p></div>
+              <Store className="h-8 w-8 text-orange-500" />
+              <div><p className="text-xs text-muted-foreground">Vendor Payouts</p><p className="font-heading text-xl font-bold">₦{totals.vendorPayout.toLocaleString()}</p></div>
             </CardContent></Card>
           </div>
 
-          {/* Vendor payout table */}
           {payouts.length === 0 ? (
             <p className="py-10 text-center text-muted-foreground">No delivered orders yet</p>
           ) : (
@@ -134,11 +133,10 @@ const AdminPayments = () => {
                     <TableRow>
                       <TableHead>Vendor</TableHead>
                       <TableHead className="text-right">Orders</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead className="text-right">Commission</TableHead>
-                      <TableHead className="text-right">Net Payout</TableHead>
-                      <TableHead className="text-right">Confirmed</TableHead>
-                      <TableHead className="text-right">Pending</TableHead>
+                      <TableHead className="text-right">Food Revenue</TableHead>
+                      <TableHead className="text-right">Platform Fee</TableHead>
+                      <TableHead className="text-right">Rider Fee</TableHead>
+                      <TableHead className="text-right">Vendor Gets</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -147,16 +145,9 @@ const AdminPayments = () => {
                         <TableCell className="font-medium">{p.vendor.name}</TableCell>
                         <TableCell className="text-right">{p.deliveredOrders}</TableCell>
                         <TableCell className="text-right">₦{p.totalRevenue.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">₦{p.commission.toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">₦{p.platformFees.toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">₦{p.riderFees.toLocaleString()}</TableCell>
                         <TableCell className="text-right font-semibold">₦{p.netPayout.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-green-600">₦{p.confirmedPayment.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          {p.pendingPayment > 0 ? (
-                            <span className="text-yellow-600">₦{p.pendingPayment.toLocaleString()}</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -166,7 +157,6 @@ const AdminPayments = () => {
           )}
         </TabsContent>
 
-        {/* ─── Payment Confirmations Tab ─── */}
         <TabsContent value="confirmations" className="mt-6">
           <Tabs defaultValue="pending">
             <TabsList>
@@ -186,7 +176,6 @@ const AdminPayments = () => {
                         <div className="flex-1">
                           <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
                           <p className="text-sm font-semibold text-primary">₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">{order.delivery_location}</p>
                           <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString()}</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -198,12 +187,8 @@ const AdminPayments = () => {
                           </Badge>
                           {order.payment_status === 'pending' && (
                             <>
-                              <Button size="sm" onClick={() => updatePaymentStatus(order.id, 'confirmed')} className="gap-1">
-                                <CheckCircle className="h-3.5 w-3.5" /> Confirm
-                              </Button>
-                              <Button size="sm" variant="destructive" onClick={() => updatePaymentStatus(order.id, 'failed')} className="gap-1">
-                                <XCircle className="h-3.5 w-3.5" /> Reject
-                              </Button>
+                              <Button size="sm" onClick={() => updatePaymentStatus(order.id, 'confirmed')} className="gap-1"><CheckCircle className="h-3.5 w-3.5" /> Confirm</Button>
+                              <Button size="sm" variant="destructive" onClick={() => updatePaymentStatus(order.id, 'failed')} className="gap-1"><XCircle className="h-3.5 w-3.5" /> Reject</Button>
                             </>
                           )}
                         </div>
