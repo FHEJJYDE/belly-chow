@@ -83,7 +83,7 @@ const RiderDashboard = () => {
       const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds);
       menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
     }
-    const menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
+    
 
     const itemsByOrder = new Map<string, { name: string; quantity: number; price: number }[]>();
     orderItems?.forEach(oi => {
