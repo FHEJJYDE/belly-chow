@@ -10,7 +10,7 @@ import logo from '@/assets/belly_chow_logo.png';
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
   const { itemCount } = useCart();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-lg">
@@ -48,8 +48,8 @@ const AppNavbar = () => {
                   <User className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
+                {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
               <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
