@@ -186,10 +186,9 @@ const Orders = () => {
   if (loading) return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <div className="container max-w-2xl py-6">
-        <div className="mb-6 flex items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
-        </div>
+      <div className="container max-w-2xl py-8">
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Orders</p>
+        <h1 className="mt-1 mb-6 font-heading text-2xl font-bold tracking-tight">My orders</h1>
         <div className="space-y-3">
           {[1, 2, 3].map(i => <OrderCardSkeleton key={i} />)}
         </div>
