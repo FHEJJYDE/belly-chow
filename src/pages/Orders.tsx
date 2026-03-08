@@ -372,6 +372,20 @@ const Orders = () => {
         />
       )}
 
+      {/* Receipt dialog */}
+      {receiptOrder && (
+        <OrderReceipt
+          open={!!receiptOrder}
+          onOpenChange={(open) => { if (!open) setReceiptOrder(null); }}
+          order={receiptOrder as any}
+          items={(orderItems[receiptOrder.id] || []).map(i => ({
+            name: i.menu_items?.name || 'Item',
+            quantity: i.quantity,
+            price: Number(i.price),
+          }))}
+        />
+      )}
+
       {/* Dispute dialog */}
       <Dialog open={!!disputeOrder} onOpenChange={open => { if (!open) setDisputeOrder(null); }}>
         <DialogContent>
