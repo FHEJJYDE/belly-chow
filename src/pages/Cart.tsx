@@ -71,7 +71,33 @@ const Cart = () => {
     }
   };
 
-  const applyPromo = async () => {
+  const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Max 5MB allowed', variant: 'destructive' });
+      return;
+    }
+    setPaymentProof(file);
+    setPaymentProofPreview(URL.createObjectURL(file));
+  };
+
+  const uploadPaymentProof = async (orderId: string): Promise<string | null> => {
+    if (!paymentProof || !user) return null;
+    setUploadingProof(true);
+    const ext = paymentProof.name.split('.').pop();
+    const path = `${user.id}/${orderId}.${ext}`;
+    const { error } = await supabase.storage.from('payment-proofs').upload(path, paymentProof, { upsert: true });
+    setUploadingProof(false);
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+    return urlData.publicUrl || path;
+  };
+
+
     if (!promoInput.trim()) return;
     setPromoLoading(true);
     const { data, error } = await supabase
