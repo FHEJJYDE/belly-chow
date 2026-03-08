@@ -404,6 +404,39 @@ export type Database = {
         }
         Relationships: []
       }
+      verifications: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          document_type: string
+          document_url: string
+          id: string
+          status: Database["public"]["Enums"]["verification_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          document_type?: string
+          document_url: string
+          id?: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          document_type?: string
+          document_url?: string
+          id?: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -442,6 +475,7 @@ export type Database = {
         | "approved"
         | "processed"
         | "rejected"
+      verification_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -585,6 +619,7 @@ export const Constants = {
       payment_method: ["pay_on_delivery", "bank_transfer"],
       payment_status: ["pending", "confirmed", "failed"],
       refund_status: ["none", "requested", "approved", "processed", "rejected"],
+      verification_status: ["pending", "approved", "rejected"],
     },
   },
 } as const

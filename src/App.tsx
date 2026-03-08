@@ -26,6 +26,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminDisputes from "./pages/admin/AdminDisputes";
 import AdminRefunds from "./pages/admin/AdminRefunds";
+import AdminVerifications from "./pages/admin/AdminVerifications";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
@@ -69,6 +70,7 @@ const App = () => (
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="disputes" element={<AdminDisputes />} />
                 <Route path="refunds" element={<AdminRefunds />} />
+                <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 

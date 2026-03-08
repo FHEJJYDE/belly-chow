@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import VerificationUpload from '@/components/VerificationUpload';
 import type { Database } from '@/integrations/supabase/types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -80,6 +81,13 @@ const Profile = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Verification for riders and vendors */}
+        {(role === 'rider' || role === 'vendor') && (
+          <div className="mt-4">
+            <VerificationUpload />
+          </div>
+        )}
       </div>
     </div>
   );
