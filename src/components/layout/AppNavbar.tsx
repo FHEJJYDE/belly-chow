@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { UtensilsCrossed, ShoppingCart, LogOut, User, Package } from 'lucide-react';
+import NotificationCenter from '@/components/NotificationCenter';
 
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
@@ -21,6 +22,7 @@ const AppNavbar = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <NotificationCenter />
               {role === 'student' && (
                 <>
                   <Link to="/orders">
