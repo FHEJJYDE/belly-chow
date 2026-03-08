@@ -23,6 +23,7 @@ import AdminVendors from "./pages/admin/AdminVendors";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminPayments from "./pages/admin/AdminPayments";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
@@ -62,6 +63,7 @@ const App = () => (
                 <Route index element={<AdminOverview />} />
                 <Route path="vendors" element={<AdminVendors />} />
                 <Route path="orders" element={<AdminOrders />} />
+                <Route path="payments" element={<AdminPayments />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>

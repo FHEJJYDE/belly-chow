@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package, Users, Settings, Crown } from 'lucide-react';
+import { LayoutDashboard, Store, Package, Users, Settings, Crown, CreditCard } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: 'Overview', url: '/admin', icon: LayoutDashboard },
   { title: 'Vendors', url: '/admin/vendors', icon: Store },
   { title: 'Orders', url: '/admin/orders', icon: Package },
+  { title: 'Payments', url: '/admin/payments', icon: CreditCard },
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];

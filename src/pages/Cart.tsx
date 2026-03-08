@@ -57,8 +57,8 @@ const Cart = () => {
 
   const placeOrder = async () => {
     if (!user || !vendorId || items.length === 0) return;
-    if (!deliveryLocation.trim()) {
-      toast({ title: 'Please enter delivery location', variant: 'destructive' });
+    if (!position && !deliveryLocation.trim()) {
+      toast({ title: 'Please share GPS location or enter delivery address', variant: 'destructive' });
       return;
     }
 
@@ -70,7 +70,7 @@ const Cart = () => {
         total: total,
         delivery_fee: deliveryFee,
         payment_method: paymentMethod,
-        delivery_location: deliveryLocation,
+        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''),
         notes,
       };
       if (position) {
@@ -150,12 +150,33 @@ const Cart = () => {
           <CardContent className="space-y-4 p-4">
             <div>
               <Label>Delivery Location</Label>
-              <Input placeholder="e.g. Block A, Room 204, Hostel Name" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
-              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={getPosition} disabled={geoLoading}>
-                <MapPin className="mr-1 h-3.5 w-3.5" />
-                {position ? '📍 Location captured' : geoLoading ? 'Getting location...' : 'Share my GPS location'}
-              </Button>
-              {position && <p className="mt-1 text-xs text-muted-foreground">GPS coordinates will be shared with rider for directions</p>}
+              <div className="flex gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant={position ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    getPosition();
+                  }}
+                  disabled={geoLoading}
+                  className="shrink-0"
+                >
+                  <MapPin className="mr-1 h-3.5 w-3.5" />
+                  {position ? '📍 GPS Shared' : geoLoading ? 'Getting...' : 'Use GPS Location'}
+                </Button>
+                <span className="text-xs text-muted-foreground self-center">or type below</span>
+              </div>
+              {position && (
+                <p className="mt-1 text-xs text-green-600">✅ GPS coordinates captured — rider will get map directions to you</p>
+              )}
+              {!position && (
+                <Input
+                  className="mt-2"
+                  placeholder="e.g. Block A, Room 204, Hostel Name"
+                  value={deliveryLocation}
+                  onChange={e => setDeliveryLocation(e.target.value)}
+                />
+              )}
             </div>
             <div>
               <Label>Payment Method</Label>
