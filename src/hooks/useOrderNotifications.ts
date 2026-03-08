@@ -59,8 +59,14 @@ export function useOrderNotifications() {
   const { user, role, loading } = useAuth();
   const knownOrders = useRef<Set<string>>(new Set());
   const vendorIdRef = useRef<string | null>(null);
+  const recentNotifications = useRef<Set<string>>(new Set());
 
-  const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update') => {
+  const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update', dedupeKey?: string) => {
+    const key = dedupeKey || `${title}-${description}`;
+    if (recentNotifications.current.has(key)) return;
+    recentNotifications.current.add(key);
+    setTimeout(() => recentNotifications.current.delete(key), 5000);
+
     toast({ title, description });
     playNotificationSound(sound);
 

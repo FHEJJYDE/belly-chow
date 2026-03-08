@@ -191,7 +191,13 @@ const RiderDashboard = () => {
       }
     };
     fetchOrders();
-    const channel = supabase.channel('rider-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders()).subscribe();
+    const channel = supabase.channel('rider-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+      const newRow = payload.new as any;
+      const oldRow = payload.old as any;
+      // Ignore GPS-only updates to avoid refetch loops
+      if (payload.eventType === 'UPDATE' && newRow && oldRow && newRow.status === oldRow.status && newRow.rider_id === oldRow.rider_id) return;
+      fetchOrders();
+    }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
