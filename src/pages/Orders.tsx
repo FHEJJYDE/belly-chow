@@ -128,8 +128,14 @@ const Orders = () => {
       setReviewedOrders(new Set(data?.map(r => r.order_id) || []));
     };
 
+    const fetchDisputes = async () => {
+      const { data } = await supabase.from('disputes').select('order_id').eq('user_id', user.id);
+      setDisputedOrders(new Set(data?.map((d: any) => d.order_id) || []));
+    };
+
     fetchOrders();
     fetchReviews();
+    fetchDisputes();
 
     const channel = supabase.channel('my-orders').on(
       'postgres_changes',
