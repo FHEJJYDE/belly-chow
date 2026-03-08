@@ -245,6 +245,8 @@ const RiderDashboard = () => {
               <Button size="sm" onClick={() => updateStatus(order.id, 'delivered')}>Delivered ✓</Button>
             )}
             <Button size="sm" variant="ghost" onClick={() => setSelectedOrder(order.id)}>Show Map</Button>
+            {/* Chat with student */}
+            <DeliveryChat orderId={order.id} otherName="Customer" />
           </div>
         )}
       </CardContent>

@@ -337,6 +337,10 @@ const Orders = () => {
                             </div>
                           </Suspense>
                         )}
+                        {/* Chat with rider */}
+                        {order.rider_id && (
+                          <DeliveryChat orderId={order.id} otherName="Rider" />
+                        )}
                       </div>
                     )}
                   </CardContent>
