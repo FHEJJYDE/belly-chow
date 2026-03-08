@@ -23,6 +23,7 @@ const items = [
   { title: 'Refunds', url: '/admin/refunds', icon: RefreshCw },
   { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
   { title: 'Tickets', url: '/admin/tickets', icon: MessageSquare },
+  { title: 'Promo Codes', url: '/admin/promo-codes', icon: Tag },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 

@@ -78,6 +78,7 @@ const App = () => (
                 <Route path="refunds" element={<AdminRefunds />} />
                 <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="tickets" element={<AdminTickets />} />
+                <Route path="promo-codes" element={<AdminPromoCodes />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
