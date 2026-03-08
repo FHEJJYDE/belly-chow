@@ -4,11 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
 
 type Order = Database['public']['Tables']['orders']['Row'];
+type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
+  menu_items?: { name: string; image_url: string | null } | null;
+};
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-500/10 text-yellow-700',
@@ -25,9 +28,19 @@ const statusColors: Record<string, string> = {
 const Orders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedOrders(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -38,6 +51,20 @@ const Orders = () => {
         .eq('student_id', user.id)
         .order('created_at', { ascending: false });
       setOrders(data || []);
+
+      if (data && data.length > 0) {
+        const orderIds = data.map(o => o.id);
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('*, menu_items(name, image_url)')
+          .in('order_id', orderIds);
+        const grouped: Record<string, OrderItem[]> = {};
+        (items || []).forEach((item: any) => {
+          if (!grouped[item.order_id]) grouped[item.order_id] = [];
+          grouped[item.order_id].push(item);
+        });
+        setOrderItems(grouped);
+      }
       setLoading(false);
     };
 
@@ -73,49 +100,88 @@ const Orders = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {orders.map(order => (
-              <Card key={order.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()} · {order.payment_method.replace('_', ' ')}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString()}</p>
-                      {order.delivery_location && (
-                        <p className="mt-1 text-xs text-muted-foreground">📍 {order.delivery_location}</p>
-                      )}
+            {orders.map(order => {
+              const items = orderItems[order.id] || [];
+              const isExpanded = expandedOrders.has(order.id);
+              return (
+                <Card key={order.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()} · {order.payment_method.replace('_', ' ')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString()}</p>
+                        {order.delivery_location && (
+                          <p className="mt-1 text-xs text-muted-foreground">📍 {order.delivery_location}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
+                          {order.status.replace('_', ' ')}
+                        </span>
+                        {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
+                          <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="gap-1">
+                            <Star className="h-3.5 w-3.5" /> Rate
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
-                        {order.status.replace('_', ' ')}
-                      </span>
-                      {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
-                        <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="gap-1">
-                          <Star className="h-3.5 w-3.5" /> Rate
-                        </Button>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Status tracker for active orders */}
-                  {!['delivered', 'cancelled', 'rejected'].includes(order.status) && (
-                    <div className="mt-4 flex items-center gap-1">
-                      {['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'delivered'].map((step, i, arr) => {
-                        const currentIdx = arr.indexOf(order.status);
-                        const isActive = i <= currentIdx;
-                        return (
-                          <div key={step} className="flex flex-1 items-center">
-                            <div className={`h-2 w-full rounded-full ${isActive ? 'bg-primary' : 'bg-muted'}`} />
+                    {/* Expand/collapse items */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 w-full justify-between text-xs text-muted-foreground"
+                      onClick={() => toggleExpand(order.id)}
+                    >
+                      {items.length} item{items.length !== 1 ? 's' : ''}
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+
+                    {isExpanded && items.length > 0 && (
+                      <div className="mt-2 space-y-2 border-t pt-2">
+                        {items.map(item => (
+                          <div key={item.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              {item.menu_items?.image_url && (
+                                <img src={item.menu_items.image_url} alt="" className="h-8 w-8 rounded object-cover" />
+                              )}
+                              <span>{item.menu_items?.name || 'Item'} × {item.quantity}</span>
+                            </div>
+                            <span className="text-muted-foreground">₦{(Number(item.price) * item.quantity).toLocaleString()}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                        ))}
+                        <div className="flex justify-between border-t pt-2 text-xs text-muted-foreground">
+                          <span>Subtotal</span>
+                          <span>₦{Number(order.total).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Delivery</span>
+                          <span>₦{Number(order.delivery_fee).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status tracker for active orders */}
+                    {!['delivered', 'cancelled', 'rejected'].includes(order.status) && (
+                      <div className="mt-4 flex items-center gap-1">
+                        {['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'delivered'].map((step, i, arr) => {
+                          const currentIdx = arr.indexOf(order.status);
+                          const isActive = i <= currentIdx;
+                          return (
+                            <div key={step} className="flex flex-1 items-center">
+                              <div className={`h-2 w-full rounded-full ${isActive ? 'bg-primary' : 'bg-muted'}`} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
