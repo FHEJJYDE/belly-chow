@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Star, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import ReviewDialog from '@/components/ReviewDialog';
 import type { Database } from '@/integrations/supabase/types';
+
+const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
@@ -33,6 +35,8 @@ const Orders = () => {
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
@@ -84,6 +88,35 @@ const Orders = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  // Realtime rider location tracking
+  useEffect(() => {
+    if (!trackingOrderId) {
+      setLiveRiderPos(null);
+      return;
+    }
+    const order = orders.find(o => o.id === trackingOrderId);
+    if (order?.rider_lat && order?.rider_lng) {
+      setLiveRiderPos({ lat: order.rider_lat, lng: order.rider_lng });
+    }
+
+    const channel = supabase.channel(`track-${trackingOrderId}`).on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${trackingOrderId}` },
+      (payload) => {
+        const updated = payload.new as any;
+        if (updated.rider_lat && updated.rider_lng) {
+          setLiveRiderPos({ lat: updated.rider_lat, lng: updated.rider_lng });
+        }
+        // Stop tracking if delivered/cancelled
+        if (['delivered', 'cancelled', 'rejected'].includes(updated.status)) {
+          setTrackingOrderId(null);
+        }
+      }
+    ).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [trackingOrderId, orders]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
@@ -176,6 +209,38 @@ const Orders = () => {
                             </div>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {/* Track delivery button + map */}
+                    {['picked_up', 'delivering'].includes(order.status) && (
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant={trackingOrderId === order.id ? 'secondary' : 'default'}
+                          className="w-full gap-2"
+                          onClick={() => setTrackingOrderId(prev => prev === order.id ? null : order.id)}
+                        >
+                          <MapPin className="h-4 w-4" />
+                          {trackingOrderId === order.id ? 'Hide Map' : 'Track Rider Live 📍'}
+                        </Button>
+                        {trackingOrderId === order.id && (
+                          <Suspense fallback={<div className="mt-3 h-[300px] animate-pulse rounded-lg bg-muted" />}>
+                            <div className="mt-3">
+                              <DeliveryMap
+                                riderLat={liveRiderPos?.lat}
+                                riderLng={liveRiderPos?.lng}
+                                customerLat={order.delivery_lat}
+                                customerLng={order.delivery_lng}
+                              />
+                              {!liveRiderPos && (
+                                <p className="mt-2 text-center text-xs text-muted-foreground">
+                                  Waiting for rider location updates…
+                                </p>
+                              )}
+                            </div>
+                          </Suspense>
+                        )}
                       </div>
                     )}
                   </CardContent>
