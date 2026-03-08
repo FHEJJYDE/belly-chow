@@ -39,7 +39,7 @@ const Cart = () => {
 
     setIsOrdering(true);
     try {
-      const { data: order, error: orderError } = await supabase.from('orders').insert({
+      const orderData: any = {
         student_id: user.id,
         vendor_id: vendorId,
         total: total,
@@ -47,7 +47,12 @@ const Cart = () => {
         payment_method: paymentMethod,
         delivery_location: deliveryLocation,
         notes,
-      }).select().single();
+      };
+      if (position) {
+        orderData.delivery_lat = position.lat;
+        orderData.delivery_lng = position.lng;
+      }
+      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
 
       if (orderError) throw orderError;
 
