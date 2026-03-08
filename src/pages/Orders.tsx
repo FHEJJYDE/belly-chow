@@ -46,6 +46,11 @@ const Orders = () => {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [disputeOrder, setDisputeOrder] = useState<Order | null>(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [disputedOrders, setDisputedOrders] = useState<Set<string>>(new Set());
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
