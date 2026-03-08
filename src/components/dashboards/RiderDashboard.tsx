@@ -315,16 +315,17 @@ const RiderDashboard = () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const calc = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).reduce((sum, o) => sum + Number(o.delivery_fee), 0);
+    // Use the fixed rider_fee per delivery, not the full delivery_fee (which includes platform cut)
+    const calc = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).length * riderFee;
     const countFrom = (from: Date) => deliveryHistory.filter(o => new Date(o.created_at) >= from).length;
     return {
       today: calc(todayStart), todayCount: countFrom(todayStart),
       week: calc(weekStart), weekCount: countFrom(weekStart),
       month: calc(monthStart), monthCount: countFrom(monthStart),
-      total: deliveryHistory.reduce((sum, o) => sum + Number(o.delivery_fee), 0),
+      total: deliveryHistory.length * riderFee,
       totalCount: deliveryHistory.length,
     };
-  }, [deliveryHistory]);
+  }, [deliveryHistory, riderFee]);
 
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
