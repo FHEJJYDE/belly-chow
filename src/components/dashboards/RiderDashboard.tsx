@@ -315,8 +315,8 @@ const RiderDashboard = () => {
                           {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
                         </p>
                       )}
+                      {order.delivery_lat && <p className="text-xs text-green-600">📍 GPS — <button className="underline" onClick={() => openInGoogleMaps(order.delivery_lat!, order.delivery_lng!)}>Navigate</button></p>}
                       <p className="text-sm font-medium text-primary mt-1">Earn ₦{Number(order.delivery_fee).toLocaleString()}</p>
-                      {order.delivery_lat && <p className="text-xs text-green-600">📍 GPS location available</p>}
                     </div>
                     <Button onClick={() => acceptOrder(order.id)}>Accept</Button>
                   </div>
