@@ -129,6 +129,22 @@ const VendorOrders = () => {
             <p className="text-xs text-muted-foreground italic">Note: {order.notes}</p>
           )}
 
+          {/* Payment proof for bank transfers */}
+          {order.payment_method === 'bank_transfer' && (order as any).payment_proof_url && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+              <p className="text-xs font-semibold flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-primary" /> Payment Proof
+              </p>
+              <a href={(order as any).payment_proof_url} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={(order as any).payment_proof_url}
+                  alt="Payment proof"
+                  className="w-full max-h-48 rounded-md object-contain bg-muted cursor-pointer hover:opacity-80 transition-opacity"
+                />
+              </a>
+            </div>
+          )}
+
           {/* Chat for active orders (picked_up, delivering, preparing, ready) */}
           {['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(order.status) && (
             <DeliveryChat orderId={order.id} otherName="Rider & Student" />
