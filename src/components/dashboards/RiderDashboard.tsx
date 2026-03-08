@@ -16,11 +16,12 @@ import { useToast } from '@/hooks/use-toast';
 import {
   MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package,
   ArrowLeft, Clock, CheckCircle2, Truck, Wallet, History, Settings,
-  Home, Bike, TrendingUp, Calendar, DollarSign, Hash
+  Home, Bike, TrendingUp, Calendar, DollarSign, Hash, Locate, XCircle
 } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import DeliveryChat from '@/components/chat/DeliveryChat';
 import DeliveryMap from '@/components/maps/DeliveryMap';
+import LivePulse from '@/components/LivePulse';
 
 interface EnrichedOrder {
   id: string;
@@ -200,8 +201,21 @@ const RiderDashboard = () => {
   const updateStatus = async (orderId: string, status: string) => {
     const { error } = await supabase.from('orders').update({ status: status as any }).eq('id', orderId);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: `Order marked as ${status}` });
+    toast({ title: `Order marked as ${status.replace('_', ' ')}` });
     if (status === 'delivered') setActiveDeliveryId(null);
+  };
+
+  const cancelDelivery = async (orderId: string) => {
+    // Rider cancels: unassign rider and set back to ready
+    const { error } = await supabase.from('orders').update({
+      rider_id: null,
+      rider_lat: null,
+      rider_lng: null,
+      status: 'ready' as any,
+    } as any).eq('id', orderId);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Delivery cancelled. Order returned to pool.' });
+    setActiveDeliveryId(null);
   };
 
   const openInGoogleMaps = (lat: number, lng: number) => {
@@ -268,6 +282,9 @@ const RiderDashboard = () => {
     ];
     const currentStepIndex = statusSteps.findIndex(s => s.key === activeOrder.status);
 
+    // Student is sharing location if delivery_lat/lng are updating
+    const studentSharingLocation = !!activeOrder.delivery_lat && !!activeOrder.delivery_lng;
+
     // Build chat participants
     const chatParticipants = [
       { id: activeOrder.student_id, name: activeOrder.customer_name, role: 'student' },
@@ -283,9 +300,12 @@ const RiderDashboard = () => {
           </Button>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">Order #{activeOrder.id.slice(0, 8)}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> {new Date(activeOrder.created_at).toLocaleTimeString()}
-            </p>
+            <div className="flex items-center gap-2">
+              <LivePulse label="Active" />
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3" /> {new Date(activeOrder.created_at).toLocaleTimeString()}
+              </span>
+            </div>
           </div>
           <Badge variant={activeOrder.status === 'delivering' ? 'default' : 'secondary'} className="shrink-0">
             {activeOrder.status.replace('_', ' ')}
@@ -301,6 +321,12 @@ const RiderDashboard = () => {
             customerLng={activeOrder.delivery_lng}
             className="h-[250px] rounded-none"
           />
+          {/* Student sharing location indicator */}
+          {studentSharingLocation && (
+            <div className="absolute top-3 left-3 bg-blue-500/90 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+              <Locate className="h-3 w-3 animate-pulse" /> Student sharing live location
+            </div>
+          )}
           {activeOrder.delivery_lat && activeOrder.delivery_lng && (
             <Button
               size="sm"
@@ -363,7 +389,7 @@ const RiderDashboard = () => {
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-2">
               <p className="font-semibold flex items-center gap-1.5"><User className="h-4 w-4 text-muted-foreground" /> {activeOrder.customer_name}</p>
-              <p className="text-sm text-muted-foreground">{activeOrder.delivery_location || 'No location set'}</p>
+              <p className="text-sm text-muted-foreground">{activeOrder.delivery_location || 'GPS Location'}</p>
               {activeOrder.customer_phone && (
                 <a href={`tel:${activeOrder.customer_phone}`} className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
                   <Phone className="h-4 w-4" /> {activeOrder.customer_phone}
@@ -424,35 +450,62 @@ const RiderDashboard = () => {
         </div>
 
         {/* Sticky bottom action bar */}
-        <div className="sticky bottom-0 z-30 bg-card border-t p-4 flex gap-3">
-          {activeOrder.status === 'picked_up' && (
-            <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivering')}>
-              <Truck className="h-5 w-5" /> I'm On the Way
-            </Button>
-          )}
-          {activeOrder.status === 'delivering' && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button className="flex-1 h-12 text-base gap-2">
-                  <CheckCircle2 className="h-5 w-5" /> Mark Delivered ✓
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure this order has been delivered to the customer? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => updateStatus(activeOrder.id, 'delivered')}>
-                    Yes, Delivered ✓
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+        <div className="sticky bottom-0 z-30 bg-card border-t p-4 space-y-2">
+          <div className="flex gap-3">
+            {activeOrder.status === 'picked_up' && (
+              <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivering')}>
+                <Truck className="h-5 w-5" /> I'm On the Way
+              </Button>
+            )}
+            {activeOrder.status === 'delivering' && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button className="flex-1 h-12 text-base gap-2">
+                    <CheckCircle2 className="h-5 w-5" /> Mark Delivered ✓
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure this order has been delivered to the customer? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => updateStatus(activeOrder.id, 'delivered')}>
+                      Yes, Delivered ✓
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+          {/* Cancel delivery option */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive gap-1">
+                <XCircle className="h-4 w-4" /> Cancel Delivery
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel this delivery?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The order will be returned to the available pool for another rider to pick up. The student will be notified.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Delivery</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => cancelDelivery(activeOrder.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Yes, Cancel
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     );
@@ -533,7 +586,7 @@ const RiderDashboard = () => {
                               <Store className="h-3.5 w-3.5" /> {order.vendor_name}
                             </p>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
+                              <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'GPS Location'}
                             </p>
                             <p className="text-xs text-muted-foreground flex items-center gap-1">
                               <Package className="h-3 w-3" /> {order.items.length} item{order.items.length !== 1 ? 's' : ''}
@@ -593,7 +646,7 @@ const RiderDashboard = () => {
                                 <div>
                                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Drop-off</p>
                                   <p className="text-sm font-medium">{order.customer_name}</p>
-                                  <p className="text-xs text-muted-foreground">{order.delivery_location || 'No location'}</p>
+                                  <p className="text-xs text-muted-foreground">{order.delivery_location || 'GPS Location'}</p>
                                 </div>
                               </div>
                               {/* Items summary */}
