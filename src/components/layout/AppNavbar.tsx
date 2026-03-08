@@ -22,16 +22,23 @@ const AppNavbar = () => {
           {user ? (
             <>
               {role === 'student' && (
-                <Link to="/cart" className="relative">
-                  <Button variant="ghost" size="icon">
-                    <ShoppingCart className="h-5 w-5" />
-                    {itemCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                        {itemCount}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/orders">
+                    <Button variant="ghost" size="icon">
+                      <Package className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link to="/cart" className="relative">
+                    <Button variant="ghost" size="icon">
+                      <ShoppingCart className="h-5 w-5" />
+                      {itemCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                          {itemCount}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                </>
               )}
               <Link to="/profile">
                 <Button variant="ghost" size="icon">
