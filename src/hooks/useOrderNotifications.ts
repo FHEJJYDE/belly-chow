@@ -24,7 +24,6 @@ const riderStatusMessages: Record<string, { title: string; description: string }
   ready: { title: 'Order Ready! 📦', description: 'An order is ready for pickup.' },
 };
 
-// Generate a notification beep using Web Audio API
 function playNotificationSound(type: 'new_order' | 'status_update' = 'status_update') {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -35,7 +34,6 @@ function playNotificationSound(type: 'new_order' | 'status_update' = 'status_upd
     gainNode.connect(ctx.destination);
 
     if (type === 'new_order') {
-      // Attention-grabbing double beep for new orders
       oscillator.frequency.setValueAtTime(880, ctx.currentTime);
       oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
       oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
@@ -44,7 +42,6 @@ function playNotificationSound(type: 'new_order' | 'status_update' = 'status_upd
       oscillator.start(ctx.currentTime);
       oscillator.stop(ctx.currentTime + 0.5);
     } else {
-      // Subtle single tone for status updates
       oscillator.frequency.setValueAtTime(660, ctx.currentTime);
       gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
@@ -54,12 +51,12 @@ function playNotificationSound(type: 'new_order' | 'status_update' = 'status_upd
 
     oscillator.onended = () => ctx.close();
   } catch {
-    // Audio not supported, silently ignore
+    // Audio not supported
   }
 }
 
 export function useOrderNotifications() {
-  const { user, role } = useAuth();
+  const { user, role, loading } = useAuth();
   const knownOrders = useRef<Set<string>>(new Set());
   const vendorIdRef = useRef<string | null>(null);
 
@@ -67,13 +64,11 @@ export function useOrderNotifications() {
     toast({ title, description });
     playNotificationSound(sound);
 
-    // Also try browser notification if permitted
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(title, { body: description, icon: '/favicon.ico' });
     }
   }, []);
 
-  // Request notification permission on mount for vendors/riders
   useEffect(() => {
     if ((role === 'vendor' || role === 'rider') && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -81,7 +76,7 @@ export function useOrderNotifications() {
   }, [role]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading || !role) return;
 
     const init = async () => {
       if (role === 'student') {
@@ -137,5 +132,5 @@ export function useOrderNotifications() {
     ).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user, role, notify]);
+  }, [user, role, loading, notify]);
 }
