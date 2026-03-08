@@ -211,6 +211,38 @@ const Orders = () => {
                         })}
                       </div>
                     )}
+
+                    {/* Track delivery button + map */}
+                    {['picked_up', 'delivering'].includes(order.status) && (
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant={trackingOrderId === order.id ? 'secondary' : 'default'}
+                          className="w-full gap-2"
+                          onClick={() => setTrackingOrderId(prev => prev === order.id ? null : order.id)}
+                        >
+                          <MapPin className="h-4 w-4" />
+                          {trackingOrderId === order.id ? 'Hide Map' : 'Track Rider Live 📍'}
+                        </Button>
+                        {trackingOrderId === order.id && (
+                          <Suspense fallback={<div className="mt-3 h-[300px] animate-pulse rounded-lg bg-muted" />}>
+                            <div className="mt-3">
+                              <DeliveryMap
+                                riderLat={liveRiderPos?.lat}
+                                riderLng={liveRiderPos?.lng}
+                                customerLat={order.delivery_lat}
+                                customerLng={order.delivery_lng}
+                              />
+                              {!liveRiderPos && (
+                                <p className="mt-2 text-center text-xs text-muted-foreground">
+                                  Waiting for rider location updates…
+                                </p>
+                              )}
+                            </div>
+                          </Suspense>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
