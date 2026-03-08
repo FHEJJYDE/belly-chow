@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, LogOut, User, Package } from 'lucide-react';
+import { ShoppingCart, LogOut, User, Package, Sun, Moon } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 import logo from '@/assets/belly_chow_logo.png';
 
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
   const { itemCount } = useCart();
+  const { theme, setTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-lg">
@@ -46,6 +48,9 @@ const AppNavbar = () => {
                   <User className="h-5 w-5" />
                 </Button>
               </Link>
+              <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
+                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
               <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
               </Button>
