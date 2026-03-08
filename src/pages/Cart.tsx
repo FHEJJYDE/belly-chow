@@ -29,6 +29,10 @@ const Cart = () => {
   const { position, loading: geoLoading, getPosition } = useGeolocation();
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bank_account_name: string; bank_account_number: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fees from platform settings
   const [platformFee, setPlatformFee] = useState(500);
