@@ -653,7 +653,7 @@ const RiderDashboard = () => {
                         <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'N/A'}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(order.created_at).toLocaleDateString()} · {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
-                      <div className="text-right"><p className="font-bold text-primary">₦{Number(order.delivery_fee).toLocaleString()}</p><p className="text-xs text-muted-foreground">earned</p></div>
+                      <div className="text-right"><p className="font-bold text-primary">₦{riderFee.toLocaleString()}</p><p className="text-xs text-muted-foreground">earned</p></div>
                     </div>
                   </CardContent>
                 </Card>
