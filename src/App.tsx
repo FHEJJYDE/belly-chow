@@ -26,6 +26,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminDisputes from "./pages/admin/AdminDisputes";
 import AdminRefunds from "./pages/admin/AdminRefunds";
+import AdminVerifications from "./pages/admin/AdminVerifications";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
