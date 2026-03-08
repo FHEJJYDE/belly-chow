@@ -212,11 +212,14 @@ const Orders = () => {
   const pastOrders = orders.filter(o => !ACTIVE_STATUSES.includes(o.status));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container max-w-2xl py-6">
-        <div className="mb-6 flex items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
+      <div className="container max-w-2xl py-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Orders</p>
+            <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">My orders</h1>
+          </div>
           {activeOrders.length > 0 && <LivePulse />}
         </div>
 
