@@ -6,9 +6,8 @@ import { useCart } from '@/contexts/CartContext';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Star, Clock, AlertCircle, MessageSquare, Heart } from 'lucide-react';
+import { ArrowLeft, Plus, Star, Clock, AlertCircle, Heart } from 'lucide-react';
 import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
 import { useFavourites } from '@/hooks/useFavourites';
 import { MenuItemSkeleton } from '@/components/Skeletons';
@@ -62,7 +61,7 @@ const VendorDetail = () => {
 
   const handleAddItem = (item: MenuItem) => {
     addItem(item);
-    toast({ title: `${item.name} added to cart 🛒` });
+    toast({ title: `${item.name} added to cart` });
   };
 
   const categories = items.reduce<Record<string, MenuItem[]>>((acc, item) => {
@@ -73,9 +72,9 @@ const VendorDetail = () => {
   if (loading) return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <div className="container py-6 space-y-4">
+      <div className="container py-8 space-y-4">
         <div className="h-6 w-32 animate-pulse rounded bg-muted" />
-        <div className="h-32 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-28 animate-pulse rounded-xl bg-muted" />
         <div className="grid gap-3 sm:grid-cols-2">
           {[1, 2, 3, 4].map(i => <MenuItemSkeleton key={i} />)}
         </div>
@@ -86,7 +85,7 @@ const VendorDetail = () => {
   if (!vendor) return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <EmptyState emoji="🔍" title="Vendor not found" description="This vendor may have been removed or doesn't exist" action={<Link to="/dashboard"><Button>Back to vendors</Button></Link>} />
+      <EmptyState emoji="🔍" title="Vendor not found" description="This vendor may have been removed" action={<Link to="/dashboard"><Button>Back to vendors</Button></Link>} />
     </div>
   );
 
@@ -95,51 +94,51 @@ const VendorDetail = () => {
   const fav = isFavourite(vendor.id);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container py-6">
-        <Link to="/dashboard" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Back to vendors
+      <div className="container py-8">
+        <Link to="/dashboard" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back
         </Link>
 
         {/* Vendor Header */}
-        <div className="mb-8 rounded-2xl border bg-card p-6">
+        <div className="mb-10">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-3xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-2xl shrink-0">
               {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-xl object-cover" /> : '🍽️'}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-heading text-2xl font-bold">{vendor.name}</h1>
+                <h1 className="font-heading text-2xl font-bold tracking-tight truncate">{vendor.name}</h1>
                 {user && (
-                  <button onClick={() => toggleFavourite(vendor.id)} className="rounded-full p-1.5 transition-colors hover:bg-muted">
-                    <Heart className={`h-5 w-5 ${fav ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
+                  <button onClick={() => toggleFavourite(vendor.id)} className="rounded-full p-1.5 transition-colors hover:bg-muted shrink-0">
+                    <Heart className={`h-5 w-5 ${fav ? 'fill-foreground text-foreground' : 'text-muted-foreground'}`} />
                   </button>
                 )}
               </div>
-              <p className="text-muted-foreground">{vendor.description || 'Delicious campus food'}</p>
-              <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">{vendor.description || 'Campus food vendor'}</p>
+              <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-primary text-primary" />
+                  <Star className="h-3 w-3 fill-foreground text-foreground" />
                   {avgRating || 'New'}
                   {vendor.total_reviews && vendor.total_reviews > 0 && (
-                    <span className="text-xs">({vendor.total_reviews} review{vendor.total_reviews !== 1 ? 's' : ''})</span>
+                    <span>({vendor.total_reviews})</span>
                   )}
                 </span>
-                <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}</span>
-                <Badge variant={open ? 'default' : 'secondary'}>{open ? '🟢 Open' : 'Closed'}</Badge>
+                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}</span>
+                <span className={`font-medium ${open ? 'text-foreground' : 'text-muted-foreground'}`}>{open ? 'Open' : 'Closed'}</span>
               </div>
             </div>
           </div>
         </div>
 
         {!open && (
-          <div className="mb-6 flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-            <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
+          <div className="mb-8 flex items-center gap-3 rounded-xl border p-4">
+            <AlertCircle className="h-5 w-5 shrink-0 text-muted-foreground" />
             <div>
-              <p className="font-medium text-destructive">This vendor is currently closed</p>
-              <p className="text-sm text-muted-foreground">
-                Operating hours: {formatTime(vendor.opening_time)} - {formatTime(vendor.closing_time)}. You can browse the menu but ordering is unavailable.
+              <p className="font-medium text-sm">This vendor is currently closed</p>
+              <p className="text-xs text-muted-foreground">
+                Hours: {formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}
               </p>
             </div>
           </div>
@@ -147,22 +146,22 @@ const VendorDetail = () => {
 
         {/* Menu */}
         {items.length === 0 ? (
-          <EmptyState emoji="📋" title="No menu items available" description="This vendor hasn't added any items yet" />
+          <EmptyState emoji="📋" title="No menu items" description="This vendor hasn't added any items yet" />
         ) : (
           Object.entries(categories).map(([category, catItems]) => (
-            <div key={category} className="mb-8">
-              <h2 className="mb-3 font-heading text-lg font-semibold">{category}</h2>
+            <div key={category} className="mb-10">
+              <h2 className="mb-4 text-sm font-medium uppercase tracking-widest text-muted-foreground">{category}</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {catItems.map(item => (
                   <Card key={item.id} className="overflow-hidden">
                     <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{item.name}</h3>
-                        {item.description && <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
-                        <p className="mt-1 font-heading font-bold text-primary">₦{Number(item.price).toLocaleString()}</p>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm">{item.name}</h3>
+                        {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>}
+                        <p className="mt-1.5 font-heading font-bold text-sm">₦{Number(item.price).toLocaleString()}</p>
                       </div>
-                      <Button size="sm" className="ml-4 shrink-0" onClick={() => handleAddItem(item)} disabled={!open}>
-                        <Plus className="mr-1 h-4 w-4" /> Add
+                      <Button size="sm" variant="outline" className="ml-4 shrink-0" onClick={() => handleAddItem(item)} disabled={!open}>
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Add
                       </Button>
                     </CardContent>
                   </Card>
@@ -174,16 +173,12 @@ const VendorDetail = () => {
 
         {/* Reviews */}
         <div className="mt-4 mb-8">
-          <div className="mb-4 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <h2 className="font-heading text-lg font-semibold">
-              Reviews
-              {avgRating && <span className="ml-2 text-base font-normal text-muted-foreground">— {avgRating} ⭐</span>}
-            </h2>
-          </div>
+          <h2 className="mb-4 text-sm font-medium uppercase tracking-widest text-muted-foreground">
+            Reviews {avgRating && `· ${avgRating} avg`}
+          </h2>
 
           {reviews.length === 0 ? (
-            <EmptyState emoji="💬" title="No reviews yet" description="Be the first to review this vendor!" />
+            <p className="py-8 text-center text-sm text-muted-foreground">No reviews yet</p>
           ) : (
             <div className="space-y-3">
               {reviews.map(review => (
@@ -196,7 +191,7 @@ const VendorDetail = () => {
                       </div>
                       <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map(s => (
-                          <Star key={s} className={`h-3.5 w-3.5 ${s <= review.rating ? 'fill-primary text-primary' : 'text-muted-foreground/30'}`} />
+                          <Star key={s} className={`h-3 w-3 ${s <= review.rating ? 'fill-foreground text-foreground' : 'text-muted-foreground/20'}`} />
                         ))}
                       </div>
                     </div>

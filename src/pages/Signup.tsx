@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap, Store, Bike } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { useToast } from '@/hooks/use-toast';
@@ -40,7 +39,7 @@ const Signup = () => {
     setIsLoading(true);
     try {
       await signUp(email, password, fullName, selectedRole, vendorName || undefined);
-      toast({ title: 'Account created!', description: 'Welcome to Belly-Chow 🎉' });
+      toast({ title: 'Account created', description: 'Welcome to Belly-Chow' });
       navigate('/dashboard');
     } catch (error: any) {
       toast({
@@ -54,30 +53,50 @@ const Signup = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Link to="/" className="mx-auto mb-4 flex items-center gap-2">
-            <img src={logo} alt="Belly-Chow" className="h-9 w-9 rounded-lg object-contain" />
-            <span className="font-heading text-xl font-bold">Belly-Chow</span>
+    <div className="flex min-h-screen">
+      {/* Left panel — branding */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between border-r bg-muted/30 p-12">
+        <Link to="/" className="flex items-center gap-2.5">
+          <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
+          <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+        </Link>
+        <div>
+          <h1 className="font-heading text-4xl font-bold leading-tight tracking-tight">
+            Join the campus
+            <br />
+            <span className="text-primary">food network.</span>
+          </h1>
+          <p className="mt-4 max-w-sm text-muted-foreground leading-relaxed">
+            Whether you're ordering, selling, or delivering — there's a place for you.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Belly-Chow</p>
+      </div>
+
+      {/* Right panel — form */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
+          <Link to="/" className="mb-10 flex items-center gap-2 lg:hidden">
+            <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
           </Link>
-          <CardTitle className="font-heading text-2xl">Create your account</CardTitle>
-          <CardDescription>Join the campus food revolution</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Get started</p>
+          <h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Create your account</h2>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div className="space-y-2">
-              <Label>I am a...</Label>
+              <Label className="text-sm font-medium">I am a...</Label>
               <div className="grid grid-cols-3 gap-2">
                 {roles.map(r => (
                   <button
                     key={r.value}
                     type="button"
                     onClick={() => setSelectedRole(r.value)}
-                    className={`flex flex-col items-center gap-1 rounded-lg border-2 p-3 text-center transition-colors ${
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-all ${
                       selectedRole === r.value
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
+                        ? 'border-foreground bg-foreground/5'
+                        : 'border-border hover:border-foreground/30'
                     }`}
                   >
                     {r.icon}
@@ -88,37 +107,40 @@ const Signup = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName" className="text-sm font-medium">Full Name</Label>
               <Input id="fullName" placeholder="John Doe" value={fullName} onChange={e => setFullName(e.target.value)} required />
             </div>
 
             {selectedRole === 'vendor' && (
               <div className="space-y-2">
-                <Label htmlFor="vendorName">Business Name</Label>
+                <Label htmlFor="vendorName" className="text-sm font-medium">Business Name</Label>
                 <Input id="vendorName" placeholder="e.g. Mama's Kitchen" value={vendorName} onChange={e => setVendorName(e.target.value)} required />
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input id="email" type="email" placeholder="you@university.edu" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <Input id="password" type="password" placeholder="Min 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating account...' : 'Create Account'}
+              {isLoading ? 'Creating account...' : 'Create account'}
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-primary hover:underline">Log in</Link>
-          </p>
-        </CardContent>
-      </Card>
+
+          <div className="mt-8 border-t pt-6">
+            <p className="text-center text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium text-foreground hover:text-primary transition-colors">Log in</Link>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

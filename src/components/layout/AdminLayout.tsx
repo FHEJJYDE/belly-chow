@@ -14,13 +14,13 @@ const AdminLayout = () => {
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b bg-background/80 backdrop-blur-md px-4">
+          <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b bg-background/90 backdrop-blur-lg px-4">
             <SidebarTrigger />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Link to="/profile">
-                <Button variant="ghost" size="icon"><User className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><User className="h-5 w-5" /></Button>
               </Link>
-              <Button variant="ghost" size="icon" onClick={signOut}>
+              <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>

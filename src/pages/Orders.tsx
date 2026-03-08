@@ -25,15 +25,15 @@ type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
 };
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-700',
-  accepted: 'bg-blue-500/10 text-blue-700',
-  preparing: 'bg-orange-500/10 text-orange-700',
-  ready: 'bg-purple-500/10 text-purple-700',
-  picked_up: 'bg-indigo-500/10 text-indigo-700',
-  delivering: 'bg-cyan-500/10 text-cyan-700',
-  delivered: 'bg-green-500/10 text-green-700',
-  cancelled: 'bg-red-500/10 text-red-700',
-  rejected: 'bg-red-500/10 text-red-700',
+  pending: 'border bg-muted/50 text-foreground',
+  accepted: 'border bg-muted/50 text-foreground',
+  preparing: 'border bg-muted/50 text-foreground',
+  ready: 'border bg-muted/50 text-foreground',
+  picked_up: 'border bg-muted/50 text-foreground',
+  delivering: 'border bg-muted/50 text-foreground',
+  delivered: 'border bg-muted/50 text-foreground',
+  cancelled: 'border bg-destructive/5 text-destructive',
+  rejected: 'border bg-destructive/5 text-destructive',
 };
 
 const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering'];
@@ -186,10 +186,9 @@ const Orders = () => {
   if (loading) return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <div className="container max-w-2xl py-6">
-        <div className="mb-6 flex items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
-        </div>
+      <div className="container max-w-2xl py-8">
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Orders</p>
+        <h1 className="mt-1 mb-6 font-heading text-2xl font-bold tracking-tight">My orders</h1>
         <div className="space-y-3">
           {[1, 2, 3].map(i => <OrderCardSkeleton key={i} />)}
         </div>
@@ -213,11 +212,14 @@ const Orders = () => {
   const pastOrders = orders.filter(o => !ACTIVE_STATUSES.includes(o.status));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container max-w-2xl py-6">
-        <div className="mb-6 flex items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold">My Orders 📦</h1>
+      <div className="container max-w-2xl py-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Orders</p>
+            <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">My orders</h1>
+          </div>
           {activeOrders.length > 0 && <LivePulse />}
         </div>
 
@@ -232,12 +234,12 @@ const Orders = () => {
             {/* Active Orders */}
             {activeOrders.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Active Orders</h2>
+                <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground mb-3">Active orders</h2>
                 <div className="space-y-3">
                   {activeOrders.map(order => (
                     <Card
                       key={order.id}
-                      className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                      className="cursor-pointer hover:ring-1 hover:ring-border transition-all"
                       onClick={() => setTrackingOrderId(order.id)}
                     >
                       <CardContent className="p-4">
@@ -253,7 +255,7 @@ const Orders = () => {
                             <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
                               {order.status.replace('_', ' ')}
                             </span>
-                            <span className="text-xs text-primary font-medium">Tap to track →</span>
+                            <span className="text-xs text-foreground font-medium">Track →</span>
                           </div>
                         </div>
                         {/* Mini progress bar */}
@@ -263,7 +265,7 @@ const Orders = () => {
                             const isActive = i <= currentIdx;
                             return (
                               <div key={step} className="flex flex-1 items-center">
-                                <div className={`h-2 w-full rounded-full ${isActive ? 'bg-primary' : 'bg-muted'}`} />
+                                <div className={`h-1.5 w-full rounded-full ${isActive ? 'bg-foreground' : 'bg-muted'}`} />
                               </div>
                             );
                           })}
@@ -278,7 +280,7 @@ const Orders = () => {
             {/* Past Orders */}
             {pastOrders.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Past Orders</h2>
+                <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground mb-3">Past orders</h2>
                 <div className="space-y-3">
                   {pastOrders.map(order => {
                     const items = orderItems[order.id] || [];
@@ -401,7 +403,7 @@ const Orders = () => {
       <Dialog open={!!disputeOrder} onOpenChange={open => { if (!open) setDisputeOrder(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Report an Issue — Order #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
+            <DialogTitle className="font-heading">Report issue — #{disputeOrder?.id.slice(0, 8)}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>

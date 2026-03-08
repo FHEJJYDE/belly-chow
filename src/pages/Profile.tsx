@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,47 +44,50 @@ const Profile = () => {
     }).eq('user_id', user.id);
     setSaving(false);
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else toast({ title: 'Profile updated ✓' });
+    else toast({ title: 'Profile updated' });
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <AppNavbar />
-      <div className="container max-w-lg py-6">
+      <div className="container max-w-lg py-8">
+        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Account</p>
+        <h1 className="mt-1 mb-8 font-heading text-2xl font-bold tracking-tight">My profile</h1>
+
         <Card>
-          <CardHeader>
-            <CardTitle className="font-heading">My Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Email</Label>
-              <Input value={user?.email || ''} disabled />
+          <CardContent className="space-y-5 p-6">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Email</Label>
+              <Input value={user?.email || ''} disabled className="bg-muted/50" />
             </div>
-            <div>
-              <Label>Role</Label>
-              <Input value={role || 'student'} disabled className="capitalize" />
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Role</Label>
+              <Input value={role || 'student'} disabled className="capitalize bg-muted/50" />
             </div>
-            <div>
-              <Label>Full Name</Label>
-              <Input value={fullName} onChange={e => setFullName(e.target.value)} />
+
+            <div className="border-t pt-5 space-y-5">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Full Name</Label>
+                <Input value={fullName} onChange={e => setFullName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Phone</Label>
+                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+234..." />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Campus Location</Label>
+                <Input value={campusLocation} onChange={e => setCampusLocation(e.target.value)} placeholder="e.g. Block A Hostel" />
+              </div>
             </div>
-            <div>
-              <Label>Phone</Label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+234..." />
-            </div>
-            <div>
-              <Label>Campus Location</Label>
-              <Input value={campusLocation} onChange={e => setCampusLocation(e.target.value)} placeholder="e.g. Block A Hostel" />
-            </div>
+
             <Button onClick={save} disabled={saving} className="w-full">
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save changes'}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Verification for riders and vendors */}
         {(role === 'rider' || role === 'vendor') && (
-          <div className="mt-4">
+          <div className="mt-6">
             <VerificationUpload />
           </div>
         )}
