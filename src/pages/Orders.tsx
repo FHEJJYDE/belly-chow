@@ -242,6 +242,14 @@ const Orders = () => {
                             <RotateCcw className="h-3.5 w-3.5" /> Reorder
                           </Button>
                         )}
+                        {!['pending'].includes(order.status) && !disputedOrders.has(order.id) && (
+                          <Button size="sm" variant="ghost" onClick={() => setDisputeOrder(order)} className="gap-1 text-destructive hover:text-destructive">
+                            <AlertTriangle className="h-3.5 w-3.5" /> Report Issue
+                          </Button>
+                        )}
+                        {disputedOrders.has(order.id) && (
+                          <span className="text-xs text-muted-foreground">⚠️ Dispute filed</span>
+                        )}
                       </div>
                     </div>
 
