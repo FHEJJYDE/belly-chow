@@ -61,7 +61,7 @@ const AdminPayments = () => {
     // Enrich withdrawals with rider names
     const wds = withdrawalsRes.data || [];
     if (wds.length > 0) {
-      const userIds = [...new Set(wds.map((w: any) => w.user_id))];
+      const userIds = [...new Set(wds.map((w: any) => w.user_id))] as string[];
       const { data: profiles } = await supabase.from('profiles').select('user_id, full_name').in('user_id', userIds);
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
       setWithdrawals(wds.map((w: any) => ({ ...w, rider_name: profileMap.get(w.user_id) || 'Unknown' })));
