@@ -255,7 +255,7 @@ const Orders = () => {
                             <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
                               {order.status.replace('_', ' ')}
                             </span>
-                            <span className="text-xs text-primary font-medium">Tap to track →</span>
+                            <span className="text-xs text-foreground font-medium">Track →</span>
                           </div>
                         </div>
                         {/* Mini progress bar */}
