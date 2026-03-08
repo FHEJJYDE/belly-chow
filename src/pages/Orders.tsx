@@ -52,7 +52,43 @@ const Orders = () => {
     });
   };
 
-  useEffect(() => {
+  const handleReorder = useCallback(async (orderId: string, vendorId: string) => {
+    const items = orderItems[orderId] || [];
+    if (items.length === 0) {
+      toast({ title: 'No items found for this order', variant: 'destructive' });
+      return;
+    }
+    // Fetch current menu items to ensure they still exist and are available
+    const menuItemIds = items.map(i => i.menu_item_id);
+    const { data: currentItems } = await supabase
+      .from('menu_items')
+      .select('*')
+      .in('id', menuItemIds)
+      .eq('is_available', true);
+
+    if (!currentItems || currentItems.length === 0) {
+      toast({ title: 'These items are no longer available', variant: 'destructive' });
+      return;
+    }
+
+    clearCart();
+    currentItems.forEach(menuItem => {
+      const originalItem = items.find(i => i.menu_item_id === menuItem.id);
+      const qty = originalItem?.quantity || 1;
+      for (let i = 0; i < qty; i++) {
+        addItem(menuItem);
+      }
+    });
+
+    const unavailable = menuItemIds.length - currentItems.length;
+    if (unavailable > 0) {
+      toast({ title: `${unavailable} item${unavailable > 1 ? 's' : ''} no longer available — the rest were added to your cart` });
+    } else {
+      toast({ title: 'Items added to cart! 🛒' });
+    }
+    navigate('/cart');
+  }, [orderItems, clearCart, addItem, toast, navigate]);
+
     if (!user) return;
     const fetchOrders = async () => {
       const { data } = await supabase
