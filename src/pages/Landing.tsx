@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { UtensilsCrossed, Truck, Clock, Star } from 'lucide-react';
+import { Truck, Clock, Star, UtensilsCrossed } from 'lucide-react';
+import logo from '@/assets/belly_chow_logo.png';
 
 const Landing = () => {
   return (
