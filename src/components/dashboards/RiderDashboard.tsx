@@ -191,7 +191,7 @@ const RiderDashboard = () => {
         </div>
 
         {/* Order Items */}
-        {order.items.length > 0 && (
+        {order.items && order.items.length > 0 && (
           <div className="rounded-lg border p-3 space-y-1">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">🛒 Items</p>
             {order.items.map((item, i) => (
