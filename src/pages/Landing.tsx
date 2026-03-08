@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { UtensilsCrossed, Truck, Clock, Star } from 'lucide-react';
+import { Truck, Clock, Star, UtensilsCrossed } from 'lucide-react';
+import logo from '@/assets/belly_chow_logo.png';
 
 const Landing = () => {
   return (
@@ -9,9 +10,7 @@ const Landing = () => {
       <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Belly-Chow" className="h-9 w-9 rounded-lg object-contain" />
             <span className="font-heading text-xl font-bold">Belly-Chow</span>
           </Link>
           <div className="flex items-center gap-3">
@@ -109,9 +108,7 @@ const Landing = () => {
       <footer className="border-t py-8">
         <div className="container flex flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <UtensilsCrossed className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Belly-Chow" className="h-7 w-7 rounded-md object-contain" />
             <span className="font-heading text-sm font-semibold">Belly-Chow</span>
           </div>
           <p className="text-sm text-muted-foreground">

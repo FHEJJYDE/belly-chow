@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png"],
+      includeAssets: ["belly_chow_logo.png"],
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
@@ -32,9 +32,8 @@ export default defineConfig(({ mode }) => ({
         orientation: "portrait",
         start_url: "/",
         icons: [
-          { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/belly_chow_logo.png", sizes: "512x512", type: "image/png" },
+          { src: "/belly_chow_logo.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),

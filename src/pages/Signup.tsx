@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, GraduationCap, Store, Bike } from 'lucide-react';
+import { GraduationCap, Store, Bike } from 'lucide-react';
+import logo from '@/assets/belly_chow_logo.png';
 import { useToast } from '@/hooks/use-toast';
 import type { Enums } from '@/integrations/supabase/types';
 
@@ -57,9 +58,7 @@ const Signup = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Link to="/" className="mx-auto mb-4 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Belly-Chow" className="h-9 w-9 rounded-lg object-contain" />
             <span className="font-heading text-xl font-bold">Belly-Chow</span>
           </Link>
           <CardTitle className="font-heading text-2xl">Create your account</CardTitle>
