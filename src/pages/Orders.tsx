@@ -89,6 +89,7 @@ const Orders = () => {
     navigate('/cart');
   }, [orderItems, clearCart, addItem, toast, navigate]);
 
+  useEffect(() => {
     if (!user) return;
     const fetchOrders = async () => {
       const { data } = await supabase
