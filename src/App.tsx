@@ -35,7 +35,9 @@ import VendorSettings from "./pages/vendor/VendorSettings";
 const queryClient = new QueryClient();
 
 const NotificationListener = () => {
+  const { user, loading } = useAuth();
   useOrderNotifications();
+  if (loading || !user) return null;
   return null;
 };
 
