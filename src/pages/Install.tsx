@@ -104,7 +104,7 @@ export default function Install() {
               step={2}
               icon={<Plus className="h-5 w-5 text-primary" />}
               title='"Add to Home Screen"'
-              description="Scroll down in the share menu and tap "Add to Home Screen"."
+              description={'Scroll down in the share menu and tap "Add to Home Screen".'}
             />
             <StepCard
               step={3}
