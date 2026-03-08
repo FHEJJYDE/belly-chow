@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import DeliveryChat from '@/components/chat/DeliveryChat';
 import DeliveryMap from '@/components/maps/DeliveryMap';
 
 interface EnrichedOrder {
