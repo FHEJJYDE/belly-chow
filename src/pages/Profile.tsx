@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import type { Database } from '@/integrations/supabase/types';
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
 const Profile = () => {
-  const { user, role } = useAuth();
+  const { user, role, loading } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState('');
@@ -33,6 +34,8 @@ const Profile = () => {
         }
       });
   }, [user]);
+
+  if (!loading && !user) return <Navigate to="/login" replace />;
 
   const save = async () => {
     if (!user) return;
