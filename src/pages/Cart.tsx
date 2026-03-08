@@ -337,7 +337,44 @@ const Cart = () => {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and place your order.</p>
+                <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and upload your receipt below.</p>
+              </div>
+            )}
+
+            {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Upload className="h-4 w-4" /> Upload Payment Proof <span className="text-destructive">*</span>
+                </Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProofSelect}
+                />
+                {paymentProofPreview ? (
+                  <div className="relative rounded-lg border overflow-hidden">
+                    <img src={paymentProofPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted" />
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentProof(null); setPaymentProofPreview(null); }}
+                      className="absolute top-2 right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    <ImageIcon className="h-8 w-8" />
+                    <span className="text-sm font-medium">Tap to upload transfer receipt</span>
+                    <span className="text-xs">JPG, PNG — max 5MB</span>
+                  </button>
+                )}
               </div>
             )}
 
