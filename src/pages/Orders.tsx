@@ -7,6 +7,7 @@ import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Package, Star, ChevronDown, ChevronUp, MapPin, RotateCcw, AlertTriangle } from 'lucide-react';
+import LivePulse from '@/components/LivePulse';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
