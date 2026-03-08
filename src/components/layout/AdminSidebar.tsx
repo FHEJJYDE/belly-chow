@@ -33,7 +33,7 @@ export function AdminSidebar() {
           <Crown className="h-6 w-6 shrink-0 text-primary" />
           {!collapsed && <span className="font-heading text-lg font-bold">Admin Panel</span>}
         </div>
-        <SidebarGroup defaultOpen>
+        <SidebarGroup>
           <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
