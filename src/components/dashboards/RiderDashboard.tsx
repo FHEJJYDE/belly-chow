@@ -300,7 +300,7 @@ const RiderDashboard = () => {
                       <p className="flex items-center gap-1 text-sm text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'No location'}
                       </p>
-                      {order.items.length > 0 && (
+                      {order.items && order.items.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
                           <Package className="inline h-3 w-3 mr-1" />
                           {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
