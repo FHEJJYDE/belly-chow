@@ -54,6 +54,7 @@ const Orders = () => {
   const [disputeDesc, setDisputeDesc] = useState('');
   const [disputedOrders, setDisputedOrders] = useState<Set<string>>(new Set());
   const [submittingDispute, setSubmittingDispute] = useState(false);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
