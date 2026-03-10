@@ -123,17 +123,21 @@ const Cart = () => {
 
   const placeOrder = async () => {
     if (!user || !vendorId || items.length === 0) return;
-    if (!position && !deliveryLocation.trim()) { toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' }); return; }
+    if (!position && !usingDefault && !deliveryLocation.trim()) { toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' }); return; }
     if (paymentMethod === 'bank_transfer' && !paymentProof) { toast({ title: 'Please upload proof of payment', variant: 'destructive' }); return; }
 
     setIsOrdering(true);
     try {
+      const useLat = position?.lat ?? (usingDefault && defaultLocation ? defaultLocation.lat : undefined);
+      const useLng = position?.lng ?? (usingDefault && defaultLocation ? defaultLocation.lng : undefined);
+      const locLabel = deliveryLocation || (position ? 'GPS Location' : usingDefault && defaultLocation ? defaultLocation.name : '');
+
       const orderData: any = {
         student_id: user.id, vendor_id: vendorId, total, delivery_fee: serviceFee, discount,
         promo_code: appliedPromo?.code || null, payment_method: paymentMethod,
-        delivery_location: deliveryLocation || (position ? 'GPS Location' : ''), notes,
+        delivery_location: locLabel, notes,
       };
-      if (position) { orderData.delivery_lat = position.lat; orderData.delivery_lng = position.lng; }
+      if (useLat && useLng) { orderData.delivery_lat = useLat; orderData.delivery_lng = useLng; }
       const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
       if (orderError) throw orderError;
 
