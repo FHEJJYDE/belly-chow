@@ -236,19 +236,27 @@ const Cart = () => {
         <div className="space-y-6 mb-8">
           <div className="space-y-3">
             <Label className="text-sm font-medium">Delivery location</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant={position ? 'default' : 'outline'} size="sm" onClick={() => {
+                setUsingDefault(false);
                 getPosition();
                 if (!navigator.geolocation) toast({ title: 'GPS not supported', variant: 'destructive' });
               }} disabled={geoLoading} className="shrink-0 gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
                 {position ? 'GPS shared' : geoLoading ? 'Getting location...' : 'Use GPS'}
               </Button>
-              <span className="text-xs text-muted-foreground self-center">or type below</span>
+              {defaultLocation && !position && (
+                <Button type="button" variant={usingDefault ? 'default' : 'outline'} size="sm" onClick={() => setUsingDefault(!usingDefault)} className="shrink-0 gap-1.5">
+                  <Navigation className="h-3.5 w-3.5" />
+                  {usingDefault ? defaultLocation.name : `Use "${defaultLocation.name}"`}
+                </Button>
+              )}
+              {!position && !usingDefault && <span className="text-xs text-muted-foreground self-center">or type below</span>}
             </div>
             {position && <p className="text-xs text-muted-foreground">GPS coordinates captured — rider will get directions</p>}
-            {!position && geoError && <p className="text-xs text-destructive">{geoError.includes('denied') ? 'Location access denied. Enable in settings.' : geoError}</p>}
-            {!position && <Input className="mt-2" placeholder="e.g. Block A, Room 204" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />}
+            {usingDefault && !position && <p className="text-xs text-muted-foreground">Using your saved default location — {defaultLocation!.name}</p>}
+            {!position && geoError && !usingDefault && <p className="text-xs text-destructive">{geoError.includes('denied') ? 'Location access denied. Enable in settings.' : geoError}</p>}
+            {!position && !usingDefault && <Input className="mt-2" placeholder="e.g. Block A, Room 204" value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />}
           </div>
 
           <div className="space-y-2">
