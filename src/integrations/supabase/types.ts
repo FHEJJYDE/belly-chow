@@ -418,6 +418,9 @@ export type Database = {
           avatar_url: string | null
           campus_location: string | null
           created_at: string
+          default_lat: number | null
+          default_lng: number | null
+          default_location_name: string | null
           full_name: string
           id: string
           is_suspended: boolean
@@ -430,6 +433,9 @@ export type Database = {
           avatar_url?: string | null
           campus_location?: string | null
           created_at?: string
+          default_lat?: number | null
+          default_lng?: number | null
+          default_location_name?: string | null
           full_name?: string
           id?: string
           is_suspended?: boolean
@@ -442,6 +448,9 @@ export type Database = {
           avatar_url?: string | null
           campus_location?: string | null
           created_at?: string
+          default_lat?: number | null
+          default_lng?: number | null
+          default_location_name?: string | null
           full_name?: string
           id?: string
           is_suspended?: boolean
