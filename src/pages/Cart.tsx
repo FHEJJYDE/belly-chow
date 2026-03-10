@@ -61,7 +61,18 @@ const Cart = () => {
       }
     };
     fetchSettings();
-  }, []);
+
+    // Load saved default location
+    if (user) {
+      supabase.from('profiles').select('default_lat, default_lng, default_location_name').eq('user_id', user.id).single()
+        .then(({ data }) => {
+          const d = data as any;
+          if (d?.default_lat && d?.default_lng) {
+            setDefaultLocation({ lat: d.default_lat, lng: d.default_lng, name: d.default_location_name || 'Saved Location' });
+          }
+        });
+    }
+  }, [user]);
 
   const copyAccountNumber = () => {
     if (bankDetails?.bank_account_number) {
