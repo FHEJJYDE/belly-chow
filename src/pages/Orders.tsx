@@ -203,8 +203,8 @@ const Orders = () => {
     return (
       <StudentOrderTracking
         order={trackingOrder}
-        onBack={() => setTrackingOrderId(null)}
-        onCancelled={() => { setTrackingOrderId(null); fetchOrders(); }}
+        onBack={() => { setTrackingOrderId(null); setDismissedTracking(true); }}
+        onCancelled={() => { setTrackingOrderId(null); setDismissedTracking(true); fetchOrders(); }}
       />
     );
   }

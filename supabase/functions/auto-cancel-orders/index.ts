@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const TIMEOUT_MINUTES = 15;
+const TIMEOUT_MINUTES = 60;
 
 Deno.serve(async (req) => {
   try {
