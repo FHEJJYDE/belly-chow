@@ -56,6 +56,7 @@ const Orders = () => {
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [dismissedTracking, setDismissedTracking] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
