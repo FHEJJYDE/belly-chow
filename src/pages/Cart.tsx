@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import type { Enums } from '@/integrations/supabase/types';
 
