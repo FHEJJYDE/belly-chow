@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const TIMEOUT_MINUTES = 15;
+const TIMEOUT_MINUTES = 60;
 
 Deno.serve(async (req) => {
   try {
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ status: "cancelled", notes: "Auto-cancelled: vendor did not respond within 15 minutes" })
+      .update({ status: "cancelled", notes: "Auto-cancelled: vendor did not respond within 1 hour" })
       .in("id", ids);
 
     if (updateError) {

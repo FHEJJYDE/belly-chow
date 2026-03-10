@@ -56,6 +56,7 @@ const Orders = () => {
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [dismissedTracking, setDismissedTracking] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => {
@@ -173,15 +174,15 @@ const Orders = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchOrders]);
 
-  // Auto-open tracking for most recent active order
+  // Auto-open tracking for most recent active order (only on first load, not after user dismisses)
   useEffect(() => {
-    if (!trackingOrderId && orders.length > 0) {
+    if (!trackingOrderId && !dismissedTracking && orders.length > 0) {
       const activeOrder = orders.find(o => ACTIVE_STATUSES.includes(o.status));
       if (activeOrder) {
         setTrackingOrderId(activeOrder.id);
       }
     }
-  }, [orders, trackingOrderId]);
+  }, [orders, trackingOrderId, dismissedTracking]);
 
   if (loading) return (
     <div className="min-h-screen bg-background">
@@ -202,8 +203,8 @@ const Orders = () => {
     return (
       <StudentOrderTracking
         order={trackingOrder}
-        onBack={() => setTrackingOrderId(null)}
-        onCancelled={() => { setTrackingOrderId(null); fetchOrders(); }}
+        onBack={() => { setTrackingOrderId(null); setDismissedTracking(true); }}
+        onCancelled={() => { setTrackingOrderId(null); setDismissedTracking(true); fetchOrders(); }}
       />
     );
   }
