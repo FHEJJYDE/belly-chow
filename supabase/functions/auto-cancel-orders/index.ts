@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ status: "cancelled", notes: "Auto-cancelled: vendor did not respond within 15 minutes" })
+      .update({ status: "cancelled", notes: "Auto-cancelled: vendor did not respond within 1 hour" })
       .in("id", ids);
 
     if (updateError) {
