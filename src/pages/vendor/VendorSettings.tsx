@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import VendorLogoUpload from '@/components/VendorLogoUpload';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -15,6 +16,7 @@ const VendorSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', address: '', opening_time: '', closing_time: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
