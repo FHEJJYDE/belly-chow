@@ -105,6 +105,14 @@ const Profile = () => {
 
         <Card>
           <CardContent className="space-y-5 p-6">
+            {user && (
+              <AvatarUpload
+                userId={user.id}
+                currentUrl={avatarUrl}
+                fullName={fullName}
+                onUploaded={setAvatarUrl}
+              />
+            )}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Email</Label>
               <Input value={user?.email || ''} disabled className="bg-muted/50" />
