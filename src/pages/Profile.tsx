@@ -11,12 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import VerificationUpload from '@/components/VerificationUpload';
 import { MapPin, Navigation, Trash2 } from 'lucide-react';
+import AvatarUpload from '@/components/AvatarUpload';
 
 const Profile = () => {
   const { user, role, loading } = useAuth();
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [campusLocation, setCampusLocation] = useState('');
   const [saving, setSaving] = useState(false);
   const [defaultLat, setDefaultLat] = useState<number | null>(null);
