@@ -34,6 +34,7 @@ const Profile = () => {
         if (data) {
           setFullName(data.full_name);
           setPhone(data.phone ?? '');
+          setAvatarUrl(data.avatar_url ?? null);
           setCampusLocation(data.campus_location ?? '');
           setDefaultLat((data as any).default_lat ?? null);
           setDefaultLng((data as any).default_lng ?? null);
