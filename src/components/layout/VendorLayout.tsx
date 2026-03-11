@@ -1,8 +1,10 @@
 import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { VendorSidebar } from './VendorSidebar';
+import VendorBottomNav from './VendorBottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -10,14 +12,16 @@ import { Link } from 'react-router-dom';
 const VendorLayout = () => {
   const { signOut } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
+  const isMobile = useIsMobile();
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <VendorSidebar />
+        {!isMobile && <VendorSidebar />}
         <div className="flex-1 flex flex-col">
           <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b bg-background/80 backdrop-blur-md px-4">
-            <SidebarTrigger />
+            {!isMobile && <SidebarTrigger />}
+            {isMobile && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
                 {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -30,10 +34,11 @@ const VendorLayout = () => {
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6">
+          <main className={`flex-1 p-6 ${isMobile ? 'pb-20' : ''}`}>
             <Outlet />
           </main>
         </div>
+        {isMobile && <VendorBottomNav />}
       </div>
     </SidebarProvider>
   );
