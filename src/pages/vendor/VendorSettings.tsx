@@ -27,6 +27,7 @@ const VendorSettings = () => {
       const { data } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
       if (data) {
         setVendor(data);
+        setLogoUrl(data.logo_url || null);
         setForm({ name: data.name, description: data.description || '', address: data.address || '', opening_time: data.opening_time || '', closing_time: data.closing_time || '' });
       }
       setLoading(false);
