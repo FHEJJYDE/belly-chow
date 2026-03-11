@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import VendorLogoUpload from '@/components/VendorLogoUpload';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -15,6 +16,7 @@ const VendorSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', address: '', opening_time: '', closing_time: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +27,7 @@ const VendorSettings = () => {
       const { data } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
       if (data) {
         setVendor(data);
+        setLogoUrl(data.logo_url || null);
         setForm({ name: data.name, description: data.description || '', address: data.address || '', opening_time: data.opening_time || '', closing_time: data.closing_time || '' });
       }
       setLoading(false);
@@ -54,6 +57,15 @@ const VendorSettings = () => {
       <div className="max-w-lg">
         <Card>
           <CardContent className="space-y-5 p-6">
+            {vendor && user && (
+              <VendorLogoUpload
+                vendorId={vendor.id}
+                userId={user.id}
+                currentUrl={logoUrl}
+                vendorName={vendor.name}
+                onUploaded={setLogoUrl}
+              />
+            )}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Store name</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />

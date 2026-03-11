@@ -11,12 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import VerificationUpload from '@/components/VerificationUpload';
 import { MapPin, Navigation, Trash2 } from 'lucide-react';
+import AvatarUpload from '@/components/AvatarUpload';
 
 const Profile = () => {
   const { user, role, loading } = useAuth();
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [campusLocation, setCampusLocation] = useState('');
   const [saving, setSaving] = useState(false);
   const [defaultLat, setDefaultLat] = useState<number | null>(null);
@@ -32,6 +34,7 @@ const Profile = () => {
         if (data) {
           setFullName(data.full_name);
           setPhone(data.phone ?? '');
+          setAvatarUrl(data.avatar_url ?? null);
           setCampusLocation(data.campus_location ?? '');
           setDefaultLat((data as any).default_lat ?? null);
           setDefaultLng((data as any).default_lng ?? null);
@@ -102,6 +105,14 @@ const Profile = () => {
 
         <Card>
           <CardContent className="space-y-5 p-6">
+            {user && (
+              <AvatarUpload
+                userId={user.id}
+                currentUrl={avatarUrl}
+                fullName={fullName}
+                onUploaded={setAvatarUrl}
+              />
+            )}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Email</Label>
               <Input value={user?.email || ''} disabled className="bg-muted/50" />
