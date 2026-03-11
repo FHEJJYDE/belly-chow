@@ -57,6 +57,15 @@ const VendorSettings = () => {
       <div className="max-w-lg">
         <Card>
           <CardContent className="space-y-5 p-6">
+            {vendor && user && (
+              <VendorLogoUpload
+                vendorId={vendor.id}
+                userId={user.id}
+                currentUrl={logoUrl}
+                vendorName={vendor.name}
+                onUploaded={setLogoUrl}
+              />
+            )}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Store name</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
