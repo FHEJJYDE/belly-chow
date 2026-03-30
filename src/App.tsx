@@ -45,6 +45,7 @@ const queryClient = new QueryClient();
 
 const NotificationListener = () => {
   useOrderNotifications();
+  usePushNotifications();
   return null;
 };
 
