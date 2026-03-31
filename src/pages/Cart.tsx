@@ -36,6 +36,10 @@ const Cart = () => {
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDrinkUpsell, setShowDrinkUpsell] = useState(false);
+  const [drinkUpsellShown, setDrinkUpsellShown] = useState(false);
+  const [selectedDrinks, setSelectedDrinks] = useState<SelectedDrink[]>([]);
+  const [customDrinkRequest, setCustomDrinkRequest] = useState<CustomDrinkRequest | null>(null);
 
   const [platformFee, setPlatformFee] = useState(500);
   const [riderFee, setRiderFee] = useState(500);
