@@ -50,7 +50,8 @@ const Cart = () => {
   const [promoLoading, setPromoLoading] = useState(false);
 
   const discount = appliedPromo?.discount_amount || 0;
-  const grandTotal = Math.max(0, total + serviceFee - discount);
+  const drinkTotal = selectedDrinks.reduce((s, d) => s + d.price * d.quantity, 0);
+  const grandTotal = Math.max(0, total + serviceFee + drinkTotal - discount);
 
   useEffect(() => {
     const fetchSettings = async () => {
