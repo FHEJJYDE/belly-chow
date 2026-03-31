@@ -58,6 +58,36 @@ export type Database = {
           },
         ]
       }
+      drinks: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          is_available: boolean
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       favourites: {
         Row: {
           created_at: string
@@ -252,12 +282,14 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          custom_drink_request: Json | null
           delivery_fee: number
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_location: string
           delivery_proof_url: string | null
           discount: number
+          drink_items: Json | null
           estimated_ready_at: string | null
           id: string
           notes: string | null
@@ -279,12 +311,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_drink_request?: Json | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
           delivery_proof_url?: string | null
           discount?: number
+          drink_items?: Json | null
           estimated_ready_at?: string | null
           id?: string
           notes?: string | null
@@ -306,12 +340,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_drink_request?: Json | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_location?: string
           delivery_proof_url?: string | null
           discount?: number
+          drink_items?: Json | null
           estimated_ready_at?: string | null
           id?: string
           notes?: string | null

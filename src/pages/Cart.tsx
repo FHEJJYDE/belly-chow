@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import DrinkUpsellModal, { SelectedDrink, CustomDrinkRequest } from '@/components/DrinkUpsellModal';
 import type { Enums } from '@/integrations/supabase/types';
 
 type PaymentMethod = Enums<"payment_method">;
@@ -35,6 +36,10 @@ const Cart = () => {
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDrinkUpsell, setShowDrinkUpsell] = useState(false);
+  const [drinkUpsellShown, setDrinkUpsellShown] = useState(false);
+  const [selectedDrinks, setSelectedDrinks] = useState<SelectedDrink[]>([]);
+  const [customDrinkRequest, setCustomDrinkRequest] = useState<CustomDrinkRequest | null>(null);
 
   const [platformFee, setPlatformFee] = useState(500);
   const [riderFee, setRiderFee] = useState(500);
@@ -45,7 +50,8 @@ const Cart = () => {
   const [promoLoading, setPromoLoading] = useState(false);
 
   const discount = appliedPromo?.discount_amount || 0;
-  const grandTotal = Math.max(0, total + serviceFee - discount);
+  const drinkTotal = selectedDrinks.reduce((s, d) => s + d.price * d.quantity, 0);
+  const grandTotal = Math.max(0, total + serviceFee + drinkTotal - discount);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -73,6 +79,21 @@ const Cart = () => {
         });
     }
   }, [user]);
+
+  // Show drink upsell once when cart page loads
+  useEffect(() => {
+    if (items.length > 0 && !drinkUpsellShown) {
+      const timer = setTimeout(() => setShowDrinkUpsell(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [items.length, drinkUpsellShown]);
+
+  const handleDrinkConfirm = (drinks: SelectedDrink[], customReq: CustomDrinkRequest | null) => {
+    setSelectedDrinks(drinks);
+    setCustomDrinkRequest(customReq);
+    setShowDrinkUpsell(false);
+    setDrinkUpsellShown(true);
+  };
 
   const copyAccountNumber = () => {
     if (bankDetails?.bank_account_number) {
@@ -136,6 +157,8 @@ const Cart = () => {
         student_id: user.id, vendor_id: vendorId, total, delivery_fee: serviceFee, discount,
         promo_code: appliedPromo?.code || null, payment_method: paymentMethod,
         delivery_location: locLabel, notes,
+        drink_items: selectedDrinks.length > 0 ? selectedDrinks : [],
+        custom_drink_request: customDrinkRequest || null,
       };
       if (useLat && useLng) { orderData.delivery_lat = useLat; orderData.delivery_lng = useLng; }
       const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
@@ -210,6 +233,28 @@ const Cart = () => {
             </div>
           ))}
         </div>
+
+        {/* Selected Drinks Summary */}
+        {(selectedDrinks.length > 0 || customDrinkRequest) && (
+          <div className="mb-8 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">🥤 Drinks added</p>
+              <button onClick={() => { setShowDrinkUpsell(true); setDrinkUpsellShown(false); }} className="text-xs text-primary hover:underline">Change</button>
+            </div>
+            {selectedDrinks.map(d => (
+              <div key={d.id} className="flex justify-between text-sm border-b pb-2">
+                <span>{d.name} × {d.quantity}</span>
+                <span>₦{(d.price * d.quantity).toLocaleString()}</span>
+              </div>
+            ))}
+            {customDrinkRequest && (
+              <div className="text-sm rounded-lg bg-muted/50 p-2">
+                <span className="text-muted-foreground">Custom request:</span> {customDrinkRequest.name}
+                {customDrinkRequest.max_budget > 0 && <span className="text-muted-foreground"> (budget: ₦{customDrinkRequest.max_budget.toLocaleString()})</span>}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Promo Code */}
         <div className="mb-8">
@@ -329,6 +374,7 @@ const Cart = () => {
         <div className="border-t pt-6 mb-6">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₦{total.toLocaleString()}</span></div>
+            {drinkTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Drinks</span><span>₦{drinkTotal.toLocaleString()}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Service fee</span><span>₦{serviceFee.toLocaleString()}</span></div>
             {discount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>−₦{discount.toLocaleString()}</span></div>}
             <div className="flex justify-between border-t pt-2 font-heading font-bold text-base">
@@ -341,6 +387,12 @@ const Cart = () => {
           {isOrdering ? 'Placing order...' : `Place order — ₦${grandTotal.toLocaleString()}`}
         </Button>
       </div>
+
+      <DrinkUpsellModal
+        open={showDrinkUpsell}
+        onClose={() => { setShowDrinkUpsell(false); setDrinkUpsellShown(true); }}
+        onConfirm={handleDrinkConfirm}
+      />
     </div>
   );
 };

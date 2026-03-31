@@ -31,6 +31,7 @@ import AdminRefunds from "./pages/admin/AdminRefunds";
 import AdminVerifications from "./pages/admin/AdminVerifications";
 import AdminTickets from "./pages/admin/AdminTickets";
 import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
+import AdminDrinks from "./pages/admin/AdminDrinks";
 import Support from "./pages/Support";
 import Install from "./pages/Install";
 
@@ -83,6 +84,7 @@ const App = () => (
                 <Route path="verifications" element={<AdminVerifications />} />
                 <Route path="tickets" element={<AdminTickets />} />
                 <Route path="promo-codes" element={<AdminPromoCodes />} />
+                <Route path="drinks" element={<AdminDrinks />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
