@@ -25,6 +25,7 @@ const items = [
   { title: 'Verifications', url: '/admin/verifications', icon: ShieldCheck },
   { title: 'Tickets', url: '/admin/tickets', icon: MessageSquare },
   { title: 'Promo Codes', url: '/admin/promo-codes', icon: Tag },
+  { title: 'Drinks', url: '/admin/drinks', icon: GlassWater },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
