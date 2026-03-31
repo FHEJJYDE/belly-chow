@@ -234,6 +234,28 @@ const Cart = () => {
           ))}
         </div>
 
+        {/* Selected Drinks Summary */}
+        {(selectedDrinks.length > 0 || customDrinkRequest) && (
+          <div className="mb-8 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">🥤 Drinks added</p>
+              <button onClick={() => { setShowDrinkUpsell(true); setDrinkUpsellShown(false); }} className="text-xs text-primary hover:underline">Change</button>
+            </div>
+            {selectedDrinks.map(d => (
+              <div key={d.id} className="flex justify-between text-sm border-b pb-2">
+                <span>{d.name} × {d.quantity}</span>
+                <span>₦{(d.price * d.quantity).toLocaleString()}</span>
+              </div>
+            ))}
+            {customDrinkRequest && (
+              <div className="text-sm rounded-lg bg-muted/50 p-2">
+                <span className="text-muted-foreground">Custom request:</span> {customDrinkRequest.name}
+                {customDrinkRequest.max_budget > 0 && <span className="text-muted-foreground"> (budget: ₦{customDrinkRequest.max_budget.toLocaleString()})</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Promo Code */}
         <div className="mb-8">
           {appliedPromo ? (
