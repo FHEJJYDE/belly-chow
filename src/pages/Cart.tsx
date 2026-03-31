@@ -157,6 +157,8 @@ const Cart = () => {
         student_id: user.id, vendor_id: vendorId, total, delivery_fee: serviceFee, discount,
         promo_code: appliedPromo?.code || null, payment_method: paymentMethod,
         delivery_location: locLabel, notes,
+        drink_items: selectedDrinks.length > 0 ? selectedDrinks : [],
+        custom_drink_request: customDrinkRequest || null,
       };
       if (useLat && useLng) { orderData.delivery_lat = useLat; orderData.delivery_lng = useLng; }
       const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
