@@ -387,6 +387,12 @@ const Cart = () => {
           {isOrdering ? 'Placing order...' : `Place order — ₦${grandTotal.toLocaleString()}`}
         </Button>
       </div>
+
+      <DrinkUpsellModal
+        open={showDrinkUpsell}
+        onClose={() => { setShowDrinkUpsell(false); setDrinkUpsellShown(true); }}
+        onConfirm={handleDrinkConfirm}
+      />
     </div>
   );
 };
