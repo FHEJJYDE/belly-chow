@@ -80,6 +80,21 @@ const Cart = () => {
     }
   }, [user]);
 
+  // Show drink upsell once when cart page loads
+  useEffect(() => {
+    if (items.length > 0 && !drinkUpsellShown) {
+      const timer = setTimeout(() => setShowDrinkUpsell(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [items.length, drinkUpsellShown]);
+
+  const handleDrinkConfirm = (drinks: SelectedDrink[], customReq: CustomDrinkRequest | null) => {
+    setSelectedDrinks(drinks);
+    setCustomDrinkRequest(customReq);
+    setShowDrinkUpsell(false);
+    setDrinkUpsellShown(true);
+  };
+
   const copyAccountNumber = () => {
     if (bankDetails?.bank_account_number) {
       navigator.clipboard.writeText(bankDetails.bank_account_number);
