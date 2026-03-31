@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package, Users, Settings, CreditCard, AlertTriangle, RefreshCw, ShieldCheck, MessageSquare, Tag } from 'lucide-react';
+import { LayoutDashboard, Store, Package, Users, Settings, CreditCard, AlertTriangle, RefreshCw, ShieldCheck, MessageSquare, Tag, GlassWater } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
