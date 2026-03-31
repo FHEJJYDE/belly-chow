@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import DrinkUpsellModal, { SelectedDrink, CustomDrinkRequest } from '@/components/DrinkUpsellModal';
 import type { Enums } from '@/integrations/supabase/types';
 
 type PaymentMethod = Enums<"payment_method">;
