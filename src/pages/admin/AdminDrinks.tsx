@@ -88,12 +88,12 @@ const AdminDrinks = () => {
   };
 
   const toggleAvailability = async (id: string, current: boolean) => {
-    await supabase.from('drinks' as any).update({ is_available: !current } as any).eq('id', id);
+    await supabase.from('drinks').update({ is_available: !current }).eq('id', id);
     setDrinks(prev => prev.map(d => d.id === id ? { ...d, is_available: !current } : d));
   };
 
   const deleteDrink = async (id: string) => {
-    await supabase.from('drinks' as any).delete().eq('id', id);
+    await supabase.from('drinks').delete().eq('id', id);
     setDrinks(prev => prev.filter(d => d.id !== id));
     toast({ title: 'Drink removed' });
   };
