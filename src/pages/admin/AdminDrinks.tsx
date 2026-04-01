@@ -38,20 +38,51 @@ const AdminDrinks = () => {
 
   useEffect(() => { fetchDrinks(); }, []);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Max 5MB', variant: 'destructive' });
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const uploadImage = async (): Promise<string> => {
+    if (!imageFile) return '';
+    setUploading(true);
+    const compressed = await compressImage(imageFile);
+    const ext = imageFile.name.split('.').pop() || 'jpg';
+    const path = `drinks/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('food-images').upload(path, compressed, { upsert: true });
+    setUploading(false);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from('food-images').getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
   const addDrink = async () => {
     if (!form.name.trim() || !form.price) return;
     setSaving(true);
-    const { error } = await supabase.from('drinks' as any).insert({
-      name: form.name.trim(),
-      price: parseFloat(form.price),
-      image_url: form.image_url.trim(),
-    } as any);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else {
-      toast({ title: 'Drink added ✓' });
-      setForm({ name: '', price: '', image_url: '' });
-      setDialogOpen(false);
-      fetchDrinks();
+    try {
+      const image_url = await uploadImage();
+      const { error } = await supabase.from('drinks').insert({
+        name: form.name.trim(),
+        price: parseFloat(form.price),
+        image_url,
+      });
+      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      else {
+        toast({ title: 'Drink added ✓' });
+        setForm({ name: '', price: '' });
+        setImageFile(null);
+        setImagePreview(null);
+        setDialogOpen(false);
+        fetchDrinks();
+      }
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
     }
     setSaving(false);
   };
