@@ -23,8 +23,12 @@ const AdminDrinks = () => {
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', price: '', image_url: '' });
+  const [form, setForm] = useState({ name: '', price: '' });
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDrinks = async () => {
     const { data } = await supabase.from('drinks' as any).select('*').order('created_at', { ascending: false });
