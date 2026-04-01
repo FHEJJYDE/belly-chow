@@ -31,8 +31,8 @@ const AdminDrinks = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDrinks = async () => {
-    const { data } = await supabase.from('drinks' as any).select('*').order('created_at', { ascending: false });
-    setDrinks((data as any) || []);
+    const { data } = await supabase.from('drinks').select('*').order('created_at', { ascending: false });
+    setDrinks(data || []);
     setLoading(false);
   };
 
