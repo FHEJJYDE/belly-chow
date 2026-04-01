@@ -113,9 +113,22 @@ const AdminDrinks = () => {
             <div className="space-y-4 pt-2">
               <div><Label>Name</Label><Input placeholder="e.g. Coca-Cola" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
               <div><Label>Price (₦)</Label><Input type="number" placeholder="e.g. 300" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></div>
-              <div><Label>Image URL (optional)</Label><Input placeholder="https://..." value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} /></div>
-              <Button onClick={addDrink} disabled={saving || !form.name.trim() || !form.price} className="w-full">
-                {saving ? 'Adding...' : 'Add Drink'}
+              <div>
+                <Label>Image (optional)</Label>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                {imagePreview ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <img src={imagePreview} alt="Preview" className="h-16 w-16 rounded-lg object-cover" />
+                    <Button variant="outline" size="sm" onClick={() => { setImageFile(null); setImagePreview(null); }}>Remove</Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" className="mt-1.5 w-full gap-2" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-4 w-4" /> Upload Image
+                  </Button>
+                )}
+              </div>
+              <Button onClick={addDrink} disabled={saving || uploading || !form.name.trim() || !form.price} className="w-full">
+                {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</> : 'Add Drink'}
               </Button>
             </div>
           </DialogContent>
