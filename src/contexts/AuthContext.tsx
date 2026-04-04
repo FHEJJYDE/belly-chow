@@ -64,19 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
     if (!data.user) throw new Error('Signup failed');
 
-    const { error: roleError } = await supabase.from('user_roles').insert({
+    // Use the secure function to handle role assignment and vendor creation
+    const { error: signupError } = await supabase.rpc('handle_user_signup', {
       user_id: data.user.id,
-      role: selectedRole,
+      user_role: selectedRole,
+      vendor_name: vendorName || null,
     });
-    if (roleError) throw roleError;
-
-    if (selectedRole === 'vendor' && vendorName) {
-      const { error: vendorError } = await supabase.from('vendors').insert({
-        user_id: data.user.id,
-        name: vendorName,
-      });
-      if (vendorError) throw vendorError;
-    }
+    if (signupError) throw signupError;
 
     setRole(selectedRole);
   };
