@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2 } from 'lucide-react';
+import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
 
 type MenuItem = Database['public']['Tables']['menu_items']['Row'];
@@ -72,21 +73,24 @@ const VendorMenu = () => {
           <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Menu</p>
           <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">{items.length} items</h1>
         </div>
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Add item</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle className="font-heading">Add menu item</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2"><Label className="text-sm font-medium">Name</Label><Input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="Jollof Rice" /></div>
-              <div className="space-y-2"><Label className="text-sm font-medium">Description</Label><Textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} placeholder="Description..." /></div>
-              <div className="space-y-2"><Label className="text-sm font-medium">Price (₦)</Label><Input type="number" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} placeholder="1500" /></div>
-              <div className="space-y-2"><Label className="text-sm font-medium">Category</Label><Input value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} placeholder="Main, Drinks, Snacks..." /></div>
-              <Button onClick={addItem} className="w-full">Add item</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-4">
+          <VendorStatusToggle variant="compact" />
+          <Dialog open={showAdd} onOpenChange={setShowAdd}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Add item</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle className="font-heading">Add menu item</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2"><Label className="text-sm font-medium">Name</Label><Input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="Jollof Rice" /></div>
+                <div className="space-y-2"><Label className="text-sm font-medium">Description</Label><Textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} placeholder="Description..." /></div>
+                <div className="space-y-2"><Label className="text-sm font-medium">Price (₦)</Label><Input type="number" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} placeholder="1500" /></div>
+                <div className="space-y-2"><Label className="text-sm font-medium">Category</Label><Input value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} placeholder="Main, Drinks, Snacks..." /></div>
+                <Button onClick={addItem} className="w-full">Add item</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {items.length === 0 ? (

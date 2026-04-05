@@ -21,7 +21,10 @@ export function useInAppNotifications() {
 
     // Fetch notifications
     const fetchNotifications = useCallback(async () => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
         try {
             const { data, error } = await supabase
@@ -35,6 +38,7 @@ export function useInAppNotifications() {
             setNotifications(data || []);
         } catch (error) {
             console.error('Error fetching notifications:', error);
+            setNotifications([]);
         } finally {
             setLoading(false);
         }
@@ -77,57 +81,19 @@ export function useInAppNotifications() {
         }
     }, [user]);
 
-    // Real-time subscription
+    // Initial fetch and periodic refresh (fallback for realtime)
     useEffect(() => {
         if (!user) return;
 
-        // Initial fetch
         fetchNotifications();
 
-        // Subscribe to new notifications with unique channel name
-        const channel = supabase
-            .channel(`user-notifications-${user.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                (payload) => {
-                    const newNotification = payload.new as InAppNotification;
-                    setNotifications(prev => [newNotification, ...prev]);
-
-                    // Show toast notification as fallback
-                    toast({
-                        title: newNotification.title,
-                        description: newNotification.message,
-                        duration: 5000,
-                    });
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                (payload) => {
-                    const updatedNotification = payload.new as InAppNotification;
-                    setNotifications(prev =>
-                        prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
-                    );
-                }
-            )
-            .subscribe();
+        // Refresh notifications every 30 seconds as fallback
+        const interval = setInterval(fetchNotifications, 30000);
 
         return () => {
-            supabase.removeChannel(channel);
+            clearInterval(interval);
         };
-    }, [user?.id]); // Only depend on user.id to avoid recreating subscriptions
+    }, [user, fetchNotifications]);
 
     const unreadCount = notifications.filter(n => !n.is_read).length;
 

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import VendorLogoUpload from '@/components/VendorLogoUpload';
+import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -51,8 +52,13 @@ const VendorSettings = () => {
 
   return (
     <div>
-      <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Settings</p>
-      <h1 className="mt-1 mb-8 font-heading text-2xl font-bold tracking-tight">Store settings</h1>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Settings</p>
+          <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">Store settings</h1>
+        </div>
+        <VendorStatusToggle variant="compact" />
+      </div>
 
       <div className="max-w-lg">
         <Card>
