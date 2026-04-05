@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAppBadge } from '@/hooks/useAppBadge';
 
 export interface InAppNotification {
     id: string;
@@ -16,6 +17,7 @@ export interface InAppNotification {
 
 export function useInAppNotifications() {
     const { user } = useAuth();
+    const { setBadge } = useAppBadge();
     const [notifications, setNotifications] = useState<InAppNotification[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -54,13 +56,16 @@ export function useInAppNotifications() {
 
             if (error) throw error;
 
-            setNotifications(prev =>
-                prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-            );
+            setNotifications(prev => {
+                const updated = prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n);
+                const newUnreadCount = updated.filter(n => !n.is_read).length;
+                setBadge(newUnreadCount);
+                return updated;
+            });
         } catch (error) {
             console.error('Error marking notification as read:', error);
         }
-    }, []);
+    }, [setBadge]);
 
     // Mark all as read
     const markAllAsRead = useCallback(async () => {
@@ -76,10 +81,11 @@ export function useInAppNotifications() {
             if (error) throw error;
 
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setBadge(0); // Clear badge when all notifications are read
         } catch (error) {
             console.error('Error marking all notifications as read:', error);
         }
-    }, [user]);
+    }, [user, setBadge]);
 
     // Initial fetch and periodic refresh (fallback for realtime)
     useEffect(() => {
@@ -96,6 +102,11 @@ export function useInAppNotifications() {
     }, [user, fetchNotifications]);
 
     const unreadCount = notifications.filter(n => !n.is_read).length;
+
+    // Update app badge when unread count changes
+    useEffect(() => {
+        setBadge(unreadCount);
+    }, [unreadCount, setBadge]);
 
     return {
         notifications,

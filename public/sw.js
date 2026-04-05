@@ -22,11 +22,21 @@ self.addEventListener("push", (event) => {
     renotify: true,
   };
 
+  // Update app badge if supported
+  if ('setAppBadge' in navigator && data.unreadCount) {
+    navigator.setAppBadge(data.unreadCount);
+  }
+
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // Clear app badge when notification is clicked
+  if ('clearAppBadge' in navigator) {
+    navigator.clearAppBadge();
+  }
 
   const urlToOpen = event.notification.data?.url || "/dashboard";
 

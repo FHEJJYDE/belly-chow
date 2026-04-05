@@ -34,6 +34,23 @@ export default defineConfig(() => ({
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
+        categories: ["food", "lifestyle"],
+        shortcuts: [
+          {
+            name: "Orders",
+            short_name: "Orders",
+            description: "View your orders",
+            url: "/orders",
+            icons: [{ src: "/pwa-192.png", sizes: "192x192" }]
+          },
+          {
+            name: "Notifications",
+            short_name: "Alerts",
+            description: "Check notifications",
+            url: "/notifications",
+            icons: [{ src: "/pwa-192.png", sizes: "192x192" }]
+          }
+        ]
       },
     }),
   ].filter(Boolean),
