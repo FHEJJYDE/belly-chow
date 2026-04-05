@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useInAppNotifications } from '@/hooks/useInAppNotificationsSimple';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -115,8 +115,8 @@ const NotificationCenter = () => {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={`w-full p-4 text-left transition-all hover:bg-muted/50 ${!notification.is_read
-                      ? `${getNotificationColor(notification.type)} border-l-4`
-                      : 'hover:bg-muted/30'
+                    ? `${getNotificationColor(notification.type)} border-l-4`
+                    : 'hover:bg-muted/30'
                     }`}
                 >
                   <div className="flex items-start gap-3">

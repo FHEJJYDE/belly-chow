@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Package, ShoppingCart, User, HeadphonesIcon, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
-import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useInAppNotifications } from '@/hooks/useInAppNotificationsSimple';
 import { cn } from '@/lib/utils';
 
 const BottomNav = () => {

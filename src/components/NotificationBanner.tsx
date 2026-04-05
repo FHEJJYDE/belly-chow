@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useInAppNotifications } from '@/hooks/useInAppNotificationsSimple';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { X, Bell, Package, AlertTriangle } from 'lucide-react';

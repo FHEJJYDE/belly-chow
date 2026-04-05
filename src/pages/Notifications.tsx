@@ -1,4 +1,4 @@
-import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useInAppNotifications } from '@/hooks/useInAppNotificationsSimple';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -142,8 +142,8 @@ const Notifications = () => {
                         <Card
                             key={notification.id}
                             className={`cursor-pointer transition-all hover:shadow-md ${!notification.is_read
-                                    ? `border-l-4 ${getNotificationBorderColor(notification.type)} bg-muted/20`
-                                    : 'hover:bg-muted/50'
+                                ? `border-l-4 ${getNotificationBorderColor(notification.type)} bg-muted/20`
+                                : 'hover:bg-muted/50'
                                 }`}
                             onClick={() => handleNotificationClick(notification)}
                         >
