@@ -41,6 +41,86 @@ const BadgeTest = () => {
         }
     };
 
+    const testPushNotification = async () => {
+        if (!('serviceWorker' in navigator)) {
+            toast({ title: "Error", description: "Service Worker not supported" });
+            return;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.ready;
+
+            // Create a test push notification
+            const testData = {
+                title: "Test Push Notification",
+                body: "This is a test push notification with badge",
+                icon: "/pwa-192.png",
+                badge: "/pwa-192.png",
+                unreadCount: 1,
+                data: { url: "/notifications" }
+            };
+
+            // Show notification directly (simulating push)
+            await registration.showNotification(testData.title, {
+                body: testData.body,
+                icon: testData.icon,
+                badge: testData.badge,
+                vibrate: [200, 100, 200],
+                data: testData.data,
+                actions: [
+                    { action: "open", title: "Open App" },
+                    { action: "dismiss", title: "Dismiss" }
+                ],
+                tag: "test-notification",
+                renotify: true,
+                requireInteraction: false,
+                silent: false
+            });
+
+            // Set badge
+            if ('setAppBadge' in navigator) {
+                await navigator.setAppBadge(testData.unreadCount);
+                console.log('Badge set to:', testData.unreadCount);
+            }
+
+            toast({
+                title: "Test push notification sent!",
+                description: "Check your notifications and app badge"
+            });
+        } catch (error) {
+            console.error('Failed to send test push notification:', error);
+            toast({
+                title: "Error",
+                description: "Failed to send test push notification",
+                variant: "destructive"
+            });
+        }
+    };
+
+    const checkNotificationPermission = async () => {
+        if (!('Notification' in window)) {
+            toast({ title: "Error", description: "Notifications not supported in this browser" });
+            return;
+        }
+
+        const permission = Notification.permission;
+        console.log('Current notification permission:', permission);
+
+        if (permission === 'default') {
+            const newPermission = await Notification.requestPermission();
+            console.log('New notification permission:', newPermission);
+            toast({
+                title: `Permission ${newPermission}`,
+                description: `Notification permission is now: ${newPermission}`
+            });
+        } else {
+            toast({
+                title: `Permission: ${permission}`,
+                description: `Notification permission is: ${permission}`
+            });
+        }
+    };
+
     if (!isSupported) {
         return (
             <Card className="max-w-md">
@@ -70,7 +150,11 @@ const BadgeTest = () => {
                     <Button onClick={() => setBadge(5)} size="sm">Set Badge (5)</Button>
                     <Button onClick={() => setBadge(99)} size="sm">Set Badge (99)</Button>
                     <Button onClick={clearBadge} variant="outline" size="sm">Clear Badge</Button>
+                </div>
+                <div className="flex gap-2 flex-wrap">
                     <Button onClick={createTestNotification} variant="secondary" size="sm">Create Test Notification</Button>
+                    <Button onClick={testPushNotification} variant="destructive" size="sm">Test Push Notification</Button>
+                    <Button onClick={checkNotificationPermission} variant="outline" size="sm">Check Permission</Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                     Check your app icon (if installed as PWA) to see the badge changes.
