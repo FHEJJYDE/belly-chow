@@ -3,11 +3,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Package, Clock, DollarSign, TrendingUp, Star, ShoppingBag } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import LivePulse from '@/components/LivePulse';
+import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -57,12 +56,6 @@ const VendorOverview = () => {
     ).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [vendor?.id]);
-
-  const toggleActive = async () => {
-    if (!vendor) return;
-    const { error } = await supabase.from('vendors').update({ is_active: !vendor.is_active }).eq('id', vendor.id);
-    if (!error) setVendor({ ...vendor, is_active: !vendor.is_active });
-  };
 
   const delivered = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders]);
   const pending = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
@@ -122,10 +115,9 @@ const VendorOverview = () => {
             <Badge variant={vendor.is_active ? 'default' : 'outline'} className="text-xs">{vendor.is_active ? 'Open' : 'Closed'}</Badge>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="active" className="text-sm text-muted-foreground">Open for orders</Label>
-          <Switch id="active" checked={!!vendor.is_active} onCheckedChange={toggleActive} />
-        </div>
+
+        {/* Enhanced Open/Closed Toggle */}
+        <VendorStatusToggle variant="full" />
       </div>
 
       <div className="mb-8 grid gap-4 grid-cols-2 lg:grid-cols-4">

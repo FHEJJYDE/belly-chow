@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronDown, ChevronUp, ImageIcon, CheckCircle, XCircle, Volume2, VolumeX, Download } from 'lucide-react';
 import DeliveryChat from '@/components/chat/DeliveryChat';
+import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
 
 type Order = Database['public']['Tables']['orders']['Row'];
@@ -26,7 +27,7 @@ const playNotificationSound = () => {
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
     oscillator.start(ctx.currentTime); oscillator.stop(ctx.currentTime + 0.5);
-  } catch {}
+  } catch { }
 };
 
 const VendorOrders = () => {
@@ -196,13 +197,16 @@ const VendorOrders = () => {
           <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Manage</p>
           <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">Orders</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setSoundEnabled(!soundEnabled)} title={soundEnabled ? 'Mute' : 'Unmute'}>
-            {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5 text-muted-foreground" />}
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
-            <Download className="h-4 w-4" /> Export
-          </Button>
+        <div className="flex items-center gap-4">
+          <VendorStatusToggle variant="compact" />
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setSoundEnabled(!soundEnabled)} title={soundEnabled ? 'Mute' : 'Unmute'}>
+              {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5 text-muted-foreground" />}
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </div>
         </div>
       </div>
 
