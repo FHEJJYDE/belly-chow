@@ -1,5 +1,6 @@
 {
   "name": "belly-chow",
+  "description": "Campus food delivery PWA with notification badges",
   "private": true,
   "version": "0.0.0",
   "type": "module",
