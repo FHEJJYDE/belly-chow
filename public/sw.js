@@ -1,5 +1,22 @@
 // Belly-Chow Push Notification Service Worker
 
+// Background sync for notifications
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'background-sync-notifications') {
+    event.waitUntil(checkForNewNotifications());
+  }
+});
+
+async function checkForNewNotifications() {
+  try {
+    // This would need to be implemented with your backend API
+    // For now, we'll rely on the app's polling system
+    console.log('Background sync: checking for notifications');
+  } catch (error) {
+    console.error('Background sync failed:', error);
+  }
+}
+
 self.addEventListener("push", (event) => {
   let data = { title: "Belly-Chow", body: "You have a new notification" };
 
@@ -24,6 +41,7 @@ self.addEventListener("push", (event) => {
 
   // Update app badge if supported
   if ('setAppBadge' in navigator && data.unreadCount) {
+    console.log('Service Worker: Setting badge to', data.unreadCount);
     navigator.setAppBadge(data.unreadCount);
   }
 

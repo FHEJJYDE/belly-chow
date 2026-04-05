@@ -12,13 +12,19 @@ export function useAppBadge() {
     const isSupported = 'setAppBadge' in navigator;
 
     const setBadge = async (count: number) => {
-        if (!isSupported) return;
+        if (!isSupported) {
+            console.log('App Badge API not supported');
+            return;
+        }
 
         try {
+            console.log('Setting app badge to:', count);
             if (count > 0) {
                 await navigator.setAppBadge!(count);
+                console.log('App badge set successfully to:', count);
             } else {
                 await navigator.clearAppBadge!();
+                console.log('App badge cleared successfully');
             }
         } catch (error) {
             console.warn('Failed to set app badge:', error);
@@ -39,17 +45,14 @@ export function useAppBadge() {
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!document.hidden) {
-                // Small delay to allow notifications to be marked as read
-                setTimeout(clearBadge, 1000);
+                console.log('App became visible, will clear badge after delay');
+                // Only clear badge if user actually interacts with notifications
+                // Don't auto-clear just because app becomes visible
+                // setTimeout(clearBadge, 2000);
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Clear badge on initial load if app is visible
-        if (!document.hidden) {
-            setTimeout(clearBadge, 1000);
-        }
 
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);

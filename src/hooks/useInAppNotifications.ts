@@ -37,14 +37,24 @@ export function useInAppNotifications() {
                 .limit(50);
 
             if (error) throw error;
-            setNotifications(data || []);
+
+            const newNotifications = data || [];
+            const newUnreadCount = newNotifications.filter(n => !n.is_read).length;
+
+            // Update badge immediately when new notifications are fetched
+            setBadge(newUnreadCount);
+
+            // Log for debugging
+            console.log('Fetched notifications:', newNotifications.length, 'unread:', newUnreadCount);
+
+            setNotifications(newNotifications);
         } catch (error) {
             console.error('Error fetching notifications:', error);
             setNotifications([]);
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, setBadge]);
 
     // Mark notification as read
     const markAsRead = useCallback(async (notificationId: string) => {

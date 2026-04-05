@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useBackgroundNotifications } from "@/hooks/useBackgroundNotifications";
 import BottomNav from "./components/layout/BottomNav";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -49,6 +50,7 @@ const queryClient = new QueryClient();
 const NotificationListener = () => {
   useOrderNotifications();
   usePushNotifications();
+  useBackgroundNotifications();
   return null;
 };
 
