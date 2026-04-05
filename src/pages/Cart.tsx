@@ -4,19 +4,20 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
+import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector';
+import WalletBalance from '@/components/wallet/WalletBalance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin, Copy, Check, Tag, X, Upload, Image as ImageIcon, Navigation } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, X, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { walletService } from '@/services/wallet';
+import { paymentService } from '@/services/payment';
+import { PAYMENT_CONFIG } from '@/lib/paymentConfig';
 import DrinkUpsellModal, { SelectedDrink, CustomDrinkRequest } from '@/components/DrinkUpsellModal';
-import type { Enums } from '@/integrations/supabase/types';
-
-type PaymentMethod = Enums<"payment_method">;
 
 const Cart = () => {
   const { items, updateQuantity, removeItem, clearCart, total, vendorId } = useCart();
@@ -24,26 +25,21 @@ const Cart = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [deliveryLocation, setDeliveryLocation] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pay_on_delivery');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isOrdering, setIsOrdering] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
   const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
   const [defaultLocation, setDefaultLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [usingDefault, setUsingDefault] = useState(false);
-  const [bankDetails, setBankDetails] = useState<{ bank_name: string; bank_account_name: string; bank_account_number: string } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
-  const [uploadingProof, setUploadingProof] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDrinkUpsell, setShowDrinkUpsell] = useState(false);
   const [drinkUpsellShown, setDrinkUpsellShown] = useState(false);
   const [selectedDrinks, setSelectedDrinks] = useState<SelectedDrink[]>([]);
   const [customDrinkRequest, setCustomDrinkRequest] = useState<CustomDrinkRequest | null>(null);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
 
-  const [platformFee, setPlatformFee] = useState(500);
-  const [riderFee, setRiderFee] = useState(500);
-  const serviceFee = platformFee + riderFee;
+  const deliveryFee = PAYMENT_CONFIG.DELIVERY_FEE;
+  const serviceFee = deliveryFee;
 
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount_amount: number } | null>(null);
@@ -54,21 +50,7 @@ const Cart = () => {
   const grandTotal = Math.max(0, total + serviceFee + drinkTotal - discount);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      const { data } = await supabase.from('platform_settings').select('*').limit(1).single();
-      if (data) {
-        setPlatformFee(Number((data as any).platform_fee) || 500);
-        setRiderFee(Number((data as any).rider_fee) || 500);
-        setBankDetails({
-          bank_name: (data as any).bank_name || '',
-          bank_account_name: (data as any).bank_account_name || '',
-          bank_account_number: (data as any).bank_account_number || '',
-        });
-      }
-    };
-    fetchSettings();
-
-    // Load saved default location
+    // Load saved default location and wallet balance
     if (user) {
       supabase.from('profiles').select('default_lat, default_lng, default_location_name').eq('user_id', user.id).single()
         .then(({ data }) => {
@@ -77,6 +59,11 @@ const Cart = () => {
             setDefaultLocation({ lat: d.default_lat, lng: d.default_lng, name: d.default_location_name || 'Saved Location' });
           }
         });
+
+      // Load wallet balance
+      walletService.getWalletBalance(user.id)
+        .then(balance => setWalletBalance(balance.balance))
+        .catch(console.error);
     }
   }, [user]);
 
@@ -95,35 +82,107 @@ const Cart = () => {
     setDrinkUpsellShown(true);
   };
 
-  const copyAccountNumber = () => {
-    if (bankDetails?.bank_account_number) {
-      navigator.clipboard.writeText(bankDetails.bank_account_number);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handlePaymentMethodSelect = (method: string) => {
+    setSelectedPaymentMethod(method);
   };
 
-  const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Max 5MB allowed', variant: 'destructive' });
+  const handleProceedToPayment = async () => {
+    if (!user || !vendorId || items.length === 0) return;
+    if (!position && !usingDefault && !deliveryLocation.trim()) {
+      toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' });
       return;
     }
-    setPaymentProof(file);
-    setPaymentProofPreview(URL.createObjectURL(file));
+
+    setIsOrdering(true);
+    try {
+      const useLat = position?.lat ?? (usingDefault && defaultLocation ? defaultLocation.lat : undefined);
+      const useLng = position?.lng ?? (usingDefault && defaultLocation ? defaultLocation.lng : undefined);
+      const locLabel = deliveryLocation || (position ? 'GPS Location' : usingDefault && defaultLocation ? defaultLocation.name : '');
+
+      // Create order first
+      const orderData: any = {
+        student_id: user.id,
+        vendor_id: vendorId,
+        total,
+        delivery_fee: serviceFee,
+        discount,
+        promo_code: appliedPromo?.code || null,
+        delivery_location: locLabel,
+        notes,
+        drink_items: selectedDrinks.length > 0 ? selectedDrinks : [],
+        custom_drink_request: customDrinkRequest || null,
+        status: 'pending_payment',
+      };
+
+      if (useLat && useLng) {
+        orderData.delivery_lat = useLat;
+        orderData.delivery_lng = useLng;
+      }
+
+      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
+      if (orderError) throw orderError;
+
+      // Add order items
+      const orderItems = items.map(i => ({
+        order_id: order.id,
+        menu_item_id: i.menuItem.id,
+        quantity: i.quantity,
+        price: i.menuItem.price
+      }));
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+      if (itemsError) throw itemsError;
+
+      // Process payment based on selected method
+      if (selectedPaymentMethod === PAYMENT_CONFIG.PAYMENT_METHODS.WALLET) {
+        // Wallet payment
+        await paymentService.processWalletPayment(order.id, user.id, grandTotal);
+        toast({ title: 'Payment successful', description: 'Order paid with wallet balance' });
+      } else {
+        // Paystack payment - initialize payment
+        const paymentData = await paymentService.initializePayment({
+          orderId: order.id,
+          customerId: user.id,
+          totalAmount: grandTotal,
+          foodAmount: total + drinkTotal,
+          deliveryFee: serviceFee,
+          paymentMethod: selectedPaymentMethod,
+          customerEmail: user.email || '',
+        });
+
+        // Redirect to Paystack checkout
+        if (paymentData.authorization_url) {
+          window.location.href = paymentData.authorization_url;
+          return;
+        }
+      }
+
+      // Update promo code usage
+      if (appliedPromo) {
+        try {
+          await supabase.from('promo_codes')
+            .update({ used_count: supabase.sql`used_count + 1` })
+            .eq('code', appliedPromo.code);
+        } catch (error) {
+          console.error('Failed to update promo usage:', error);
+        }
+      }
+
+      clearCart();
+      navigate('/orders');
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast({ title: 'Payment failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsOrdering(false);
+    }
   };
 
-  const uploadPaymentProof = async (orderId: string): Promise<string | null> => {
-    if (!paymentProof || !user) return null;
-    setUploadingProof(true);
-    const ext = paymentProof.name.split('.').pop();
-    const path = `${user.id}/${orderId}.${ext}`;
-    const { error } = await supabase.storage.from('payment-proofs').upload(path, paymentProof, { upsert: true });
-    setUploadingProof(false);
-    if (error) { console.error('Upload error:', error); return null; }
-    const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
-    return urlData.publicUrl || path;
+  const handleCheckout = () => {
+    if (!position && !usingDefault && !deliveryLocation.trim()) {
+      toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' });
+      return;
+    }
+    setShowPaymentSelector(true);
   };
 
   const applyPromo = async () => {
@@ -141,53 +200,6 @@ const Cart = () => {
   };
 
   const removePromo = () => { setAppliedPromo(null); setPromoInput(''); };
-
-  const placeOrder = async () => {
-    if (!user || !vendorId || items.length === 0) return;
-    if (!position && !usingDefault && !deliveryLocation.trim()) { toast({ title: 'Please share GPS or enter delivery address', variant: 'destructive' }); return; }
-    if (paymentMethod === 'bank_transfer' && !paymentProof) { toast({ title: 'Please upload proof of payment', variant: 'destructive' }); return; }
-
-    setIsOrdering(true);
-    try {
-      const useLat = position?.lat ?? (usingDefault && defaultLocation ? defaultLocation.lat : undefined);
-      const useLng = position?.lng ?? (usingDefault && defaultLocation ? defaultLocation.lng : undefined);
-      const locLabel = deliveryLocation || (position ? 'GPS Location' : usingDefault && defaultLocation ? defaultLocation.name : '');
-
-      const orderData: any = {
-        student_id: user.id, vendor_id: vendorId, total, delivery_fee: serviceFee, discount,
-        promo_code: appliedPromo?.code || null, payment_method: paymentMethod,
-        delivery_location: locLabel, notes,
-        drink_items: selectedDrinks.length > 0 ? selectedDrinks : [],
-        custom_drink_request: customDrinkRequest || null,
-      };
-      if (useLat && useLng) { orderData.delivery_lat = useLat; orderData.delivery_lng = useLng; }
-      const { data: order, error: orderError } = await supabase.from('orders').insert(orderData).select().single();
-      if (orderError) throw orderError;
-
-      if (paymentMethod === 'bank_transfer' && paymentProof) {
-        const proofUrl = await uploadPaymentProof(order.id);
-        if (proofUrl) await supabase.from('orders').update({ payment_proof_url: proofUrl } as any).eq('id', order.id);
-      }
-
-      const orderItems = items.map(i => ({ order_id: order.id, menu_item_id: i.menuItem.id, quantity: i.quantity, price: i.menuItem.price }));
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-      if (itemsError) throw itemsError;
-
-      if (appliedPromo) {
-        try {
-          await (supabase.from('promo_codes') as any).update({ used_count: (await (supabase.from('promo_codes') as any).select('used_count').eq('code', appliedPromo.code).single()).data?.used_count + 1 || 1 }).eq('code', appliedPromo.code);
-        } catch {}
-      }
-
-      clearCart();
-      toast({ title: 'Order placed', description: 'Your food is on its way soon.' });
-      navigate('/orders');
-    } catch (error: any) {
-      toast({ title: 'Failed to place order', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsOrdering(false);
-    }
-  };
 
   if (items.length === 0) {
     return (
@@ -256,6 +268,11 @@ const Cart = () => {
           </div>
         )}
 
+        {/* Wallet Balance Display */}
+        <div className="mb-6">
+          <WalletBalance compact={true} showActions={false} />
+        </div>
+
         {/* Promo Code */}
         <div className="mb-8">
           {appliedPromo ? (
@@ -277,7 +294,7 @@ const Cart = () => {
           )}
         </div>
 
-        {/* Delivery & Payment */}
+        {/* Delivery Location */}
         <div className="space-y-6 mb-8">
           <div className="space-y-3">
             <Label className="text-sm font-medium">Delivery location</Label>
@@ -305,66 +322,6 @@ const Cart = () => {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Payment method</Label>
-            <Select value={paymentMethod} onValueChange={v => setPaymentMethod(v as PaymentMethod)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pay_on_delivery">Pay on Delivery (Cash)</SelectItem>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
-            <div className="rounded-lg border p-4 space-y-2">
-              <p className="text-sm font-semibold">Transfer details</p>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{bankDetails.bank_name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{bankDetails.bank_account_name}</span></div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Number</span>
-                  <span className="flex items-center gap-1.5 font-medium">
-                    {bankDetails.bank_account_number}
-                    <button onClick={copyAccountNumber} className="rounded p-1 hover:bg-muted transition-colors" type="button">
-                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                    </button>
-                  </span>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">Transfer ₦{grandTotal.toLocaleString()} and upload receipt below.</p>
-            </div>
-          )}
-
-          {paymentMethod === 'bank_transfer' && bankDetails && bankDetails.bank_account_number && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Upload className="h-4 w-4" /> Payment proof <span className="text-destructive">*</span>
-              </Label>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofSelect} />
-              {paymentProofPreview ? (
-                <div className="relative rounded-lg border overflow-hidden">
-                  <img src={paymentProofPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted" />
-                  <button type="button" onClick={() => { setPaymentProof(null); setPaymentProofPreview(null); }}
-                    className="absolute top-2 right-2 rounded-full bg-foreground p-1 text-background shadow-sm hover:opacity-80">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors">
-                  <ImageIcon className="h-6 w-6" />
-                  <span className="text-sm font-medium">Upload transfer receipt</span>
-                  <span className="text-xs">JPG, PNG — max 5MB</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {paymentMethod === 'bank_transfer' && (!bankDetails || !bankDetails.bank_account_number) && (
-            <p className="text-sm text-destructive">Bank transfer details not configured. Choose Pay on Delivery.</p>
-          )}
-
-          <div className="space-y-2">
             <Label className="text-sm font-medium">Notes (optional)</Label>
             <Textarea placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
@@ -383,9 +340,52 @@ const Cart = () => {
           </div>
         </div>
 
-        <Button className="w-full" onClick={placeOrder} disabled={isOrdering || uploadingProof}>
-          {isOrdering ? 'Placing order...' : `Place order — ₦${grandTotal.toLocaleString()}`}
+        <Button
+          className="w-full h-12 text-base font-medium bg-primary hover:bg-primary/90"
+          onClick={handleCheckout}
+          disabled={isOrdering}
+          size="lg"
+        >
+          {isOrdering ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+              Processing...
+            </div>
+          ) : (
+            `Proceed to Payment • ₦${grandTotal.toLocaleString()}`
+          )}
         </Button>
+
+        {/* Payment Method Selector Modal */}
+        {showPaymentSelector && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-background rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border">
+              <div className="sticky top-0 bg-background/95 backdrop-blur-sm p-6 border-b flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Payment</h2>
+                  <p className="text-sm text-muted-foreground">Complete your order</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPaymentSelector(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-6">
+                <PaymentMethodSelector
+                  totalAmount={grandTotal}
+                  walletBalance={walletBalance}
+                  onPaymentMethodSelect={handlePaymentMethodSelect}
+                  onProceedToPayment={handleProceedToPayment}
+                  isLoading={isOrdering}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <DrinkUpsellModal

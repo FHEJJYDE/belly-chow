@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, ShoppingCart, User, HeadphonesIcon, Bell } from 'lucide-react';
+import { Home, Package, ShoppingCart, User, HeadphonesIcon, Bell, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
@@ -17,6 +17,7 @@ const BottomNav = () => {
     { to: '/dashboard', icon: Home, label: 'Home' },
     { to: '/orders', icon: Package, label: 'Orders' },
     ...(role === 'student' ? [{ to: '/cart', icon: ShoppingCart, label: 'Cart', badge: itemCount }] : []),
+    { to: '/wallet', icon: Wallet, label: 'Wallet' },
     { to: '/notifications', icon: Bell, label: 'Alerts', badge: unreadCount },
     { to: '/support', icon: HeadphonesIcon, label: 'Help' },
     { to: '/profile', icon: User, label: 'Profile' },

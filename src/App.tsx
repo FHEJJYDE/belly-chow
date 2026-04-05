@@ -36,6 +36,9 @@ import AdminDrinks from "./pages/admin/AdminDrinks";
 import Support from "./pages/Support";
 import Install from "./pages/Install";
 import Notifications from "./pages/Notifications";
+import PaymentTest from "./pages/PaymentTest";
+import PaymentUITest from "./pages/PaymentUITest";
+import Wallet from "./pages/Wallet";
 import NotificationBanner from "./components/NotificationBanner";
 
 // Vendor pages
@@ -77,6 +80,9 @@ const App = () => (
                 <Route path="/support" element={<Support />} />
                 <Route path="/install" element={<Install />} />
                 <Route path="/notifications" element={<Notifications />} />
+                <Route path="/payment-test" element={<PaymentTest />} />
+                <Route path="/payment-ui-test" element={<PaymentUITest />} />
+                <Route path="/wallet" element={<Wallet />} />
 
                 {/* Admin panel */}
                 <Route path="/admin" element={<AdminLayout />}>
