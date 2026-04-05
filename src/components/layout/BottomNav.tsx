@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, ShoppingCart, User, HeadphonesIcon } from 'lucide-react';
+import { Home, Package, ShoppingCart, User, HeadphonesIcon, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { cn } from '@/lib/utils';
 
 const BottomNav = () => {
   const { user, role } = useAuth();
   const { itemCount } = useCart();
+  const { unreadCount } = useInAppNotifications();
   const location = useLocation();
 
   if (!user || role === 'admin' || role === 'vendor') return null;
@@ -15,6 +17,7 @@ const BottomNav = () => {
     { to: '/dashboard', icon: Home, label: 'Home' },
     { to: '/orders', icon: Package, label: 'Orders' },
     ...(role === 'student' ? [{ to: '/cart', icon: ShoppingCart, label: 'Cart', badge: itemCount }] : []),
+    { to: '/notifications', icon: Bell, label: 'Alerts', badge: unreadCount },
     { to: '/support', icon: HeadphonesIcon, label: 'Help' },
     { to: '/profile', icon: User, label: 'Profile' },
   ];

@@ -12,6 +12,7 @@ import { isVendorOpen, formatTime } from '@/lib/vendorUtils';
 import { useFavourites } from '@/hooks/useFavourites';
 import { VendorCardSkeleton } from '@/components/Skeletons';
 import EmptyState from '@/components/EmptyState';
+import NotificationStatus from '@/components/NotificationStatus';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -149,6 +150,11 @@ const StudentDashboard = () => {
               <X className="h-4 w-4" />
             </button>
           )}
+        </div>
+
+        {/* Notification Status */}
+        <div className="mb-6">
+          <NotificationStatus maxItems={2} />
         </div>
 
         {/* Filter chips */}

@@ -34,6 +34,8 @@ import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import AdminDrinks from "./pages/admin/AdminDrinks";
 import Support from "./pages/Support";
 import Install from "./pages/Install";
+import Notifications from "./pages/Notifications";
+import NotificationBanner from "./components/NotificationBanner";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
@@ -59,45 +61,47 @@ const App = () => (
         <AuthProvider>
           <CartProvider>
             <NotificationListener />
+            <NotificationBanner />
             <div className="pb-16 md:pb-0">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/vendor/:id" element={<VendorDetail />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/install" element={<Install />} />
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/vendor/:id" element={<VendorDetail />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/install" element={<Install />} />
+                <Route path="/notifications" element={<Notifications />} />
 
-              {/* Admin panel */}
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<AdminOverview />} />
-                <Route path="vendors" element={<AdminVendors />} />
-                <Route path="orders" element={<AdminOrders />} />
-                <Route path="payments" element={<AdminPayments />} />
-                <Route path="users" element={<AdminUsers />} />
-                <Route path="disputes" element={<AdminDisputes />} />
-                <Route path="refunds" element={<AdminRefunds />} />
-                <Route path="verifications" element={<AdminVerifications />} />
-                <Route path="tickets" element={<AdminTickets />} />
-                <Route path="promo-codes" element={<AdminPromoCodes />} />
-                <Route path="drinks" element={<AdminDrinks />} />
-                <Route path="settings" element={<AdminSettings />} />
-              </Route>
+                {/* Admin panel */}
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminOverview />} />
+                  <Route path="vendors" element={<AdminVendors />} />
+                  <Route path="orders" element={<AdminOrders />} />
+                  <Route path="payments" element={<AdminPayments />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="disputes" element={<AdminDisputes />} />
+                  <Route path="refunds" element={<AdminRefunds />} />
+                  <Route path="verifications" element={<AdminVerifications />} />
+                  <Route path="tickets" element={<AdminTickets />} />
+                  <Route path="promo-codes" element={<AdminPromoCodes />} />
+                  <Route path="drinks" element={<AdminDrinks />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                </Route>
 
-              {/* Vendor panel */}
-              <Route path="/vendor-panel" element={<VendorLayout />}>
-                <Route index element={<VendorOverview />} />
-                <Route path="orders" element={<VendorOrdersPage />} />
-                <Route path="menu" element={<VendorMenu />} />
-                <Route path="settings" element={<VendorSettings />} />
-              </Route>
+                {/* Vendor panel */}
+                <Route path="/vendor-panel" element={<VendorLayout />}>
+                  <Route index element={<VendorOverview />} />
+                  <Route path="orders" element={<VendorOrdersPage />} />
+                  <Route path="menu" element={<VendorMenu />} />
+                  <Route path="settings" element={<VendorSettings />} />
+                </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
             </div>
             <BottomNav />
           </CartProvider>

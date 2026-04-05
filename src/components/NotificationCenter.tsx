@@ -1,86 +1,65 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bell, Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bell, Check, Clock, Package, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-interface Notification {
-  id: string;
-  user_id: string;
-  title: string;
-  message: string;
-  type: string;
-  order_id: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+import { formatDistanceToNow } from 'date-fns';
 
 const NotificationCenter = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useInAppNotifications();
 
-  useEffect(() => {
-    if (!user) return;
-
-    const fetch = async () => {
-      const { data } = await (supabase.from('notifications') as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(30);
-      setNotifications(data || []);
-    };
-    fetch();
-
-    const channel = supabase.channel('my-notifications').on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-      (payload: any) => {
-        setNotifications(prev => [payload.new as Notification, ...prev].slice(0, 30));
-      }
-    ).subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
-  const markAllRead = async () => {
-    if (!user) return;
-    await (supabase.from('notifications') as any)
-      .update({ is_read: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'order_update':
+        return <Package className="h-4 w-4 text-blue-500" />;
+      case 'new_order':
+        return <Bell className="h-4 w-4 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      default:
+        return <Info className="h-4 w-4 text-blue-500" />;
+    }
   };
 
-  const handleClick = (n: Notification) => {
-    if (!n.is_read) {
-      (supabase.from('notifications') as any).update({ is_read: true }).eq('id', n.id).then(() => {});
-      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'new_order':
+        return 'bg-green-50 border-green-200';
+      case 'error':
+        return 'bg-red-50 border-red-200';
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      default:
+        return 'bg-blue-50 border-blue-200';
     }
-    if (n.order_id) {
+  };
+
+  const handleNotificationClick = async (notification: any) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+
+    // Navigate based on notification type
+    if (notification.order_id) {
       setOpen(false);
       navigate('/orders');
     }
   };
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'now';
-    if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h`;
-    return `${Math.floor(hrs / 24)}d`;
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return 'recently';
+    }
   };
-
-  if (!user) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -88,45 +67,104 @@ const NotificationCenter = () => {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
+            <Badge
+              variant="destructive"
+              className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-[10px] font-bold flex items-center justify-center"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-96 p-0" align="end">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <h3 className="font-heading text-sm font-semibold">Notifications</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">Notifications</h3>
+            {unreadCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {unreadCount} new
+              </Badge>
+            )}
+          </div>
           {unreadCount > 0 && (
-            <button onClick={markAllRead} className="flex items-center gap-1 text-xs text-primary hover:underline">
-              <Check className="h-3 w-3" /> Mark all read
-            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={markAllAsRead}
+              className="h-auto p-1 text-xs text-primary hover:underline"
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Mark all read
+            </Button>
           )}
         </div>
-        <ScrollArea className="max-h-80">
+
+        <ScrollArea className="max-h-96">
           {notifications.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No notifications yet</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Bell className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                You'll see order updates and important messages here
+              </p>
+            </div>
           ) : (
-            <div>
-              {notifications.map(n => (
+            <div className="divide-y">
+              {notifications.map((notification) => (
                 <button
-                  key={n.id}
-                  onClick={() => handleClick(n)}
-                  className={`w-full border-b px-4 py-3 text-left transition-colors hover:bg-muted/50 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`w-full p-4 text-left transition-all hover:bg-muted/50 ${!notification.is_read
+                      ? `${getNotificationColor(notification.type)} border-l-4`
+                      : 'hover:bg-muted/30'
+                    }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm truncate ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {getNotificationIcon(notification.type)}
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm ${!notification.is_read ? 'font-semibold' : 'font-medium'}`}>
+                          {notification.title}
+                        </p>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                          <Clock className="h-3 w-3" />
+                          {formatTimeAgo(notification.created_at)}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {notification.message}
+                      </p>
+                      {!notification.is_read && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <div className="h-2 w-2 rounded-full bg-primary" />
+                          <span className="text-xs text-primary font-medium">New</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {!n.is_read && <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-primary" />}
                 </button>
               ))}
             </div>
           )}
         </ScrollArea>
+
+        {notifications.length > 0 && (
+          <div className="border-t px-4 py-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+                navigate('/notifications');
+              }}
+              className="w-full text-xs"
+            >
+              View all notifications
+            </Button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
