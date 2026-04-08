@@ -83,7 +83,7 @@ const AdminOrders = () => {
                   ₦{Number(order.total).toLocaleString()} · {order.delivery_location}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {order.payment_method.replace('_', ' ')} · {order.payment_status} · {new Date(order.created_at).toLocaleString()}
+                  {new Date(order.created_at).toLocaleString()}
                 </p>
               </div>
               <div className="flex items-center gap-2">
