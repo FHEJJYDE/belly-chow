@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import BadgeTest from '@/components/BadgeTest';
 import {
     Bell,
     Check,
@@ -125,11 +124,6 @@ const Notifications = () => {
                         Mark all read
                     </Button>
                 )}
-            </div>
-
-            {/* Badge Test Component - Remove this in production */}
-            <div className="mb-6">
-                <BadgeTest />
             </div>
 
             {notifications.length === 0 ? (
