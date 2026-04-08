@@ -22,35 +22,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   const fetchRole = async (userId: string) => {
-    const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
-    setRole(data as AppRole | null);
+    try {
+      const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
+      setRole(data as AppRole | null);
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      setRole(null);
+    }
   };
 
+  // Initialize auth state on app start
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Get the current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Error getting session:', error);
+          if (isMounted) {
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            await fetchRole(session.user.id);
+          } else {
+            setRole(null);
+          }
+
+          setLoading(false);
+          setInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (isMounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    if (!initialized) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
-        setTimeout(() => fetchRole(session.user.id), 0);
+        await fetchRole(session.user.id);
       } else {
         setRole(null);
       }
-      setLoading(false);
-    });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
+      // Only set loading to false after we've processed the auth change
+      if (event !== 'INITIAL_SESSION') {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initialized]);
 
   const signUp = async (email: string, password: string, fullName: string, selectedRole: AppRole, vendorName?: string) => {
     const { data, error } = await supabase.auth.signUp({
@@ -81,10 +135,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    setLoading(true);
     setUser(null);
     setSession(null);
     setRole(null);
     await supabase.auth.signOut();
+    setLoading(false);
   };
 
   return (
@@ -92,6 +148,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+};
+
+return (
+  <AuthContext.Provider value={{ user, session, role, loading, signUp, signIn, signOut }}>
+    {children}
+  </AuthContext.Provider>
+);
 };
 
 export const useAuth = () => {

@@ -3,12 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBackgroundNotifications } from "@/hooks/useBackgroundNotifications";
 import BottomNav from "./components/layout/BottomNav";
+import LoadingScreen from "./components/LoadingScreen";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -53,6 +54,62 @@ const NotificationListener = () => {
   return null;
 };
 
+const AppContent = () => {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <>
+      <NotificationListener />
+      <NotificationBanner />
+      <div className="pb-16 md:pb-0">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/vendor/:id" element={<VendorDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/install" element={<Install />} />
+          <Route path="/notifications" element={<Notifications />} />
+
+          {/* Admin panel */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverview />} />
+            <Route path="vendors" element={<AdminVendors />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="disputes" element={<AdminDisputes />} />
+            <Route path="refunds" element={<AdminRefunds />} />
+            <Route path="verifications" element={<AdminVerifications />} />
+            <Route path="tickets" element={<AdminTickets />} />
+            <Route path="promo-codes" element={<AdminPromoCodes />} />
+            <Route path="drinks" element={<AdminDrinks />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
+
+          {/* Vendor panel */}
+          <Route path="/vendor-panel" element={<VendorLayout />}>
+            <Route index element={<VendorOverview />} />
+            <Route path="orders" element={<VendorOrdersPage />} />
+            <Route path="menu" element={<VendorMenu />} />
+            <Route path="settings" element={<VendorSettings />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+      <BottomNav />
+    </>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -61,49 +118,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
-            <NotificationListener />
-            <NotificationBanner />
-            <div className="pb-16 md:pb-0">
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/vendor/:id" element={<VendorDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/install" element={<Install />} />
-                <Route path="/notifications" element={<Notifications />} />
-
-                {/* Admin panel */}
-                <Route path="/admin" element={<AdminLayout />}>
-                  <Route index element={<AdminOverview />} />
-                  <Route path="vendors" element={<AdminVendors />} />
-                  <Route path="orders" element={<AdminOrders />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="disputes" element={<AdminDisputes />} />
-                  <Route path="refunds" element={<AdminRefunds />} />
-                  <Route path="verifications" element={<AdminVerifications />} />
-                  <Route path="tickets" element={<AdminTickets />} />
-                  <Route path="promo-codes" element={<AdminPromoCodes />} />
-                  <Route path="drinks" element={<AdminDrinks />} />
-                  <Route path="settings" element={<AdminSettings />} />
-                </Route>
-
-                {/* Vendor panel */}
-                <Route path="/vendor-panel" element={<VendorLayout />}>
-                  <Route index element={<VendorOverview />} />
-                  <Route path="orders" element={<VendorOrdersPage />} />
-                  <Route path="menu" element={<VendorMenu />} />
-                  <Route path="settings" element={<VendorSettings />} />
-                </Route>
-
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
-            <BottomNav />
+            <AppContent />
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>
