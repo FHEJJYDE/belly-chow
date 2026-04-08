@@ -293,7 +293,7 @@ const Orders = () => {
                             <div>
                               <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
                               <p className="text-sm text-muted-foreground">
-                                ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()} · {order.payment_method.replace('_', ' ')}
+                                ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()}
                               </p>
                               <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString()}</p>
                               {order.delivery_location && (
