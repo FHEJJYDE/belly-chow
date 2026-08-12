@@ -88,10 +88,10 @@ const StudentDashboard = () => {
     return (
       <div className="relative group">
         <Link to={`/vendor/${vendor.id}`}>
-          <Card className={`overflow-hidden transition-all hover:ring-1 hover:ring-border ${!open ? 'opacity-50' : ''}`}>
-            <div className="relative h-36 bg-muted flex items-center justify-center">
+          <Card className={`overflow-hidden premium-card ${!open ? 'opacity-50 hover:translate-y-0 hover:border-border' : ''}`}>
+            <div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden">
               {vendor.logo_url ? (
-                <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover" />
+                <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover transition-transform duration-350 group-hover:scale-105" />
               ) : (
                 <span className="text-4xl text-muted-foreground/40">🍽️</span>
               )}
@@ -158,17 +158,17 @@ const StudentDashboard = () => {
         </div>
 
         {/* Filter chips */}
-        <div className="mb-8 flex flex-wrap gap-2">
+        <div className="mb-8 flex items-center gap-2 overflow-x-auto hide-scrollbar pb-2 snap-x snap-mandatory">
           {user && (
-            <Button size="sm" variant={showFavourites ? 'default' : 'outline'} className="rounded-full gap-1 h-8 text-xs" onClick={() => setShowFavourites(!showFavourites)}>
+            <Button size="sm" variant={showFavourites ? 'default' : 'outline'} className="rounded-full gap-1 h-8 text-xs shrink-0 snap-start" onClick={() => setShowFavourites(!showFavourites)}>
               <Heart className={`h-3 w-3 ${showFavourites ? 'fill-primary-foreground' : ''}`} /> Favourites
             </Button>
           )}
           {categories.length > 0 && (
             <>
-              <Button size="sm" variant={selectedCategory === null ? 'default' : 'outline'} className="rounded-full h-8 text-xs" onClick={() => setSelectedCategory(null)}>All</Button>
+              <Button size="sm" variant={selectedCategory === null ? 'default' : 'outline'} className="rounded-full h-8 text-xs shrink-0 snap-start" onClick={() => setSelectedCategory(null)}>All</Button>
               {categories.map(cat => (
-                <Button key={cat} size="sm" variant={selectedCategory === cat ? 'default' : 'outline'} className="rounded-full h-8 text-xs" onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}>
+                <Button key={cat} size="sm" variant={selectedCategory === cat ? 'default' : 'outline'} className="rounded-full h-8 text-xs shrink-0 snap-start" onClick={() => setSelectedCategory(prev => prev === cat ? null : cat)}>
                   {cat}
                 </Button>
               ))}

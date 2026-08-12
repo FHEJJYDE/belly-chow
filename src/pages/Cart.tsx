@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, X, Navigation } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import DrinkUpsellModal, { SelectedDrink, CustomDrinkRequest } from '@/components/DrinkUpsellModal';
+import PaymentModal from '@/components/payment/PaymentModal';
 
 const Cart = () => {
     const { items, updateQuantity, removeItem, clearCart, total, vendorId } = useCart();
@@ -22,37 +23,44 @@ const Cart = () => {
     const [deliveryLocation, setDeliveryLocation] = useState('');
     const [notes, setNotes] = useState('');
     const [isOrdering, setIsOrdering] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [orderData, setOrderData] = useState<any>(null);
 
     const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
     const [defaultLocation, setDefaultLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
     const [showDrinkModal, setShowDrinkModal] = useState(false);
     const [selectedDrinks, setSelectedDrinks] = useState<SelectedDrink[]>([]);
-    const [customDrinkRequests, setCustomDrinkRequests] = useState<CustomDrinkRequest[]>([]);
+    const [customDrinkRequests, setCustomDrinkRequests] = useState<CustomDrinkRequest | null>(null);
 
     const deliveryFee = 1000; // Fixed delivery fee
-    const serviceFee = deliveryFee;
+    const serviceFee = 0; // No service fee yet — set to 0 to avoid double-charging
 
     useEffect(() => {
         if (user) {
-            // Load user's default location
+            // Profiles table stores location as separate columns: default_lat, default_lng, default_location_name
             supabase
                 .from('profiles')
-                .select('default_location')
-                .eq('id', user.id)
+                .select('default_lat, default_lng, default_location_name')
+                .eq('user_id', user.id)
                 .single()
-                .then(({ data }) => {
-                    if (data?.default_location) {
-                        setDefaultLocation(data.default_location);
-                        setDeliveryLocation(data.default_location.name);
+                .then(({ data, error }) => {
+                    if (error || !data) return;
+                    if (data.default_lat && data.default_lng && data.default_location_name) {
+                        setDefaultLocation({
+                            lat: data.default_lat,
+                            lng: data.default_lng,
+                            name: data.default_location_name,
+                        });
+                        setDeliveryLocation(data.default_location_name);
                     }
-                })
-                .catch(console.error);
+                });
         }
     }, [user]);
 
     const handleLocationSelect = () => {
-        if (position) {
-            setDeliveryLocation(`${position.coords.latitude}, ${position.coords.longitude}`);
+        // position from useGeolocation returns {lat, lng}, not a GeolocationPosition object
+        if (position?.lat && position?.lng) {
+            setDeliveryLocation(`${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`);
         } else {
             getPosition();
         }
@@ -91,19 +99,21 @@ const Cart = () => {
         try {
             const grandTotal = total + serviceFee;
 
-            // Create order without payment
+            // Create order with pending payment status
             const { data: order, error: orderError } = await supabase
                 .from('orders')
                 .insert({
-                    customer_id: user.id,
+                    student_id: user.id,
                     vendor_id: vendorId,
-                    items: items,
-                    total_amount: grandTotal,
+                    total: total,
+                    delivery_fee: deliveryFee,
                     delivery_location: deliveryLocation,
                     notes: notes,
-                    status: 'pending', // Order starts as pending
-                    selected_drinks: selectedDrinks,
-                    custom_drink_requests: customDrinkRequests,
+                    status: 'pending',
+                    payment_status: 'pending',
+                    payment_method: 'pay_on_delivery',
+                    drink_items: selectedDrinks as unknown as import('@/integrations/supabase/types').Json,
+                    custom_drink_request: customDrinkRequests as unknown as import('@/integrations/supabase/types').Json,
                 })
                 .select()
                 .single();
@@ -112,21 +122,43 @@ const Cart = () => {
                 throw orderError;
             }
 
-            // Clear cart and redirect
-            clearCart();
+            // Create order items
+            const orderItems = items.map(item => ({
+                order_id: order.id,
+                menu_item_id: item.menuItem.id,
+                quantity: item.quantity,
+                price: item.menuItem.price,
+            }));
 
-            toast({
-                title: "Order placed successfully!",
-                description: "Your order has been submitted and is pending confirmation.",
+            const { error: itemsError } = await supabase
+                .from('order_items')
+                .insert(orderItems);
+
+            if (itemsError) {
+                throw itemsError;
+            }
+
+            // Prepare order data for payment
+            setOrderData({
+                id: order.id,
+                total: grandTotal,
+                delivery_fee: deliveryFee,
+                vendor_id: vendorId,
+                items: items.map(item => ({
+                    name: item.menuItem.name,
+                    quantity: item.quantity,
+                    price: item.menuItem.price,
+                })),
             });
 
-            navigate('/orders');
+            // Show payment modal
+            setShowPaymentModal(true);
 
         } catch (error) {
             console.error('Order creation error:', error);
             toast({
                 title: "Order failed",
-                description: error instanceof Error ? error.message : "Failed to place order",
+                description: (error as any)?.message || "Failed to create order",
                 variant: "destructive",
             });
         } finally {
@@ -134,9 +166,24 @@ const Cart = () => {
         }
     };
 
-    const handleDrinkSelection = (drinks: SelectedDrink[], customRequests: CustomDrinkRequest[]) => {
+    const handlePaymentSuccess = (reference: string) => {
+        // Clear cart after successful payment
+        clearCart();
+        setShowPaymentModal(false);
+
+        toast({
+            title: "Order placed successfully!",
+            description: "Your payment is being processed. You'll be redirected shortly.",
+        });
+
+        // Redirect to payment verification page
+        navigate(`/payment/verify?ref=${reference}&payment=success`);
+    };
+
+    // DrinkUpsellModal calls onConfirm(drinks, customRequest: CustomDrinkRequest | null)
+    const handleDrinkSelection = (drinks: SelectedDrink[], customRequest: CustomDrinkRequest | null) => {
         setSelectedDrinks(drinks);
-        setCustomDrinkRequests(customRequests);
+        setCustomDrinkRequests(customRequest);
         setShowDrinkModal(false);
     };
 
@@ -174,16 +221,16 @@ const Cart = () => {
                     <CardContent className="p-6">
                         <div className="space-y-4">
                             {items.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between py-4 border-b border-border last:border-b-0">
+                                <div key={item.menuItem.id} className="flex items-center justify-between py-4 border-b border-border last:border-b-0">
                                     <div className="flex-1">
-                                        <h3 className="font-medium text-foreground">{item.name}</h3>
-                                        <p className="text-sm text-muted-foreground">₦{item.price.toLocaleString()}</p>
+                                        <h3 className="font-medium text-foreground">{item.menuItem.name}</h3>
+                                        <p className="text-sm text-muted-foreground">₦{item.menuItem.price?.toLocaleString() || '0'}</p>
                                     </div>
                                     <div className="flex items-center space-x-3">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                                            onClick={() => updateQuantity(item.menuItem.id, Math.max(0, item.quantity - 1))}
                                             className="h-8 w-8 p-0"
                                         >
                                             <Minus className="h-4 w-4" />
@@ -192,7 +239,7 @@ const Cart = () => {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                            onClick={() => updateQuantity(item.menuItem.id, item.quantity + 1)}
                                             className="h-8 w-8 p-0"
                                         >
                                             <Plus className="h-4 w-4" />
@@ -200,7 +247,7 @@ const Cart = () => {
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => removeItem(item.id)}
+                                            onClick={() => removeItem(item.menuItem.id)}
                                             className="h-8 w-8 p-0 text-destructive hover:text-destructive/80"
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -325,13 +372,21 @@ const Cart = () => {
                 </Button>
             </div>
 
+            {/* Payment Modal */}
+            {showPaymentModal && orderData && (
+                <PaymentModal
+                    open={showPaymentModal}
+                    onOpenChange={setShowPaymentModal}
+                    order={orderData}
+                    onPaymentSuccess={handlePaymentSuccess}
+                />
+            )}
+
             {/* Drink Selection Modal */}
             <DrinkUpsellModal
-                isOpen={showDrinkModal}
+                open={showDrinkModal}
                 onClose={() => setShowDrinkModal(false)}
                 onConfirm={handleDrinkSelection}
-                initialDrinks={selectedDrinks}
-                initialCustomRequests={customDrinkRequests}
             />
         </div>
     );

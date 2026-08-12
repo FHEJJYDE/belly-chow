@@ -120,21 +120,21 @@ const VendorOverview = () => {
         <VendorStatusToggle variant="full" />
       </div>
 
-      <div className="mb-8 grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Pending', value: pending, icon: Package },
           { label: 'Active', value: active, icon: Clock },
           { label: 'Revenue', value: `₦${revenue.toLocaleString()}`, icon: DollarSign },
           { label: 'Total Orders', value: orders.length, icon: ShoppingBag },
         ].map(s => (
-          <Card key={s.label}>
+          <Card key={s.label} className="premium-card">
             <CardContent className="flex items-center gap-3 p-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted">
                 <s.icon className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className="font-heading text-xl font-bold">{s.value}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground truncate">{s.label}</p>
+                <p className="font-heading text-xl font-bold truncate">{s.value}</p>
               </div>
             </CardContent>
           </Card>

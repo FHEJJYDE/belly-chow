@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { LocationProvider } from "@/contexts/LocationContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBackgroundNotifications } from "@/hooks/useBackgroundNotifications";
@@ -33,10 +35,15 @@ import AdminVerifications from "./pages/admin/AdminVerifications";
 import AdminTickets from "./pages/admin/AdminTickets";
 import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import AdminDrinks from "./pages/admin/AdminDrinks";
+import AdminPayments from "./pages/admin/AdminPayments";
+import AdminEscrow from "./pages/admin/AdminEscrow";
 import Support from "./pages/Support";
 import Install from "./pages/Install";
 import Notifications from "./pages/Notifications";
 import NotificationBanner from "./components/NotificationBanner";
+import PaymentVerification from "./components/payment/PaymentVerification";
+import TestPaymentPage from "./pages/TestPayment";
+import MockCheckout from "./pages/MockCheckout";
 
 // Vendor pages
 import VendorLayout from "./components/layout/VendorLayout";
@@ -45,7 +52,14 @@ import VendorOrdersPage from "./pages/vendor/VendorOrders";
 import VendorMenu from "./pages/vendor/VendorMenu";
 import VendorSettings from "./pages/vendor/VendorSettings";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,   // 1 minute
+      gcTime: 300_000,     // 5 minutes
+    },
+  },
+});
 
 const NotificationListener = () => {
   useOrderNotifications();
@@ -70,17 +84,20 @@ const AppContent = () => {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/vendor/:id" element={<VendorDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/support" element={<Support />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/vendor/:id" element={<ProtectedRoute allowedRoles={['student']}><VendorDetail /></ProtectedRoute>} />
+          <Route path="/cart" element={<ProtectedRoute allowedRoles={['student']}><Cart /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute allowedRoles={['student']}><Orders /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/support" element={<ProtectedRoute allowedRoles={['student']}><Support /></ProtectedRoute>} />
           <Route path="/install" element={<Install />} />
-          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          <Route path="/payment/verify" element={<ProtectedRoute allowedRoles={['student']}><PaymentVerification /></ProtectedRoute>} />
+          <Route path="/test-payment" element={<TestPaymentPage />} />
+          <Route path="/mock-checkout" element={<MockCheckout />} />
 
           {/* Admin panel */}
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
             <Route index element={<AdminOverview />} />
             <Route path="vendors" element={<AdminVendors />} />
             <Route path="orders" element={<AdminOrders />} />
@@ -91,11 +108,13 @@ const AppContent = () => {
             <Route path="tickets" element={<AdminTickets />} />
             <Route path="promo-codes" element={<AdminPromoCodes />} />
             <Route path="drinks" element={<AdminDrinks />} />
+            <Route path="payments" element={<AdminPayments />} />
+            <Route path="escrow" element={<AdminEscrow />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           {/* Vendor panel */}
-          <Route path="/vendor-panel" element={<VendorLayout />}>
+          <Route path="/vendor-panel" element={<ProtectedRoute allowedRoles={['vendor']}><VendorLayout /></ProtectedRoute>}>
             <Route index element={<VendorOverview />} />
             <Route path="orders" element={<VendorOrdersPage />} />
             <Route path="menu" element={<VendorMenu />} />
@@ -117,9 +136,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <CartProvider>
-            <AppContent />
-          </CartProvider>
+          <LocationProvider>
+            <CartProvider>
+              <AppContent />
+            </CartProvider>
+          </LocationProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

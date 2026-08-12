@@ -86,8 +86,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!initialized) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
-
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -148,13 +146,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-};
-
-return (
-  <AuthContext.Provider value={{ user, session, role, loading, signUp, signIn, signOut }}>
-    {children}
-  </AuthContext.Provider>
-);
 };
 
 export const useAuth = () => {

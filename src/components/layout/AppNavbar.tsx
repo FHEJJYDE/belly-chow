@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useTheme } from 'next-themes';
@@ -11,13 +11,19 @@ const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
   const { itemCount } = useCart();
   const { resolvedTheme, setTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/', { replace: true });
+  };
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-lg">
+    <nav className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between">
-        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5">
+        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
           <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+          <span className="font-heading text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">Belly-Chow</span>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -51,7 +57,7 @@ const AppNavbar = () => {
               <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
                 {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
               </Button>
             </>

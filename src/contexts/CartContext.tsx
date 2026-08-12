@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database } from '@/integrations/supabase/types';
 
 type MenuItem = Database['public']['Tables']['menu_items']['Row'];
@@ -22,8 +22,31 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [vendorId, setVendorId] = useState<string | null>(null);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('belly_chow_cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [vendorId, setVendorId] = useState<string | null>(() => {
+    return localStorage.getItem('belly_chow_cart_vendor_id');
+  });
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('belly_chow_cart_items', JSON.stringify(items));
+  }, [items]);
+
+  useEffect(() => {
+    if (vendorId) {
+      localStorage.setItem('belly_chow_cart_vendor_id', vendorId);
+    } else {
+      localStorage.removeItem('belly_chow_cart_vendor_id');
+    }
+  }, [vendorId]);
 
   const addItem = (menuItem: MenuItem) => {
     if (vendorId && vendorId !== menuItem.vendor_id) {
@@ -58,6 +81,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     setVendorId(null);
+    localStorage.removeItem('belly_chow_cart_items');
+    localStorage.removeItem('belly_chow_cart_vendor_id');
   };
 
   const total = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);

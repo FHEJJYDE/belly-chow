@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
@@ -94,16 +94,151 @@ const RiderDashboard = () => {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Update rider location in active orders
+  // Simulation state
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simStep, setSimStep] = useState(0);
+  const [totalSimSteps, setTotalSimSteps] = useState(0);
+  const [simulatedPos, setSimulatedPos] = useState<{ lat: number; lng: number } | null>(null);
+  const simIntervalRef = useRef<any>(null);
+
+  const stopRouteSimulation = useCallback(() => {
+    if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+      simIntervalRef.current = null;
+    }
+    setIsSimulating(false);
+    setSimulatedPos(null);
+    setSimStep(0);
+    setTotalSimSteps(0);
+    if (activeDeliveryId) {
+      localStorage.removeItem(`rider_sim_${activeDeliveryId}`);
+      localStorage.removeItem(`rider_sim_step_${activeDeliveryId}`);
+    }
+  }, [activeDeliveryId]);
+
   useEffect(() => {
-    if (!position || !user || myOrders.length === 0) return;
-    myOrders.forEach(async (order) => {
+    return () => {
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeDeliveryId) {
+      const savedSim = localStorage.getItem(`rider_sim_${activeDeliveryId}`);
+      if (savedSim !== 'true') {
+        stopRouteSimulation();
+      }
+    } else {
+      stopRouteSimulation();
+    }
+  }, [activeDeliveryId, stopRouteSimulation]);
+
+  const startRouteSimulation = async (startStepIndex = 0) => {
+    const activeOrder = myOrders.find(o => o.id === activeDeliveryId);
+    if (!activeOrder || !activeOrder.delivery_lat || !activeOrder.delivery_lng) {
+      toast({ title: 'Cannot simulate', description: 'Customer delivery coordinates are missing.', variant: 'destructive' });
+      return;
+    }
+
+    const customerLat = activeOrder.delivery_lat;
+    const customerLng = activeOrder.delivery_lng;
+    const vendorLat = customerLat + 0.003;
+    const vendorLng = customerLng - 0.004;
+
+    setIsSimulating(true);
+    localStorage.setItem(`rider_sim_${activeDeliveryId}`, 'true');
+    if (startStepIndex === 0) {
+      toast({ title: 'Starting GPS simulation...', description: 'Fetching OSRM street route...' });
+    } else {
+      toast({ title: 'Resuming GPS simulation...', description: 'Continuing from last active step...' });
+    }
+
+    try {
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${vendorLng},${vendorLat};${customerLng},${customerLat}?overview=full&geometries=geojson`
+      );
+      if (!res.ok) throw new Error('OSRM route error');
+      const data = await res.json();
+      let coords: [number, number][] = [];
+      if (data.routes && data.routes[0]) {
+        coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+      } else {
+        coords = [];
+        const steps = 15;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          coords.push([
+            vendorLat + (customerLat - vendorLat) * t,
+            vendorLng + (customerLng - vendorLng) * t
+          ]);
+        }
+      }
+
+      if (coords.length === 0) {
+        stopRouteSimulation();
+        return;
+      }
+
+      const initialIndex = Math.min(startStepIndex, coords.length - 1);
+      setTotalSimSteps(coords.length);
+      setSimStep(initialIndex);
+      setSimulatedPos({ lat: coords[initialIndex][0], lng: coords[initialIndex][1] });
+
+      let currentIndex = initialIndex;
       await supabase.from('orders').update({
-        rider_lat: position.lat,
-        rider_lng: position.lng,
-      } as any).eq('id', order.id);
-    });
-  }, [position, myOrders, user]);
+        rider_lat: coords[initialIndex][0],
+        rider_lng: coords[initialIndex][1]
+      } as any).eq('id', activeOrder.id);
+
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+
+      simIntervalRef.current = setInterval(async () => {
+        currentIndex += 1;
+        if (currentIndex >= coords.length) {
+          stopRouteSimulation();
+          toast({ title: 'Simulation complete 🎉', description: 'Rider has reached the destination!' });
+          return;
+        }
+
+        setSimStep(currentIndex);
+        localStorage.setItem(`rider_sim_step_${activeDeliveryId}`, currentIndex.toString());
+        const nextPt = coords[currentIndex];
+        setSimulatedPos({ lat: nextPt[0], lng: nextPt[1] });
+        await supabase.from('orders').update({
+          rider_lat: nextPt[0],
+          rider_lng: nextPt[1]
+        } as any).eq('id', activeOrder.id);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Failed to initialize route simulation:', err);
+      toast({ title: 'Simulation error', description: 'Failed to fetch OSRM route. Check connection.', variant: 'destructive' });
+      stopRouteSimulation();
+    }
+  };
+
+  useEffect(() => {
+    if (!activeDeliveryId || myOrders.length === 0 || isSimulating) return;
+    const savedSim = localStorage.getItem(`rider_sim_${activeDeliveryId}`);
+    if (savedSim === 'true') {
+      const savedStep = parseInt(localStorage.getItem(`rider_sim_step_${activeDeliveryId}`) || '0', 10);
+      startRouteSimulation(savedStep);
+    }
+  }, [activeDeliveryId, myOrders, isSimulating]);
+
+  // Broadcast rider GPS to the currently active delivery only.
+  // useGeolocation already throttles position updates to every ~4 seconds,
+  // so this effect fires at most once per throttle window.
+  useEffect(() => {
+    if (isSimulating) return; // Prevent real GPS overwriting simulation coords
+    if (!position || !user || !activeDeliveryId) return;
+    supabase.from('orders').update({
+      rider_lat: position.lat,
+      rider_lng: position.lng,
+    } as any).eq('id', activeDeliveryId).then(() => {});
+  }, [position, activeDeliveryId, user, isSimulating]);
 
   const enrichOrders = async (orders: any[]): Promise<EnrichedOrder[]> => {
     if (orders.length === 0) return [];
@@ -199,10 +334,21 @@ const RiderDashboard = () => {
     };
     fetchOrders();
     const channel = supabase.channel('rider-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-      const newRow = payload.new as any;
-      const oldRow = payload.old as any;
-      // Ignore GPS-only updates to avoid refetch loops
-      if (payload.eventType === 'UPDATE' && newRow && oldRow && newRow.status === oldRow.status && newRow.rider_id === oldRow.rider_id) return;
+      if (payload.eventType === 'UPDATE') {
+        const newRow = payload.new as any;
+        const oldRow = payload.old as any;
+        if (newRow && oldRow && newRow.status === oldRow.status && newRow.rider_id === oldRow.rider_id) {
+          // If only coordinates changed, update local state coordinates directly instead of refetching
+          setMyOrders(prev => prev.map(o => o.id === newRow.id ? {
+            ...o,
+            delivery_lat: newRow.delivery_lat,
+            delivery_lng: newRow.delivery_lng,
+            rider_lat: newRow.rider_lat,
+            rider_lng: newRow.rider_lng
+          } : o));
+          return;
+        }
+      }
       fetchOrders();
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -362,7 +508,43 @@ const RiderDashboard = () => {
         </div>
 
         <div className="relative">
-          <DeliveryMap riderLat={position?.lat} riderLng={position?.lng} customerLat={activeOrder.delivery_lat} customerLng={activeOrder.delivery_lng} className="h-[250px] rounded-none" />
+          <DeliveryMap
+            riderLat={isSimulating ? simulatedPos?.lat : position?.lat}
+            riderLng={isSimulating ? simulatedPos?.lng : position?.lng}
+            customerLat={activeOrder.delivery_lat}
+            customerLng={activeOrder.delivery_lng}
+            vendorLat={activeOrder.delivery_lat ? activeOrder.delivery_lat + 0.003 : null}
+            vendorLng={activeOrder.delivery_lng ? activeOrder.delivery_lng - 0.004 : null}
+            riderLabel="You 🏍️"
+            customerLabel="Customer 📍"
+            vendorLabel={activeOrder.vendor_name}
+            height="300px"
+            className="rounded-none"
+          />
+          {/* Simulation Panel */}
+          <div className="absolute top-3 right-3 z-[1000] bg-card/95 backdrop-blur border border-border rounded-lg shadow-lg px-3 py-2 flex flex-col gap-1.5 max-w-[200px]">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs font-semibold flex items-center gap-1">
+                <span className={`h-2 w-2 rounded-full ${isSimulating ? 'bg-emerald-500 animate-pulse' : 'bg-muted'}`} />
+                GPS Simulator
+              </span>
+              <Switch
+                checked={isSimulating}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    startRouteSimulation();
+                  } else {
+                    stopRouteSimulation();
+                  }
+                }}
+              />
+            </div>
+            {isSimulating && (
+              <p className="text-[10px] text-muted-foreground animate-pulse">
+                Rider moving: {simStep + 1}/{totalSimSteps} steps
+              </p>
+            )}
+          </div>
           {studentSharingLocation && (
             <div className="absolute top-3 left-3 bg-blue-500/90 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
               <Locate className="h-3 w-3 animate-pulse" /> Student sharing live location
@@ -532,18 +714,18 @@ const RiderDashboard = () => {
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          <Card className="bg-primary/5 border-primary/20"><CardContent className="p-3 text-center">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="premium-card bg-primary/5 border-primary/20"><CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground">Today</p>
             <p className="text-lg font-bold text-primary">₦{earnings.today.toLocaleString()}</p>
             <p className="text-[10px] text-muted-foreground">{earnings.todayCount} deliveries</p>
           </CardContent></Card>
-          <Card><CardContent className="p-3 text-center">
+          <Card className="premium-card"><CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground">This Week</p>
             <p className="text-lg font-bold">₦{earnings.week.toLocaleString()}</p>
             <p className="text-[10px] text-muted-foreground">{earnings.weekCount} deliveries</p>
           </CardContent></Card>
-          <Card><CardContent className="p-3 text-center">
+          <Card className="premium-card"><CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground">This Month</p>
             <p className="text-lg font-bold">₦{earnings.month.toLocaleString()}</p>
             <p className="text-[10px] text-muted-foreground">{earnings.monthCount} deliveries</p>
@@ -552,10 +734,10 @@ const RiderDashboard = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 mb-4">
-            <TabsTrigger value="home" className="gap-1 text-xs"><Home className="h-3.5 w-3.5" /> Home</TabsTrigger>
-            <TabsTrigger value="history" className="gap-1 text-xs"><History className="h-3.5 w-3.5" /> History</TabsTrigger>
-            <TabsTrigger value="earnings" className="gap-1 text-xs"><Wallet className="h-3.5 w-3.5" /> Earnings</TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1 text-xs"><Settings className="h-3.5 w-3.5" /> Settings</TabsTrigger>
+            <TabsTrigger value="home" className="gap-1 text-xs"><Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Home</span></TabsTrigger>
+            <TabsTrigger value="history" className="gap-1 text-xs"><History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">History</span></TabsTrigger>
+            <TabsTrigger value="earnings" className="gap-1 text-xs"><Wallet className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Earnings</span></TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1 text-xs"><Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Settings</span></TabsTrigger>
           </TabsList>
 
           {/* ═══════ HOME TAB ═══════ */}

@@ -65,10 +65,20 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(
     order.rider_lat && order.rider_lng ? { lat: order.rider_lat, lng: order.rider_lng } : null
   );
-  const [sharingLocation, setSharingLocation] = useState(false);
+  // Auto-share location when rider is involved (accepted → delivering).
+  // The student doesn't need to manually tap "Share" — the rider needs their pin.
+  const autoShareStatuses = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering'];
+  const shouldAutoShare = autoShareStatuses.includes(liveOrder.status);
+  const [sharingLocation, setSharingLocation] = useState(shouldAutoShare);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  // Always watch GPS when we should be sharing (watch=true enables continuous watchPosition)
   const { position: studentPos, getPosition } = useGeolocation(sharingLocation);
+
+  // Keep sharingLocation in sync when order status changes
+  useEffect(() => {
+    if (shouldAutoShare && !sharingLocation) setSharingLocation(true);
+  }, [shouldAutoShare, sharingLocation]);
 
   // Fetch rider profile & vendor info
   useEffect(() => {
@@ -90,7 +100,7 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     if (liveOrder.rider_id) fetchRider(liveOrder.rider_id);
   }, [liveOrder.rider_id, order.vendor_id]);
 
-  // Realtime order updates
+  // Realtime order updates — receive live rider GPS + order status changes
   useEffect(() => {
     const channel = supabase.channel(`student-track-${order.id}`).on(
       'postgres_changes',
@@ -98,6 +108,7 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
       (payload) => {
         const updated = payload.new as any;
         setLiveOrder(updated);
+        // Update rider position from the realtime payload
         if (updated.rider_lat && updated.rider_lng) {
           setLiveRiderPos({ lat: updated.rider_lat, lng: updated.rider_lng });
         }
@@ -107,7 +118,8 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     return () => { supabase.removeChannel(channel); };
   }, [order.id]);
 
-  // Share student location
+  // Push student GPS to Supabase whenever position updates.
+  // useGeolocation already throttles to ~4s so this won't spam the DB.
   useEffect(() => {
     if (!sharingLocation || !studentPos || !user) return;
     supabase.from('orders').update({
@@ -121,6 +133,11 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const canCancel = ['pending', 'accepted', 'preparing'].includes(liveOrder.status);
   const hasRider = !!liveOrder.rider_id;
   const isBeingDelivered = ['picked_up', 'delivering'].includes(liveOrder.status);
+  // Show the map from 'accepted' onwards so both parties see each other as early as possible
+  const showMap = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(liveOrder.status);
+  // Determine current student GPS for the map pin
+  const studentMapLat = studentPos?.lat ?? liveOrder.delivery_lat ?? null;
+  const studentMapLng = studentPos?.lng ?? liveOrder.delivery_lng ?? null;
 
   // Estimated time calculation (simple: based on status)
   const getETA = () => {
@@ -204,21 +221,36 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
         </div>
       </div>
 
-      {/* Map - show when rider is assigned and delivering */}
-      {isBeingDelivered && (
+      {/* Map — visible from 'accepted' onwards so both parties can see each other */}
+      {showMap && (
         <div className="relative">
-          <Suspense fallback={<div className="h-[250px] animate-pulse bg-muted" />}>
+          <Suspense fallback={<div className="animate-pulse bg-muted" style={{ height: '320px' }} />}>
             <DeliveryMap
               riderLat={liveRiderPos?.lat}
               riderLng={liveRiderPos?.lng}
-              customerLat={liveOrder.delivery_lat}
-              customerLng={liveOrder.delivery_lng}
-              className="h-[250px] rounded-none"
+              customerLat={studentMapLat}
+              customerLng={studentMapLng}
+              vendorLat={studentMapLat ? studentMapLat + 0.003 : null}
+              vendorLng={studentMapLng ? studentMapLng - 0.004 : null}
+              riderLabel="Rider 🏍️"
+              customerLabel="You 📍"
+              vendorLabel={vendorInfo?.name ?? 'Vendor 🏪'}
+              height="320px"
+              className="rounded-none"
             />
           </Suspense>
-          {!liveRiderPos && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-              <p className="text-sm text-muted-foreground">Waiting for rider location…</p>
+          {/* Overlay when no rider GPS yet */}
+          {!liveRiderPos && isBeingDelivered && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm gap-2">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-sm font-medium">Waiting for rider location…</p>
+            </div>
+          )}
+          {/* Badge: sharing indicator */}
+          {sharingLocation && studentPos && (
+            <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-full bg-blue-500/90 px-3 py-1 text-xs font-medium text-white shadow">
+              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+              Sharing your location
             </div>
           )}
         </div>
@@ -321,9 +353,9 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
           </CardContent>
         </Card>
 
-        {/* Location Sharing Toggle */}
-        {isBeingDelivered && (
-          <Card className={sharingLocation ? 'border-blue-500/30 bg-blue-500/5' : ''}>
+        {/* Location Sharing — auto-on when order is active */}
+        {shouldAutoShare && (
+          <Card className={sharingLocation ? 'border-blue-500/30 bg-blue-500/5' : 'border-dashed'}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -334,12 +366,14 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
                   )}
                   <div>
                     <p className="text-sm font-medium">
-                      {sharingLocation ? 'Sharing your location' : 'Share your live location'}
+                      {sharingLocation ? 'Your location is being shared' : 'Location sharing is off'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {sharingLocation
-                        ? 'Your rider can see exactly where you are'
-                        : 'Help your rider find you faster'}
+                        ? studentPos
+                          ? 'Rider can see exactly where you are'
+                          : 'Getting GPS fix…'
+                        : 'Turn on so your rider can find you'}
                     </p>
                   </div>
                 </div>

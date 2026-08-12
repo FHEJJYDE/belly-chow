@@ -72,7 +72,7 @@ export function useOrderNotifications() {
     playNotificationSound(sound);
 
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body: description, icon: '/favicon.ico' });
+      new Notification(title, { body: description, icon: '/belly_chow_logo.png' });
     }
   }, []);
 

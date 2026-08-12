@@ -7,11 +7,17 @@ import { useTheme } from 'next-themes';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Sun, Moon } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const VendorLayout = () => {
   const { signOut } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
   const isMobile = useIsMobile();
 
   return (
@@ -19,7 +25,7 @@ const VendorLayout = () => {
       <div className="min-h-screen flex w-full">
         {!isMobile && <VendorSidebar />}
         <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b bg-background/80 backdrop-blur-md px-4">
+          <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b border-border/40 bg-background/70 backdrop-blur-md px-4">
             {!isMobile && <SidebarTrigger />}
             {isMobile && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
             <div className="flex items-center gap-1">
@@ -29,7 +35,7 @@ const VendorLayout = () => {
               <Link to="/profile">
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><User className="h-5 w-5" /></Button>
               </Link>
-              <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>

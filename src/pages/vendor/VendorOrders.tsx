@@ -105,7 +105,7 @@ const VendorOrders = () => {
     const items = orderItems[order.id] || [];
     const isExpanded = expandedOrders.has(order.id);
     return (
-      <Card>
+      <Card className="premium-card">
         <CardContent className="flex flex-col gap-3 p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -192,12 +192,12 @@ const VendorOrders = () => {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Manage</p>
           <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">Orders</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <VendorStatusToggle variant="compact" />
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setSoundEnabled(!soundEnabled)} title={soundEnabled ? 'Mute' : 'Unmute'}>
