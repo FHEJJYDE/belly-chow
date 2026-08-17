@@ -103,104 +103,123 @@ const VendorOverview = () => {
   if (!vendor) return <p className="py-20 text-center text-muted-foreground">Setting up your vendor profile...</p>;
 
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Dashboard Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-heading text-2xl font-bold tracking-tight">{vendor.name}</h1>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+              {vendor.name}
+            </h1>
             <LivePulse />
           </div>
-          <div className="mt-2 flex gap-2">
-            <Badge variant={vendor.is_approved ? 'default' : 'secondary'} className="text-xs">{vendor.is_approved ? 'Approved' : 'Pending'}</Badge>
-            <Badge variant={vendor.is_active ? 'default' : 'outline'} className="text-xs">{vendor.is_active ? 'Open' : 'Closed'}</Badge>
+          <div className="mt-2 flex items-center gap-2">
+            <Badge variant={vendor.is_approved ? 'default' : 'secondary'} className="text-xs font-semibold px-2.5 py-0.5">
+              {vendor.is_approved ? 'Approved' : 'Pending Verification'}
+            </Badge>
+            <Badge variant={vendor.is_active ? 'outline' : 'secondary'} className={`text-xs font-semibold px-2.5 py-0.5 ${vendor.is_active ? 'border-green-500 text-green-500 bg-green-500/5' : ''}`}>
+              {vendor.is_active ? 'Open & Accepting Orders' : 'Closed'}
+            </Badge>
           </div>
         </div>
 
-        {/* Enhanced Open/Closed Toggle */}
-        <VendorStatusToggle variant="full" />
+        {/* Status Toggle control */}
+        <div className="shrink-0">
+          <VendorStatusToggle variant="full" />
+        </div>
       </div>
 
-      <div className="mb-8 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Metrics Cards Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Pending', value: pending, icon: Package },
-          { label: 'Active', value: active, icon: Clock },
-          { label: 'Revenue', value: `₦${revenue.toLocaleString()}`, icon: DollarSign },
-          { label: 'Total Orders', value: orders.length, icon: ShoppingBag },
+          { label: 'Pending Orders', value: pending, icon: Package, colorClass: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
+          { label: 'Active Orders', value: active, icon: Clock, colorClass: 'text-sky-500 bg-sky-500/10 border-sky-500/20' },
+          { label: 'Total Revenue', value: `₦${revenue.toLocaleString()}`, icon: DollarSign, colorClass: 'text-primary bg-primary/10 border-primary/20' },
+          { label: 'Completed Sales', value: orders.length, icon: ShoppingBag, colorClass: 'text-green-500 bg-green-500/10 border-green-500/20' },
         ].map(s => (
-          <Card key={s.label} className="premium-card">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted">
-                <s.icon className="h-4 w-4" />
+          <Card key={s.label} className="premium-card bg-card/30 border-border/40">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-xl border ${s.colorClass}`}>
+                <s.icon className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground truncate">{s.label}</p>
-                <p className="font-heading text-xl font-bold truncate">{s.value}</p>
+                <p className="text-xs font-medium text-muted-foreground truncate uppercase tracking-wider">{s.label}</p>
+                <p className="font-heading text-2xl font-bold mt-1 tracking-tight truncate">{s.value}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <Card>
+      {/* Chart Visualizations Grid */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card className="premium-card bg-card/30 border-border/40">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Revenue · 7 days</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <TrendingUp className="h-4 w-4 text-primary" /> Revenue Flow · Last 7 Days
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
+          <CardContent className="pt-4">
+            <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={revenueByDay}>
                 <defs>
                   <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} />
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" tickFormatter={v => `₦${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => [`₦${v.toLocaleString()}`, 'Revenue']} />
-                <Area type="monotone" dataKey="amount" stroke="hsl(var(--foreground))" fill="url(#revenueGrad)" strokeWidth={1.5} />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} tickFormatter={v => `₦${(v / 1000).toFixed(0)}k`} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border) / 0.5)', borderRadius: '12px' }}
+                  formatter={(v: number) => [`₦${v.toLocaleString()}`, 'Revenue']} 
+                />
+                <Area type="monotone" dataKey="amount" stroke="hsl(var(--primary))" fill="url(#revenueGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="premium-card bg-card/30 border-border/40">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Peak hours</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-primary" /> Busy Hours Statistics
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
+          <CardContent className="pt-4">
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={ordersByHour}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="hour" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="hsl(var(--foreground))" radius={[3, 3, 0, 0]} opacity={0.7} />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border) / 0.5)', borderRadius: '12px' }} />
+                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.8} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <Card>
+      {/* Popular Items & Status Breakdown */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card className="premium-card bg-card/30 border-border/40">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Popular items</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Top Performing Dishes</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-3">
             {popularItems.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No data yet</p>
+              <div className="py-12 text-center text-sm text-muted-foreground">No dishes sold yet. Make some sales! 🍛</div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {popularItems.map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between">
+                  <div key={item.name} className="flex items-center justify-between p-2 rounded-xl hover:bg-muted/10 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-medium">{i + 1}</span>
-                      <span className="text-sm">{item.name}</span>
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">#{i + 1}</span>
+                      <span className="text-sm font-semibold">{item.name}</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium">{item.qty} sold</p>
+                      <p className="text-sm font-bold">{item.qty} portions</p>
                       <p className="text-xs text-muted-foreground">₦{item.revenue.toLocaleString()}</p>
                     </div>
                   </div>
@@ -210,29 +229,29 @@ const VendorOverview = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="premium-card bg-card/30 border-border/40">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Order status</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Order Status Share</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-3">
             {statusBreakdown.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No orders yet</p>
+              <div className="py-12 text-center text-sm text-muted-foreground">No orders captured yet.</div>
             ) : (
-              <div className="flex items-center gap-6">
-                <ResponsiveContainer width={130} height={130}>
+              <div className="flex flex-col sm:flex-row items-center gap-6 justify-center">
+                <ResponsiveContainer width={140} height={140} className="shrink-0">
                   <PieChart>
-                    <Pie data={statusBreakdown} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={2} strokeWidth={0}>
+                    <Pie data={statusBreakdown} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} strokeWidth={0}>
                       {statusBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="flex-1 space-y-1.5">
+                <div className="flex-1 space-y-2 w-full">
                   {statusBreakdown.map((s, i) => (
-                    <div key={s.status} className="flex items-center gap-2 text-sm">
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="capitalize text-muted-foreground">{s.status}</span>
-                      <span className="ml-auto font-medium">{s.count}</span>
+                    <div key={s.status} className="flex items-center gap-2 text-xs p-1.5 rounded-lg hover:bg-muted/5">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="capitalize font-medium text-muted-foreground">{s.status}</span>
+                      <span className="ml-auto font-bold">{s.count} orders</span>
                     </div>
                   ))}
                 </div>
@@ -242,20 +261,41 @@ const VendorOverview = () => {
         </Card>
       </div>
 
-      <p className="mb-4 text-sm font-medium uppercase tracking-widest text-muted-foreground">Recent orders</p>
-      <div className="space-y-2">
-        {orders.slice(0, 10).map(order => (
-          <Card key={order.id}>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="font-medium text-sm">#{order.id.slice(0, 8)}</p>
-                <p className="text-xs text-muted-foreground">₦{Number(order.total).toLocaleString()} · {new Date(order.created_at).toLocaleString()}</p>
-              </div>
-              <span className="rounded-full border px-3 py-1 text-xs font-medium capitalize">{order.status}</span>
-            </CardContent>
-          </Card>
-        ))}
-        {orders.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No orders yet</p>}
+      {/* Recent Orders log */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Recent Orders Activity</p>
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {orders.slice(0, 6).map(order => (
+            <Card key={order.id} className="premium-card bg-card/25 border-border/40">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">Order #{order.id.slice(0, 8)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date(order.created_at).toLocaleDateString()} · {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <Badge variant={order.status === 'delivered' ? 'default' : order.status === 'pending' ? 'destructive' : 'secondary'} className="text-[10px] uppercase font-bold tracking-wider shrink-0">
+                    {order.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
+                  <span className="text-muted-foreground">Payment Method</span>
+                  <span className="font-semibold capitalize">{order.payment_method?.replace('_', ' ') || 'Unknown'}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Order Amount</span>
+                  <span className="font-bold text-primary">₦{Number(order.total).toLocaleString()}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {orders.length === 0 && (
+            <div className="col-span-full py-12 text-center border rounded-2xl bg-card/20 border-dashed border-border/40">
+              <p className="text-sm text-muted-foreground">No orders logged yet.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

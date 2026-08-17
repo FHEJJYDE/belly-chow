@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import NotificationCenter from '@/components/NotificationCenter';
 
 const VendorLayout = () => {
   const { signOut } = useAuth();
@@ -15,8 +16,13 @@ const VendorLayout = () => {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/login', { replace: true });
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
   const isMobile = useIsMobile();
 
@@ -29,6 +35,7 @@ const VendorLayout = () => {
             {!isMobile && <SidebarTrigger />}
             {isMobile && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
             <div className="flex items-center gap-1">
+              <NotificationCenter />
               <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
                 {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>

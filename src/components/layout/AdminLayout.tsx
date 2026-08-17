@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import NotificationCenter from '@/components/NotificationCenter';
 
 const AdminLayout = () => {
   const { signOut } = useAuth();
@@ -13,8 +14,13 @@ const AdminLayout = () => {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/login', { replace: true });
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
   return (
     <SidebarProvider>
@@ -24,6 +30,7 @@ const AdminLayout = () => {
           <header className="sticky top-0 z-50 h-14 flex items-center justify-between border-b border-border/40 bg-background/70 backdrop-blur-md px-4">
             <SidebarTrigger />
             <div className="flex items-center gap-1">
+              <NotificationCenter />
               <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
                 {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>

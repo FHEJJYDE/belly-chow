@@ -67,26 +67,49 @@ const VendorMenu = () => {
   const categories = [...new Set(items.map(i => i.category))];
 
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Menu</p>
-          <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">{items.length} items</h1>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Menu Catalog</p>
+          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+            {items.length} dishes listed
+          </h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
           <VendorStatusToggle variant="compact" />
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Add item</Button>
+              <Button className="gap-2 font-semibold shadow-sm shadow-primary/10">
+                <Plus className="h-4 w-4" /> Add menu item
+              </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle className="font-heading">Add menu item</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2"><Label className="text-sm font-medium">Name</Label><Input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="Jollof Rice" /></div>
-                <div className="space-y-2"><Label className="text-sm font-medium">Description</Label><Textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} placeholder="Description..." /></div>
-                <div className="space-y-2"><Label className="text-sm font-medium">Price (₦)</Label><Input type="number" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} placeholder="1500" /></div>
-                <div className="space-y-2"><Label className="text-sm font-medium">Category</Label><Input value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} placeholder="Main, Drinks, Snacks..." /></div>
-                <Button onClick={addItem} className="w-full">Add item</Button>
+            <DialogContent className="max-w-md bg-card/90 backdrop-blur-md border border-border/40 rounded-2xl">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-xl font-bold tracking-tight">Add Menu Item</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Item Name</Label>
+                  <Input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="Jollof Rice with Chicken" className="bg-background/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</Label>
+                  <Textarea value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} placeholder="Spicy parboiled rice served with fried chicken and plantain..." className="bg-background/50 resize-none h-20" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Price (₦)</Label>
+                    <Input type="number" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} placeholder="1500" className="bg-background/50" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
+                    <Input value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} placeholder="Mains, Sides, Drinks..." className="bg-background/50" />
+                  </div>
+                </div>
+                <Button onClick={addItem} className="w-full font-semibold mt-2">
+                  Create Item
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -94,25 +117,38 @@ const VendorMenu = () => {
       </div>
 
       {items.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">No menu items yet. Add your first dish.</p>
+        <div className="py-20 text-center border border-dashed border-border/40 rounded-2xl bg-card/10">
+          <p className="text-sm text-muted-foreground">No menu items found. Add your first dish to start selling! 🍲</p>
+        </div>
       ) : (
         <div className="space-y-8">
           {categories.map(cat => (
-            <div key={cat}>
-              <h3 className="mb-3 text-sm font-medium uppercase tracking-widest text-muted-foreground">{cat}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div key={cat} className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> {cat}
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.filter(i => i.category === cat).map(item => (
-                  <Card key={item.id}>
-                    <CardContent className="flex items-center justify-between p-4">
+                  <Card key={item.id} className="premium-card bg-card/30 border-border/40 hover:bg-card/40 transition-all overflow-hidden">
+                    <CardContent className="flex items-start justify-between p-4.5 gap-3">
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-medium text-sm">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">₦{Number(item.price).toLocaleString()}</p>
-                        {item.description && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.description}</p>}
+                        <h4 className="font-bold text-sm truncate">{item.name}</h4>
+                        <p className="text-sm font-semibold text-primary mt-1">₦{Number(item.price).toLocaleString()}</p>
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1.5 leading-relaxed">
+                            {item.description}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Switch checked={!!item.is_available} onCheckedChange={() => toggleAvail(item)} />
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteItem(item.id)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col items-end gap-3 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] uppercase font-bold tracking-wider ${item.is_available ? 'text-green-500' : 'text-muted-foreground'}`}>
+                            {item.is_available ? 'Available' : 'Sold Out'}
+                          </span>
+                          <Switch checked={!!item.is_available} onCheckedChange={() => toggleAvail(item)} className="data-[state=checked]:bg-green-500" />
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors rounded-lg" onClick={() => deleteItem(item.id)}>
+                          <Trash2 className="h-4.5 w-4.5" />
                         </Button>
                       </div>
                     </CardContent>

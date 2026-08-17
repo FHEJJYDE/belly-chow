@@ -51,51 +51,63 @@ const VendorSettings = () => {
   if (loading) return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-foreground border-t-transparent" /></div>;
 
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Settings</p>
-          <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight">Store settings</h1>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Store Profile</p>
+          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+            Vendor Settings
+          </h1>
         </div>
         <VendorStatusToggle variant="compact" />
       </div>
 
-      <div className="max-w-lg">
-        <Card>
-          <CardContent className="space-y-5 p-6">
+      <div className="max-w-2xl">
+        <Card className="premium-card bg-card/30 border-border/40 overflow-hidden shadow-sm">
+          <CardContent className="space-y-6 p-6">
             {vendor && user && (
-              <VendorLogoUpload
-                vendorId={vendor.id}
-                userId={user.id}
-                currentUrl={logoUrl}
-                vendorName={vendor.name}
-                onUploaded={setLogoUrl}
-              />
+              <div className="pb-4 border-b border-border/40">
+                <VendorLogoUpload
+                  vendorId={vendor.id}
+                  userId={user.id}
+                  currentUrl={logoUrl}
+                  vendorName={vendor.name}
+                  onUploaded={setLogoUrl}
+                />
+              </div>
             )}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Store name</Label>
-              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Description</Label>
-              <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell customers about your food..." />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Address</Label>
-              <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="e.g. Behind SUB, Main Campus" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Opening time</Label>
-                <Input type="time" value={form.opening_time} onChange={e => setForm({ ...form, opening_time: e.target.value })} />
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Store Name</Label>
+                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="bg-background/50" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Closing time</Label>
-                <Input type="time" value={form.closing_time} onChange={e => setForm({ ...form, closing_time: e.target.value })} />
+              
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Store Description</Label>
+                <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell campus customers what delicious meals you serve..." className="bg-background/50 resize-none h-24" />
+              </div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Physical Store Location (Address)</Label>
+                <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="e.g. Beside SUB, Main Campus" className="bg-background/50" />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opening Hour</Label>
+                  <Input type="time" value={form.opening_time} onChange={e => setForm({ ...form, opening_time: e.target.value })} className="bg-background/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Closing Hour</Label>
+                  <Input type="time" value={form.closing_time} onChange={e => setForm({ ...form, closing_time: e.target.value })} className="bg-background/50" />
+                </div>
               </div>
             </div>
-            <Button onClick={save} disabled={saving} className="w-full">
-              {saving ? 'Saving...' : 'Save changes'}
+
+            <Button onClick={save} disabled={saving} className="w-full font-semibold mt-4 shadow-sm shadow-primary/10">
+              {saving ? 'Saving changes...' : 'Save Settings'}
             </Button>
           </CardContent>
         </Card>

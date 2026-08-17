@@ -96,19 +96,23 @@ const VendorStatusToggle = ({ variant = 'compact', className = '' }: VendorStatu
             <div className={`flex items-center gap-3 ${className}`}>
                 <Badge
                     variant={vendor.is_active ? 'default' : 'outline'}
-                    className={`text-xs ${vendor.is_active ? 'bg-green-600' : 'bg-red-100 text-red-700 border-red-200'}`}
+                    className={`text-xs font-semibold px-2.5 py-0.5 ${
+                        vendor.is_active 
+                            ? 'bg-green-500 text-white hover:bg-green-600' 
+                            : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
+                    }`}
                 >
-                    {vendor.is_active ? '🟢 Open' : '🔴 Closed'}
+                    {vendor.is_active ? 'Open' : 'Closed'}
                 </Badge>
                 <div className="flex items-center gap-2">
-                    <Label htmlFor="status-toggle" className="text-sm">
+                    <Label htmlFor="status-toggle" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         {vendor.is_active ? 'Close' : 'Open'}
                     </Label>
                     <Switch
                         id="status-toggle"
                         checked={!!vendor.is_active}
                         onCheckedChange={toggleActive}
-                        className="data-[state=checked]:bg-green-600"
+                        className="data-[state=checked]:bg-green-500"
                     />
                 </div>
             </div>
@@ -116,29 +120,37 @@ const VendorStatusToggle = ({ variant = 'compact', className = '' }: VendorStatu
     }
 
     return (
-        <Card className={`p-4 transition-all ${vendor.is_active ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} ${className}`}>
+        <Card className={`p-4 transition-all border ${
+            vendor.is_active 
+                ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/10' 
+                : 'border-red-500/30 bg-red-500/5 dark:bg-red-500/10'
+        } ${className}`}>
             <div className="flex items-center gap-4">
-                <div className="text-center">
-                    <div className={`text-2xl font-bold ${vendor.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                <div className="text-center shrink-0">
+                    <div className="text-2xl animate-pulse">
                         {vendor.is_active ? '🟢' : '🔴'}
                     </div>
-                    <p className={`text-sm font-medium ${vendor.is_active ? 'text-green-700' : 'text-red-700'}`}>
+                    <p className={`text-xs font-extrabold tracking-wider mt-1 ${vendor.is_active ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                         {vendor.is_active ? 'OPEN' : 'CLOSED'}
                     </p>
                 </div>
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="vendor-active" className="text-sm font-medium">
-                            {vendor.is_active ? 'Close for orders' : 'Open for orders'}
+                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="vendor-active" className={`text-sm font-bold truncate ${
+                            vendor.is_active ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                        }`}>
+                            {vendor.is_active ? 'Open & accepting orders' : 'Closed for orders'}
                         </Label>
                         <Switch
                             id="vendor-active"
                             checked={!!vendor.is_active}
                             onCheckedChange={toggleActive}
-                            className="data-[state=checked]:bg-green-600"
+                            className="data-[state=checked]:bg-green-500 shrink-0"
                         />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={`text-xs truncate ${
+                        vendor.is_active ? 'text-green-700/80 dark:text-green-400/80' : 'text-red-700/80 dark:text-red-400/80'
+                    }`}>
                         {vendor.is_active
                             ? 'Customers can place orders now'
                             : 'No new orders will be accepted'

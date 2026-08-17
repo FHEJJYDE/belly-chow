@@ -40,11 +40,11 @@ export function VendorSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === '/vendor'}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      end={item.url === '/vendor-panel'}
+                      className="hover:bg-primary/5 rounded-md w-full py-2 px-3 transition-colors"
+                      activeClassName="bg-primary/10 text-primary font-semibold border-l-4 border-primary rounded-l-none"
                     >
-                      <item.icon className="mr-2 h-4 w-4" />
+                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

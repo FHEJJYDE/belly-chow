@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,11 +10,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import VerificationUpload from '@/components/VerificationUpload';
-import { MapPin, Navigation, Trash2 } from 'lucide-react';
+import { MapPin, Navigation, Trash2, LogOut } from 'lucide-react';
 import AvatarUpload from '@/components/AvatarUpload';
 
 const Profile = () => {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -25,7 +26,21 @@ const Profile = () => {
   const [defaultLng, setDefaultLng] = useState<number | null>(null);
   const [defaultLocationName, setDefaultLocationName] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
+
+  const handleLogout = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      toast({ title: 'Logged out successfully' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setSigningOut(false);
+      navigate('/login', { replace: true });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -210,6 +225,28 @@ const Profile = () => {
             <VerificationUpload />
           </div>
         )}
+
+        {/* Log Out Action */}
+        <Card className="mt-6 border-destructive/30 bg-destructive/5">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-sm text-destructive">Sign Out</p>
+                <p className="text-xs text-muted-foreground">Log out of your Belly-Chow account on this device.</p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleLogout}
+                disabled={signingOut}
+                className="gap-2 font-semibold shrink-0"
+              >
+                <LogOut className="h-4 w-4" />
+                {signingOut ? 'Signing out...' : 'Log out'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

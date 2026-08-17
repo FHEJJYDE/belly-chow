@@ -133,12 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    setLoading(true);
-    setUser(null);
-    setSession(null);
-    setRole(null);
-    await supabase.auth.signOut();
-    setLoading(false);
+    try {
+      setLoading(true);
+      setUser(null);
+      setSession(null);
+      setRole(null);
+      await supabase.auth.signOut().catch((err) => {
+        console.warn('Supabase sign out warning (cleared local session):', err);
+      });
+    } catch (err) {
+      console.error('Error during sign out:', err);
+    } finally {
+      setUser(null);
+      setSession(null);
+      setRole(null);
+      setLoading(false);
+    }
   };
 
   return (

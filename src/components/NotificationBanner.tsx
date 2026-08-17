@@ -54,10 +54,10 @@ const NotificationBanner = () => {
     if (!criticalNotification) return null;
 
     return (
-        <div className="fixed top-0 left-0 right-0 z-50 p-4">
+        <div className="fixed top-16 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-[100] animate-in slide-in-from-top-2">
             <Alert
                 variant={getVariant(criticalNotification.type)}
-                className="cursor-pointer shadow-lg border-2"
+                className="cursor-pointer shadow-2xl border-2 bg-card/95 backdrop-blur border-primary/30"
                 onClick={handleClick}
             >
                 <div className="flex items-center gap-2">

@@ -14,8 +14,13 @@ const AppNavbar = () => {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/', { replace: true });
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   return (
