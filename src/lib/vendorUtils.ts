@@ -7,24 +7,7 @@ export function isVendorOpen(
   closingTime: string | null,
   isActive: boolean | null
 ): boolean {
-  if (!isActive) return false;
-  if (!openingTime || !closingTime) return !!isActive;
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  const [openH, openM] = openingTime.split(':').map(Number);
-  const [closeH, closeM] = closingTime.split(':').map(Number);
-
-  const openMinutes = openH * 60 + openM;
-  const closeMinutes = closeH * 60 + closeM;
-
-  // Handle overnight hours (e.g. 22:00 - 02:00)
-  if (closeMinutes <= openMinutes) {
-    return currentMinutes >= openMinutes || currentMinutes < closeMinutes;
-  }
-
-  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+  return !!isActive;
 }
 
 export function formatTime(time: string | null): string {

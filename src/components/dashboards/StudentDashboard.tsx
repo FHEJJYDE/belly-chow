@@ -113,11 +113,13 @@ const StudentDashboard = () => {
                   <Star className="h-3 w-3 fill-foreground text-foreground" />
                   {vendor.rating && vendor.rating > 0 ? Number(vendor.rating).toFixed(1) : 'New'}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}
-                </span>
-                {open && <span className="ml-auto text-xs font-medium text-foreground">Open</span>}
+                {vendor.opening_time && vendor.closing_time && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}
+                  </span>
+                )}
+                {open && <span className="ml-auto text-xs font-semibold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">Open</span>}
               </div>
             </CardContent>
           </Card>

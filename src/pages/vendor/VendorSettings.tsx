@@ -18,7 +18,7 @@ const VendorSettings = () => {
   const { toast } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', address: '', opening_time: '', closing_time: '' });
+  const [form, setForm] = useState({ name: '', description: '', address: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -29,7 +29,7 @@ const VendorSettings = () => {
       if (data) {
         setVendor(data);
         setLogoUrl(data.logo_url || null);
-        setForm({ name: data.name, description: data.description || '', address: data.address || '', opening_time: data.opening_time || '', closing_time: data.closing_time || '' });
+        setForm({ name: data.name, description: data.description || '', address: data.address || '' });
       }
       setLoading(false);
     };
@@ -41,7 +41,6 @@ const VendorSettings = () => {
     setSaving(true);
     const { error } = await supabase.from('vendors').update({
       name: form.name, description: form.description, address: form.address,
-      opening_time: form.opening_time, closing_time: form.closing_time,
     }).eq('id', vendor.id);
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     else toast({ title: 'Settings saved' });
@@ -92,17 +91,6 @@ const VendorSettings = () => {
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Physical Store Location (Address)</Label>
                 <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="e.g. Beside SUB, Main Campus" className="bg-background/50" />
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Opening Hour</Label>
-                  <Input type="time" value={form.opening_time} onChange={e => setForm({ ...form, opening_time: e.target.value })} className="bg-background/50" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Closing Hour</Label>
-                  <Input type="time" value={form.closing_time} onChange={e => setForm({ ...form, closing_time: e.target.value })} className="bg-background/50" />
-                </div>
               </div>
             </div>
 

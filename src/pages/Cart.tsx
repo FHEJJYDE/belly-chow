@@ -98,13 +98,28 @@ const Cart = () => {
 
         try {
             const grandTotal = total + serviceFee;
+            const effectiveVendorId = vendorId || items[0]?.menuItem?.vendor_id;
+
+            if (!effectiveVendorId) {
+                toast({
+                    title: "Vendor Error",
+                    description: "Cannot identify vendor for items in cart",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            const drinkPayload = {
+                drinks: selectedDrinks,
+                custom_request: customDrinkRequests || null,
+            };
 
             // Create order with pending payment status
             const { data: order, error: orderError } = await supabase
                 .from('orders')
                 .insert({
                     student_id: user.id,
-                    vendor_id: vendorId,
+                    vendor_id: effectiveVendorId,
                     total: total,
                     delivery_fee: deliveryFee,
                     delivery_location: deliveryLocation,
@@ -112,8 +127,7 @@ const Cart = () => {
                     status: 'pending',
                     payment_status: 'pending',
                     payment_method: 'pay_on_delivery',
-                    drink_items: selectedDrinks as unknown as import('@/integrations/supabase/types').Json,
-                    custom_drink_request: customDrinkRequests as unknown as import('@/integrations/supabase/types').Json,
+                    drink_items: drinkPayload as unknown as import('@/integrations/supabase/types').Json,
                 })
                 .select()
                 .single();
@@ -143,13 +157,16 @@ const Cart = () => {
                 id: order.id,
                 total: grandTotal,
                 delivery_fee: deliveryFee,
-                vendor_id: vendorId,
+                vendor_id: effectiveVendorId,
                 items: items.map(item => ({
                     name: item.menuItem.name,
                     quantity: item.quantity,
                     price: item.menuItem.price,
                 })),
             });
+
+            // Clear cart state & localStorage immediately so items are removed after placing order
+            clearCart();
 
             // Show payment modal
             setShowPaymentModal(true);

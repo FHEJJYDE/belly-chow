@@ -125,20 +125,22 @@ const VendorDetail = () => {
                     <span>({vendor.total_reviews})</span>
                   )}
                 </span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}</span>
-                <span className={`font-medium ${open ? 'text-foreground' : 'text-muted-foreground'}`}>{open ? 'Open' : 'Closed'}</span>
+                {vendor.opening_time && vendor.closing_time && (
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}</span>
+                )}
+                <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${open ? 'bg-green-500/10 text-green-600 border border-green-500/30' : 'bg-muted text-muted-foreground'}`}>{open ? 'Open & Accepting Orders' : 'Closed'}</span>
               </div>
             </div>
           </div>
         </div>
 
         {!open && (
-          <div className="mb-8 flex items-center gap-3 rounded-xl border p-4">
-            <AlertCircle className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="mb-8 flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
             <div>
-              <p className="font-medium text-sm">This vendor is currently closed</p>
+              <p className="font-semibold text-sm">This vendor is currently closed</p>
               <p className="text-xs text-muted-foreground">
-                Hours: {formatTime(vendor.opening_time)} – {formatTime(vendor.closing_time)}
+                This store is currently not accepting orders. Check back when the vendor opens their store!
               </p>
             </div>
           </div>

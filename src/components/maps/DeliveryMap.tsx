@@ -142,13 +142,11 @@ const DeliveryMap = ({
     if (!mapRef.current || mapInstanceRef.current) return;
 
     const defaultCenter: L.LatLngExpression = [6.5244, 3.3792]; // Lagos fallback
-    const isInitialDark = document.documentElement.classList.contains('dark');
-    const initialTiles = isInitialDark ? darkTiles : lightTiles;
 
     const map = L.map(mapRef.current, { zoomControl: false }).setView(defaultCenter, 14);
     mapInstanceRef.current = map;
 
-    const tileLayer = L.tileLayer(initialTiles, {
+    const tileLayer = L.tileLayer(lightTiles, {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(map);
@@ -178,18 +176,7 @@ const DeliveryMap = ({
     });
     new RecenterControl({ position: 'bottomright' }).addTo(map);
 
-    // ── Watch dark mode class updates ─────────────────────────────────────────
-    const observer = new MutationObserver(() => {
-      const isDark = document.documentElement.classList.contains('dark');
-      const url = isDark ? darkTiles : lightTiles;
-      if (tileLayerRef.current) {
-        tileLayerRef.current.setUrl(url);
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
     return () => {
-      observer.disconnect();
       map.remove();
       mapInstanceRef.current = null;
     };

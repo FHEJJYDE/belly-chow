@@ -20,7 +20,7 @@ const BottomNav = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-lg md:hidden safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/60 glass-nav md:hidden safe-area-bottom">
       <div className="flex items-center justify-around h-14">
         {items.map((item) => {
           const active = location.pathname === item.to;

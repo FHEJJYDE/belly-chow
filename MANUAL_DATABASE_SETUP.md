@@ -13,10 +13,10 @@ Since the Supabase CLI installation is having issues, let's set up the database 
 1. In your project dashboard, click on "SQL Editor" in the left sidebar
 2. Click "New Query" to create a new SQL script
 
-## Step 3: Run the Migration
+## Step 3: Run the Master Setup Script
 
-1. Copy the entire contents of the file `supabase/migrations/001_payment_system_setup.sql`
-2. Paste it into the SQL Editor
+1. Copy the entire contents of the master setup script: [`COMPLETE_DATABASE_SETUP.sql`](file:///c:/Users/gener/OneDrive/Documents/001/github/belly-chow/COMPLETE_DATABASE_SETUP.sql) or [`database-setup.sql`](file:///c:/Users/gener/OneDrive/Documents/001/github/belly-chow/database-setup.sql)
+2. Paste it into the Supabase SQL Editor
 3. Click "Run" to execute the script
 
 ## Step 4: Verify Tables Created

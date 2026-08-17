@@ -1,16 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
-import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, LogOut, User, Package, Sun, Moon } from 'lucide-react';
+import { ShoppingCart, LogOut, User, Package } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 import logo from '@/assets/belly_chow_logo.png';
 
 const AppNavbar = () => {
   const { user, role, signOut } = useAuth();
   const { itemCount } = useCart();
-  const { resolvedTheme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -24,7 +22,7 @@ const AppNavbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 glass-nav">
       <div className="container flex h-14 items-center justify-between">
         <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
           <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
@@ -46,7 +44,7 @@ const AppNavbar = () => {
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                       <ShoppingCart className="h-5 w-5" />
                       {itemCount > 0 && (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background">
+                        <span className="absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                           {itemCount}
                         </span>
                       )}
@@ -59,9 +57,6 @@ const AppNavbar = () => {
                   <User className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="text-muted-foreground hover:text-foreground">
-                {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </Button>
               <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="h-5 w-5" />
               </Button>

@@ -14,6 +14,10 @@ const MockCheckout = () => {
     const amount = searchParams.get('amount') || '0';
 
     useEffect(() => {
+        // Clear cart storage on checkout load
+        localStorage.removeItem('belly_chow_cart_items');
+        localStorage.removeItem('belly_chow_cart_vendor_id');
+
         // Auto-redirect after successful payment
         if (status === 'success') {
             setTimeout(() => {
