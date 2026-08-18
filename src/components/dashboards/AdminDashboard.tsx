@@ -191,7 +191,7 @@ const AdminDashboard = () => {
       .reduce((sum, o) => sum + Number(o.total || 0), 0);
 
     const completedOrders = filteredOrders.filter(o => o.status === 'delivered').length;
-    const pendingOrders = filteredOrders.filter(o => ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(o.status)).length;
+    const pendingOrders = filteredOrders.filter(o => ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(o.status)).length;
     const cancelledOrders = filteredOrders.filter(o => ['cancelled', 'rejected'].includes(o.status)).length;
 
     const averageOrderValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;

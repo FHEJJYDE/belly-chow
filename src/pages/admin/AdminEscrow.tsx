@@ -87,10 +87,8 @@ const AdminEscrow = () => {
                 .from('escrow_transactions')
                 .select(`
                     *,
-                    payment_transactions!inner(korapay_reference, user_id),
-                    orders!inner(id, customer_id),
-                    vendors!inner(name, email),
-                    profiles!escrow_transactions_vendor_id_fkey(full_name, email)
+                    orders(id, student_id),
+                    vendors(name)
                 `)
                 .order('created_at', { ascending: false });
 
@@ -392,7 +390,7 @@ const AdminEscrow = () => {
                                             <div className="flex items-center gap-3">
                                                 <Shield className="h-5 w-5 text-muted-foreground" />
                                                 <div>
-                                                    <p className="font-medium">{escrow.payment_transactions?.korapay_reference}</p>
+                                                    <p className="font-medium">{(escrow as any).payment_transactions?.korapay_reference || `ESC_${escrow.id.slice(0, 8).toUpperCase()}`}</p>
                                                     <p className="text-sm text-muted-foreground">
                                                         Created: {format(new Date(escrow.created_at), 'MMM dd, yyyy HH:mm')}
                                                     </p>

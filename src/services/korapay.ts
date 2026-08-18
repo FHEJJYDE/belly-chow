@@ -382,4 +382,5 @@ class KoraPayService {
 
 // Export singleton instance
 export const koraPayService = new KoraPayService();
+export const korapayService = koraPayService;
 export default koraPayService;

@@ -52,6 +52,7 @@ const STATUS_TIMELINE = [
   { key: 'ready', label: 'Ready', icon: Package, emoji: '📦' },
   { key: 'picked_up', label: 'Picked Up', icon: Bike, emoji: '🏍️' },
   { key: 'delivering', label: 'On the Way', icon: Truck, emoji: '🚀' },
+  { key: 'arrived', label: 'Rider Arrived', icon: MapPin, emoji: '📍' },
   { key: 'delivered', label: 'Delivered', icon: CheckCircle2, emoji: '🎉' },
 ];
 
@@ -65,13 +66,12 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(
     order.rider_lat && order.rider_lng ? { lat: order.rider_lat, lng: order.rider_lng } : null
   );
-  // Auto-share location when rider is involved (accepted → delivering).
-  // The student doesn't need to manually tap "Share" — the rider needs their pin.
-  const autoShareStatuses = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering'];
+  const autoShareStatuses = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'];
   const shouldAutoShare = autoShareStatuses.includes(liveOrder.status);
   const [sharingLocation, setSharingLocation] = useState(shouldAutoShare);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
   // Always watch GPS when we should be sharing (watch=true enables continuous watchPosition)
   const { position: studentPos, getPosition } = useGeolocation(sharingLocation);
 
@@ -130,11 +130,11 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
 
   const currentStatusIndex = STATUS_TIMELINE.findIndex(s => s.key === liveOrder.status);
   const isTerminal = ['delivered', 'cancelled', 'rejected'].includes(liveOrder.status);
-  const canCancel = ['pending', 'accepted', 'preparing'].includes(liveOrder.status);
+  const canCancel = liveOrder.status === 'pending';
   const hasRider = !!liveOrder.rider_id;
-  const isBeingDelivered = ['picked_up', 'delivering'].includes(liveOrder.status);
+  const isBeingDelivered = ['picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
   // Show the map from 'accepted' onwards so both parties see each other as early as possible
-  const showMap = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(liveOrder.status);
+  const showMap = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
   // Determine current student GPS for the map pin
   const studentMapLat = studentPos?.lat ?? liveOrder.delivery_lat ?? null;
   const studentMapLng = studentPos?.lng ?? liveOrder.delivery_lng ?? null;
@@ -148,21 +148,47 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
       case 'ready': return '5-15 min';
       case 'picked_up': return '5-10 min';
       case 'delivering': return '2-5 min';
+      case 'arrived': return 'Arrived';
       default: return null;
     }
   };
 
   const handleCancel = async () => {
     if (!user || !cancelReason) return;
+    if (liveOrder.status !== 'pending') {
+      toast({ title: 'Cancellation Policy Restriction 🛑', description: 'Orders can only be cancelled while pending. Once accepted by vendor, cancellation is disabled.', variant: 'destructive' });
+      return;
+    }
     setCancelling(true);
     const { error } = await supabase.from('orders').update({ status: 'cancelled' as any }).eq('id', order.id);
+    if (!error) {
+      // Trigger instant wallet refund if paid via wallet
+      await (supabase.rpc as any)('refund_wallet_order', { p_order_id: order.id });
+    }
     setCancelling(false);
     if (error) {
       toast({ title: 'Error cancelling order', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Order cancelled ❌' });
+    toast({ title: 'Order cancelled ❌', description: 'Any wallet payment has been refunded to your wallet.' });
     onCancelled?.();
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!user) return;
+    setConfirmingDelivery(true);
+    const { error } = await supabase.from('orders').update({ status: 'delivered' as any }).eq('id', order.id);
+    if (!error) {
+      // Release escrow funds to vendor and rider platform wallets
+      await (supabase.rpc as any)('release_order_escrow', { p_order_id: order.id });
+    }
+    setConfirmingDelivery(false);
+    if (error) {
+      toast({ title: 'Error confirming delivery', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Order delivery confirmed! 🎉', description: 'Funds have been credited to vendor and rider platform wallets.' });
+    onBack();
   };
 
   // Build chat participants
@@ -215,6 +241,7 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
               {liveOrder.status === 'ready' && 'Ready! Waiting for a rider...'}
               {liveOrder.status === 'picked_up' && 'Rider picked up your order'}
               {liveOrder.status === 'delivering' && 'Your rider is on the way!'}
+              {liveOrder.status === 'arrived' && 'Your rider has arrived outside!'}
             </p>
             {eta && <p className="text-xs text-muted-foreground">Estimated: {eta}</p>}
           </div>
@@ -258,6 +285,41 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
 
       {/* Main content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Delivery Confirmation Card when rider has arrived */}
+        {liveOrder.status === 'arrived' && (
+          <Card className="border-green-500 bg-green-500/10 dark:bg-green-950/30">
+            <CardContent className="p-4 space-y-3 text-center">
+              <div className="flex justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20 text-green-600 dark:text-green-400">
+                  <CheckCircle2 className="h-6 w-6 animate-bounce" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-foreground">Rider Has Arrived! 📍</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your rider is outside. Please collect your food package and confirm delivery receipt below.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold gap-2 shadow-md" disabled={confirmingDelivery}>
+                    <CheckCircle2 className="h-5 w-5" /> {confirmingDelivery ? 'Confirming...' : 'Confirm Delivery Received 🎉'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Order Received?</AlertDialogTitle>
+                    <AlertDialogDescription>Have you received your food package from the rider?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Not Yet</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmDelivery} className="bg-green-600 hover:bg-green-700 text-white">Yes, I Have Received It 🎉</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        )}
         {/* Rider Card - when assigned */}
         {hasRider && riderProfile && (
           <Card className="border-primary/20">

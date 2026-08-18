@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { mockPaymentService } from '@/services/mockPayment';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
     CreditCard,
     Building2,
@@ -15,7 +16,8 @@ import {
     Clock,
     CheckCircle,
     AlertCircle,
-    Loader2
+    Loader2,
+    Wallet
 } from 'lucide-react';
 
 interface PaymentModalProps {
@@ -39,32 +41,41 @@ const PaymentModal = ({ open, onOpenChange, order, onPaymentSuccess }: PaymentMo
     const { user } = useAuth();
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
-    const [selectedMethod, setSelectedMethod] = useState<string>('card');
+    const [selectedMethod, setSelectedMethod] = useState<string>('wallet');
+    const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
-    const totalAmount = order.total + order.delivery_fee;
+    const totalAmount = order.total + order.delivery_fee + 100;
     const currency = import.meta.env.VITE_PAYMENT_CURRENCY || 'NGN';
     const escrowHours = import.meta.env.VITE_ESCROW_RELEASE_DELAY_HOURS || '24';
 
+    useEffect(() => {
+        if (open && user) {
+            (supabase.rpc as any)('get_or_create_wallet', { p_user_id: user.id }).then(({ data }: any) => {
+                if (data) setWalletBalance(Number(data.balance));
+            });
+        }
+    }, [open, user]);
+
     const paymentMethods = [
+        {
+            id: 'wallet',
+            name: 'Belly-Chow Wallet 💳',
+            icon: Wallet,
+            description: walletBalance !== null ? `Pay instantly from your wallet balance (Balance: ₦${walletBalance.toLocaleString()})` : 'Pay instantly from your in-app wallet balance',
+            recommended: true,
+        },
         {
             id: 'card',
             name: 'Debit/Credit Card',
             icon: CreditCard,
             description: 'Pay with your Visa, Mastercard, or Verve card',
-            recommended: true,
+            recommended: false,
         },
         {
             id: 'bank_transfer',
             name: 'Bank Transfer',
             icon: Building2,
             description: 'Direct transfer from your bank account',
-            recommended: false,
-        },
-        {
-            id: 'ussd',
-            name: 'USSD',
-            icon: Smartphone,
-            description: 'Pay using your mobile phone USSD code',
             recommended: false,
         },
     ];
@@ -82,8 +93,58 @@ const PaymentModal = ({ open, onOpenChange, order, onPaymentSuccess }: PaymentMo
         setIsProcessing(true);
 
         try {
-            const reference = mockPaymentService.generateReference('ORDER');
+            if (selectedMethod === 'wallet') {
+                if (walletBalance === null || walletBalance < totalAmount) {
+                    toast({
+                        title: 'Insufficient Wallet Balance',
+                        description: `Your wallet balance (₦${(walletBalance || 0).toLocaleString()}) is less than order total ₦${totalAmount.toLocaleString()}. Please top up your wallet.`,
+                        variant: 'destructive',
+                    });
+                    setIsProcessing(false);
+                    return;
+                }
 
+                // Call pay_with_wallet RPC
+                const { error: walletErr } = await (supabase.rpc as any)('pay_with_wallet', {
+                    p_user_id: user.id,
+                    p_amount: totalAmount,
+                    p_order_id: order.id,
+                });
+
+                if (walletErr) throw walletErr;
+
+                // Update order payment status
+                await supabase.from('orders').update({
+                    payment_method: 'wallet' as any,
+                    payment_status: 'confirmed' as any,
+                    status: 'pending' as any,
+                }).eq('id', order.id);
+
+                // Create escrow record
+                const platformFee = 300; // 100 platform + 200 vendor charge
+                const vendorNet = Math.max(0, order.total - 200);
+                await supabase.from('escrow_transactions').insert({
+                    order_id: order.id,
+                    vendor_id: order.vendor_id,
+                    amount: totalAmount,
+                    platform_fee: platformFee,
+                    vendor_amount: vendorNet,
+                    status: 'held',
+                    hold_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                    auto_release: true,
+                } as any);
+
+                toast({
+                    title: 'Payment Successful! 🎉',
+                    description: 'Order paid via Belly-Chow Wallet and sent to vendor.',
+                });
+
+                onPaymentSuccess(`WAL_${order.id.slice(0, 8)}`);
+                onOpenChange(false);
+                return;
+            }
+
+            const reference = mockPaymentService.generateReference('ORDER');
             const paymentRequest = {
                 amount: totalAmount,
                 currency,

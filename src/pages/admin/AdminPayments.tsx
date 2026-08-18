@@ -77,9 +77,8 @@ const AdminPayments = () => {
                 .from('payment_transactions')
                 .select(`
                     *,
-                    orders!inner(id, customer_id),
-                    profiles!payment_transactions_user_id_fkey(full_name, email),
-                    vendors!inner(name)
+                    orders(id, student_id),
+                    vendors(name)
                 `)
                 .order('created_at', { ascending: false })
                 .limit(100);

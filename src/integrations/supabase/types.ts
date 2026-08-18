@@ -422,6 +422,7 @@ export type Database = {
           delivery_fee: number
           id: string
           platform_fee: number
+          vendor_delivery_fee: number
           rider_fee: number
           updated_at: string
         }
@@ -433,6 +434,7 @@ export type Database = {
           delivery_fee?: number
           id?: string
           platform_fee?: number
+          vendor_delivery_fee?: number
           rider_fee?: number
           updated_at?: string
         }
@@ -444,6 +446,7 @@ export type Database = {
           delivery_fee?: number
           id?: string
           platform_fee?: number
+          vendor_delivery_fee?: number
           rider_fee?: number
           updated_at?: string
         }
@@ -791,6 +794,8 @@ export type Database = {
           account_number: string
           admin_notes: string | null
           amount: number
+          service_fee: number
+          net_amount: number
           bank_name: string
           created_at: string
           id: string
@@ -803,6 +808,8 @@ export type Database = {
           account_number?: string
           admin_notes?: string | null
           amount?: number
+          service_fee?: number
+          net_amount?: number
           bank_name?: string
           created_at?: string
           id?: string
@@ -815,12 +822,86 @@ export type Database = {
           account_number?: string
           admin_notes?: string | null
           amount?: number
+          service_fee?: number
+          net_amount?: number
           bank_name?: string
           created_at?: string
           id?: string
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          daily_spent: number
+          id: string
+          last_spend_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          daily_spent?: number
+          id?: string
+          last_spend_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          daily_spent?: number
+          id?: string
+          last_spend_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          fee: number
+          id: string
+          net_amount: number
+          reference: string | null
+          status: string
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          fee?: number
+          id?: string
+          net_amount: number
+          reference?: string | null
+          status?: string
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          fee?: number
+          id?: string
+          net_amount?: number
+          reference?: string | null
+          status?: string
+          type?: string
+          user_id?: string
+          wallet_id?: string
         }
         Relationships: []
       }
@@ -859,6 +940,7 @@ export type Database = {
         | "ready"
         | "picked_up"
         | "delivering"
+        | "arrived"
         | "delivered"
         | "cancelled"
         | "rejected"
@@ -1007,6 +1089,7 @@ export const Constants = {
         "ready",
         "picked_up",
         "delivering",
+        "arrived",
         "delivered",
         "cancelled",
         "rejected",

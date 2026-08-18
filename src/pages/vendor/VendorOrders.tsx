@@ -108,7 +108,7 @@ const VendorOrders = () => {
   if (loading) return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-foreground border-t-transparent" /></div>;
 
   const pending = orders.filter(o => o.status === 'pending');
-  const active = orders.filter(o => ['accepted', 'preparing', 'ready'].includes(o.status));
+  const active = orders.filter(o => ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(o.status));
   const completed = orders.filter(o => ['delivered', 'cancelled', 'rejected'].includes(o.status));
 
   const OrderCard = ({ order }: { order: Order }) => {
@@ -230,7 +230,7 @@ const VendorOrders = () => {
           )}
 
           {/* Live Rider Location Tracking Map for Vendor */}
-          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(order.status) && ((order as any).rider_lat || (order as any).delivery_lat) && (
+          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(order.status) && ((order as any).rider_lat || (order as any).delivery_lat) && (
             <div className="rounded-xl border border-border/40 p-3 bg-muted/10 space-y-2">
               <p className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
                 <MapPin className="h-3.5 w-3.5 text-primary animate-pulse" /> Live Rider & Delivery Route
@@ -251,7 +251,7 @@ const VendorOrders = () => {
           )}
 
           {/* Active order chat link */}
-          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering'].includes(order.status) && (
+          {['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(order.status) && (
             <div className="pt-2 border-t border-border/40">
               <DeliveryChat orderId={order.id} otherName="Rider & Student" />
             </div>

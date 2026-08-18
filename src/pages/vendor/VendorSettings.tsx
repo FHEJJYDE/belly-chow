@@ -99,6 +99,67 @@ const VendorSettings = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Platform Fee Notice Card */}
+        <Card className="mt-6 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="p-5 space-y-2">
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+              <span>💳</span> Vendor Order & Delivery Charges
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Belly-Chow charges a flat <strong className="text-primary font-bold">₦200 per delivery</strong> deducted directly from order payouts. Your food subtotal minus ₦200 is automatically credited to your vendor balance upon customer receipt.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Store Promotion & Featured Tier Card */}
+        <Card className="mt-6 border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Boost Store Visibility</span>
+              <h2 className="font-heading text-lg font-bold">Featured Vendor Promotions 🌟</h2>
+              <p className="text-xs text-muted-foreground mt-1">Get featured at the top of campus food searches and increase daily orders.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { name: 'Bronze', price: '₦1,000 / wk', desc: 'Featured Badge + Top 10 Search Placement', tier: 'bronze' },
+                { name: 'Silver', price: '₦2,500 / wk', desc: 'Featured Badge + Top 5 Placement + Category Highlight', tier: 'silver' },
+                { name: 'Gold', price: '₦5,000 / wk', desc: 'Top #1 Homepage Banner + Gold Badge', tier: 'gold' },
+              ].map((plan) => (
+                <div key={plan.tier} className="rounded-lg border p-4 bg-background/80 space-y-2 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm">{plan.name} Plan</h3>
+                    <p className="font-extrabold text-primary text-base mt-1">{plan.price}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">{plan.desc}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={vendor?.featured_tier === plan.tier ? 'default' : 'outline'}
+                    className="w-full mt-2 text-xs"
+                    onClick={async () => {
+                      if (!vendor) return;
+                      const nextWeek = new Date();
+                      nextWeek.setDate(nextWeek.getDate() + 7);
+                      const { error } = await supabase.from('vendors').update({
+                        featured_tier: plan.tier,
+                        featured_until: nextWeek.toISOString(),
+                        is_featured: true,
+                      } as any).eq('id', vendor.id);
+                      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                      else {
+                        setVendor({ ...vendor, featured_tier: plan.tier, is_featured: true });
+                        toast({ title: `${plan.name} Promotion Activated! 🚀`, description: 'Your store is now featured for 1 week.' });
+                      }
+                    }}
+                  >
+                    {vendor?.featured_tier === plan.tier ? 'Active Tier ✓' : 'Promote Store'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

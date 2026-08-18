@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 const AdminSettings = () => {
   const { toast } = useToast();
   const [settings, setSettings] = useState({
-    platform_fee: 500,
+    platform_fee: 100,
+    vendor_delivery_fee: 200,
     rider_fee: 500,
     bank_name: '',
     bank_account_name: '',
@@ -25,7 +26,8 @@ const AdminSettings = () => {
       if (data) {
         const d = data as any;
         setSettings({
-          platform_fee: Number(d.platform_fee) || 500,
+          platform_fee: Number(d.platform_fee) || 100,
+          vendor_delivery_fee: Number(d.vendor_delivery_fee) || 200,
           rider_fee: Number(d.rider_fee) || 500,
           bank_name: d.bank_name || '',
           bank_account_name: d.bank_account_name || '',
@@ -42,6 +44,7 @@ const AdminSettings = () => {
     setSaving(true);
     const payload: any = {
       platform_fee: settings.platform_fee,
+      vendor_delivery_fee: settings.vendor_delivery_fee,
       rider_fee: settings.rider_fee,
       bank_name: settings.bank_name,
       bank_account_name: settings.bank_account_name,
@@ -63,37 +66,47 @@ const AdminSettings = () => {
 
   return (
     <div>
-      <h1 className="mb-6 font-heading text-2xl font-bold">Platform Settings</h1>
+      <h1 className="mb-6 font-heading text-2xl font-bold">Platform Settings & Fee Structure</h1>
 
       <div className="max-w-lg space-y-6">
         <Card>
-          <CardHeader><CardTitle>Fixed Fee Model</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Fee Configuration</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              A fixed service fee is added on top of every order. This fee is split between the platform and the rider.
+              Platform revenue is generated via order platform fees and vendor delivery charges.
             </p>
             <div>
-              <Label>Platform Fee (₦)</Label>
+              <Label>Platform Fee per Order (Customer Pays) (₦)</Label>
               <Input
                 type="number"
                 value={settings.platform_fee}
                 onChange={e => setSettings({ ...settings, platform_fee: parseFloat(e.target.value) || 0 })}
               />
-              <p className="mt-1 text-xs text-muted-foreground">Your earnings per order</p>
+              <p className="mt-1 text-xs text-muted-foreground">Fee charged to customer per order (Default: ₦100)</p>
             </div>
             <div>
-              <Label>Rider Fee (₦)</Label>
+              <Label>Vendor Delivery Fee (Vendor Pays) (₦)</Label>
+              <Input
+                type="number"
+                value={settings.vendor_delivery_fee}
+                onChange={e => setSettings({ ...settings, vendor_delivery_fee: parseFloat(e.target.value) || 0 })}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Fee charged to vendor per completed delivery (Default: ₦200)</p>
+            </div>
+            <div>
+              <Label>Base Rider Delivery Fee (₦)</Label>
               <Input
                 type="number"
                 value={settings.rider_fee}
                 onChange={e => setSettings({ ...settings, rider_fee: parseFloat(e.target.value) || 0 })}
               />
-              <p className="mt-1 text-xs text-muted-foreground">Rider earnings per delivery</p>
+              <p className="mt-1 text-xs text-muted-foreground">Base delivery payout for riders</p>
             </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-sm font-medium">Total service fee per order: <span className="text-primary">₦{(settings.platform_fee + settings.rider_fee).toLocaleString()}</span></p>
-              <p className="text-xs text-muted-foreground mt-1">
-                e.g. ₦2,500 food → customer pays ₦{(2500 + settings.platform_fee + settings.rider_fee).toLocaleString()} total
+            <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+              <p className="text-sm font-semibold">Total Platform Revenue per Order:</p>
+              <p className="text-lg font-bold text-primary">₦{(settings.platform_fee + settings.vendor_delivery_fee).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                (Customer Platform Fee ₦{settings.platform_fee} + Vendor Delivery Charge ₦{settings.vendor_delivery_fee})
               </p>
             </div>
           </CardContent>

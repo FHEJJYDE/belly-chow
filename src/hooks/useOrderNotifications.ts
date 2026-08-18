@@ -9,7 +9,8 @@ const statusMessages: Record<string, { title: string; description: string }> = {
   ready: { title: 'Order Ready! 📦', description: 'Your order is ready for pickup.' },
   picked_up: { title: 'Picked Up 🏍️', description: 'A rider has picked up your order.' },
   delivering: { title: 'On the Way! 🚀', description: 'Your order is on its way to you.' },
-  delivered: { title: 'Delivered! 🎉', description: 'Your order has been delivered. Enjoy!' },
+  arrived: { title: 'Rider Arrived! 📍', description: 'Your rider is outside! Please meet them and confirm delivery receipt.' },
+  delivered: { title: 'Order Complete! 🎉', description: 'Delivery confirmed. Enjoy your food!' },
   cancelled: { title: 'Order Cancelled ❌', description: 'Your order has been cancelled.' },
   rejected: { title: 'Order Rejected 😞', description: 'The vendor rejected your order.' },
 };
@@ -17,7 +18,8 @@ const statusMessages: Record<string, { title: string; description: string }> = {
 const vendorStatusMessages: Record<string, { title: string; description: string }> = {
   pending: { title: 'New Order! 🔔', description: 'You have a new order waiting.' },
   picked_up: { title: 'Order Picked Up 🏍️', description: 'A rider picked up the order.' },
-  delivered: { title: 'Order Delivered ✅', description: 'An order has been delivered.' },
+  arrived: { title: 'Rider Arrived 📍', description: 'Rider has reached the customer location.' },
+  delivered: { title: 'Order Received & Delivered ✅', description: 'Customer confirmed order receipt! Order completed.' },
 };
 
 const riderStatusMessages: Record<string, { title: string; description: string }> = {

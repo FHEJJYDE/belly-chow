@@ -55,19 +55,17 @@ const VendorPayouts = () => {
         { id: 'e2', amount: 5000, status: 'released', hold_until: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), created_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() }
     ];
 
+    const [walletBalance, setWalletBalance] = useState<number>(0);
+
     const fetchData = async () => {
+        if (!user) return;
         setLoading(true);
         try {
-            // Attempt fetching from Supabase, fallback to mocks if not set up
-            const { data: pData } = await supabase.from('orders').select('id, total, status, created_at').eq('status', 'delivered').limit(10);
-            if (pData && pData.length > 0) {
-                // Synthesize payouts based on delivered order amounts for demonstration
-                setPayouts(mockPayouts);
-                setEscrowTransactions(mockEscrows);
-            } else {
-                setPayouts(mockPayouts);
-                setEscrowTransactions(mockEscrows);
-            }
+            const { data: wData } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
+            if (wData) setWalletBalance(Number(wData.balance));
+
+            setPayouts(mockPayouts);
+            setEscrowTransactions(mockEscrows);
         } catch (error) {
             setPayouts(mockPayouts);
             setEscrowTransactions(mockEscrows);
@@ -80,10 +78,39 @@ const VendorPayouts = () => {
         fetchData();
     }, [user]);
 
-    const requestPayout = () => {
+    const requestPayout = async () => {
+        if (!user) return;
+        if (walletBalance <= 0) {
+            toast({ title: "No Available Balance", description: "You have no funds available for withdrawal.", variant: "destructive" });
+            return;
+        }
+        const serviceFee = Math.floor(walletBalance / 1000) * 50;
+        const netPayout = walletBalance - serviceFee;
+
+        // Create withdrawal request
+        const { error } = await supabase.from('withdrawal_requests').insert({
+            user_id: user.id,
+            amount: walletBalance,
+            service_fee: serviceFee,
+            net_amount: netPayout,
+            status: 'pending',
+            bank_name: 'Default Bank',
+            account_number: '0000000000',
+            account_name: user.email || 'Vendor',
+        } as any);
+
+        if (error) {
+            toast({ title: "Withdrawal Failed", description: error.message, variant: "destructive" });
+            return;
+        }
+
+        // Deduct wallet balance
+        await supabase.from('wallets').update({ balance: 0 }).eq('user_id', user.id);
+        setWalletBalance(0);
+
         toast({
-            title: "Payout Requested",
-            description: "Your available balance is being processed for transfer.",
+            title: "Payout Requested! 🚀",
+            description: `Requested ₦${walletBalance.toLocaleString()} (Service Fee: ₦${serviceFee}, Net Transfer: ₦${netPayout.toLocaleString()})`,
         });
     };
 
@@ -116,7 +143,7 @@ const VendorPayouts = () => {
                         </div>
                         <div>
                             <p className="text-xs text-muted-foreground">Available for Payout</p>
-                            <p className="text-xl font-heading font-bold">₦12,500</p>
+                            <p className="text-xl font-heading font-bold">₦{walletBalance.toLocaleString()}</p>
                         </div>
                     </CardContent>
                 </Card>

@@ -4,6 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, LogOut, User, Package } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
+import WalletModal from '@/components/wallet/WalletModal';
 import logo from '@/assets/belly_chow_logo.png';
 
 const AppNavbar = () => {
@@ -32,6 +33,7 @@ const AppNavbar = () => {
         <div className="flex items-center gap-1">
           {user ? (
             <>
+              {role === 'student' && <WalletModal />}
               <NotificationCenter />
               {role === 'student' && (
                 <div className="hidden md:flex items-center gap-1">

@@ -15,7 +15,7 @@ BEGIN
         CREATE TYPE public.app_role AS ENUM ('student', 'vendor', 'rider', 'admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
-        CREATE TYPE public.order_status AS ENUM ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'delivered', 'cancelled', 'rejected');
+        CREATE TYPE public.order_status AS ENUM ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived', 'delivered', 'cancelled', 'rejected');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_method') THEN
         CREATE TYPE public.payment_method AS ENUM ('pay_on_delivery', 'bank_transfer');
@@ -430,6 +430,7 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   delivery_fee NUMERIC NOT NULL DEFAULT 500,
   platform_fee NUMERIC NOT NULL DEFAULT 100,
+  vendor_delivery_fee NUMERIC NOT NULL DEFAULT 200,
   rider_fee NUMERIC NOT NULL DEFAULT 500,
   commission_rate NUMERIC NOT NULL DEFAULT 0.10,
   bank_name TEXT DEFAULT '',
@@ -438,8 +439,8 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-INSERT INTO public.platform_settings (delivery_fee, platform_fee, rider_fee, commission_rate)
-SELECT 500, 100, 500, 0.10
+INSERT INTO public.platform_settings (delivery_fee, platform_fee, vendor_delivery_fee, rider_fee, commission_rate)
+SELECT 500, 100, 200, 500, 0.10
 WHERE NOT EXISTS (SELECT 1 FROM public.platform_settings);
 
 -- ------------------------------------------------------------------------------

@@ -31,12 +31,13 @@ const statusColors: Record<string, string> = {
   ready: 'border bg-muted/50 text-foreground',
   picked_up: 'border bg-muted/50 text-foreground',
   delivering: 'border bg-muted/50 text-foreground',
+  arrived: 'border bg-green-500/20 text-green-700 dark:text-green-400 font-semibold',
   delivered: 'border bg-muted/50 text-foreground',
   cancelled: 'border bg-destructive/5 text-destructive',
   rejected: 'border bg-destructive/5 text-destructive',
 };
 
-const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering'];
+const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'];
 
 const Orders = () => {
   const { user } = useAuth();
@@ -121,6 +122,16 @@ const Orders = () => {
     setDisputeReason('');
     setDisputeDesc('');
     toast({ title: 'Dispute filed ✅', description: 'Our team will review it shortly.' });
+  };
+
+  const handleConfirmDelivery = async (orderId: string) => {
+    const { error } = await supabase.from('orders').update({ status: 'delivered' as any }).eq('id', orderId);
+    if (!error) {
+      await (supabase.rpc as any)('release_order_escrow', { p_order_id: orderId });
+    }
+    if (error) { toast({ title: 'Error confirming delivery', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Order delivery confirmed! 🎉', description: 'Funds credited to vendor and rider platform wallets.' });
+    fetchOrders();
   };
 
   const fetchOrders = useCallback(async () => {
@@ -261,7 +272,7 @@ const Orders = () => {
                         </div>
                         {/* Mini progress bar */}
                         <div className="mt-3 flex items-center gap-1">
-                          {['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'delivered'].map((step, i, arr) => {
+                          {['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived', 'delivered'].map((step, i, arr) => {
                             const currentIdx = arr.indexOf(order.status);
                             const isActive = i <= currentIdx;
                             return (
@@ -271,6 +282,14 @@ const Orders = () => {
                             );
                           })}
                         </div>
+                        {order.status === 'arrived' && (
+                          <div className="mt-3 pt-3 border-t flex flex-col gap-2">
+                            <p className="text-xs font-semibold text-green-700 dark:text-green-400">📍 Rider has arrived! Please verify food package and confirm below.</p>
+                            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold gap-1" onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }}>
+                              <CheckCircle2 className="h-4 w-4" /> Confirm Delivery Received 🎉
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

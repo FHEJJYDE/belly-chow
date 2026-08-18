@@ -12,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, Navigation } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import DrinkUpsellModal, { SelectedDrink, CustomDrinkRequest } from '@/components/DrinkUpsellModal';
 import PaymentModal from '@/components/payment/PaymentModal';
 
 const Cart = () => {
@@ -28,12 +27,25 @@ const Cart = () => {
 
     const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
     const [defaultLocation, setDefaultLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
-    const [showDrinkModal, setShowDrinkModal] = useState(false);
-    const [selectedDrinks, setSelectedDrinks] = useState<SelectedDrink[]>([]);
-    const [customDrinkRequests, setCustomDrinkRequests] = useState<CustomDrinkRequest | null>(null);
 
-    const deliveryFee = 1000; // Fixed delivery fee
-    const serviceFee = 0; // No service fee yet — set to 0 to avoid double-charging
+    const [platformFee, setPlatformFee] = useState(100);
+    const [deliveryFee, setDeliveryFee] = useState(500);
+    const [zones, setZones] = useState<{ id: string; zone_name: string; delivery_fee: number }[]>([]);
+
+    useEffect(() => {
+        const fetchFees = async () => {
+            const [{ data: pSettings }, { data: zoneData }] = await Promise.all([
+                supabase.from('platform_settings').select('platform_fee').limit(1).maybeSingle(),
+                (supabase.from('delivery_zones') as any).select('id, zone_name, delivery_fee').eq('is_active', true),
+            ]);
+            if (pSettings?.platform_fee) setPlatformFee(Number(pSettings.platform_fee));
+            if (zoneData && zoneData.length > 0) {
+                setZones(zoneData);
+                setDeliveryFee(Number(zoneData[0].delivery_fee));
+            }
+        };
+        fetchFees();
+    }, []);
 
     useEffect(() => {
         if (user) {
@@ -97,7 +109,7 @@ const Cart = () => {
         setIsOrdering(true);
 
         try {
-            const grandTotal = total + serviceFee;
+            const grandTotal = total + deliveryFee + platformFee;
             const effectiveVendorId = vendorId || items[0]?.menuItem?.vendor_id;
 
             if (!effectiveVendorId) {
@@ -108,11 +120,6 @@ const Cart = () => {
                 });
                 return;
             }
-
-            const drinkPayload = {
-                drinks: selectedDrinks,
-                custom_request: customDrinkRequests || null,
-            };
 
             // Create order with pending payment status
             const { data: order, error: orderError } = await supabase
@@ -127,7 +134,6 @@ const Cart = () => {
                     status: 'pending',
                     payment_status: 'pending',
                     payment_method: 'pay_on_delivery',
-                    drink_items: drinkPayload as unknown as import('@/integrations/supabase/types').Json,
                 })
                 .select()
                 .single();
@@ -197,14 +203,7 @@ const Cart = () => {
         navigate(`/payment/verify?ref=${reference}&payment=success`);
     };
 
-    // DrinkUpsellModal calls onConfirm(drinks, customRequest: CustomDrinkRequest | null)
-    const handleDrinkSelection = (drinks: SelectedDrink[], customRequest: CustomDrinkRequest | null) => {
-        setSelectedDrinks(drinks);
-        setCustomDrinkRequests(customRequest);
-        setShowDrinkModal(false);
-    };
-
-    const grandTotal = total + serviceFee;
+    const grandTotal = total + deliveryFee + platformFee;
 
     if (items.length === 0) {
         return (
@@ -283,7 +282,7 @@ const Cart = () => {
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="location" className="text-base font-medium flex items-center">
                                     <MapPin className="h-4 w-4 mr-2" />
-                                    Delivery Location
+                                    Delivery Location & Zone
                                 </Label>
                                 <Button
                                     variant="outline"
@@ -296,11 +295,32 @@ const Cart = () => {
                                     {geoLoading ? 'Getting...' : 'Use Current'}
                                 </Button>
                             </div>
+                            {zones.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground">Select Delivery Zone Rate</Label>
+                                    <select
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                        onChange={(e) => {
+                                            const selected = zones.find(z => z.zone_name === e.target.value);
+                                            if (selected) {
+                                                setDeliveryFee(Number(selected.delivery_fee));
+                                                setDeliveryLocation(selected.zone_name);
+                                            }
+                                        }}
+                                    >
+                                        {zones.map(z => (
+                                            <option key={z.id} value={z.zone_name}>
+                                                {z.zone_name} — ₦{Number(z.delivery_fee).toLocaleString()} delivery
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <Input
                                 id="location"
                                 value={deliveryLocation}
                                 onChange={(e) => setDeliveryLocation(e.target.value)}
-                                placeholder="Enter your delivery address"
+                                placeholder="Enter specific hostel room / delivery details"
                                 className="w-full"
                             />
                             {geoError && (
@@ -339,43 +359,21 @@ const Cart = () => {
                                 <span>Subtotal</span>
                                 <span>₦{total.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span>Delivery Fee</span>
+                            <div className="flex justify-between text-muted-foreground">
+                                <span>Delivery Fee (Rider)</span>
                                 <span>₦{deliveryFee.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                                <span>Platform Service Fee</span>
+                                <span>₦{platformFee.toLocaleString()}</span>
                             </div>
                             <div className="border-t pt-2 mt-2">
                                 <div className="flex justify-between font-semibold text-lg">
                                     <span>Total</span>
-                                    <span>₦{grandTotal.toLocaleString()}</span>
+                                    <span>₦{(total + deliveryFee + platformFee).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Drink Selection */}
-                <Card className="mb-6">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-lg">Add Drinks</h3>
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowDrinkModal(true)}
-                                className="text-sm"
-                            >
-                                {selectedDrinks.length > 0 ? 'Edit Selection' : 'Select Drinks'}
-                            </Button>
-                        </div>
-                        {selectedDrinks.length > 0 && (
-                            <div className="space-y-2">
-                                {selectedDrinks.map((drink, index) => (
-                                    <div key={index} className="flex justify-between text-sm">
-                                        <span>{drink.name} x{drink.quantity}</span>
-                                        <span>₦{(drink.price * drink.quantity).toLocaleString()}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
 
@@ -398,13 +396,6 @@ const Cart = () => {
                     onPaymentSuccess={handlePaymentSuccess}
                 />
             )}
-
-            {/* Drink Selection Modal */}
-            <DrinkUpsellModal
-                open={showDrinkModal}
-                onClose={() => setShowDrinkModal(false)}
-                onConfirm={handleDrinkSelection}
-            />
         </div>
     );
 };

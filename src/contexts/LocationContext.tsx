@@ -38,7 +38,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             .from('orders')
             .select('id')
             .eq('rider_id', user.id)
-            .in('status', ['accepted', 'preparing', 'ready', 'picked_up', 'delivering'])
+            .in('status', ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'])
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -48,7 +48,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             .from('orders')
             .select('id')
             .eq('student_id', user.id)
-            .in('status', ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering'])
+            .in('status', ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'])
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();

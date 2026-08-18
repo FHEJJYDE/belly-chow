@@ -200,10 +200,11 @@ async function handlePaymentWebhook(webhookData: KoraPayWebhookPayload) {
 
 async function createEscrowTransaction(paymentTransaction: any, paymentData: any) {
     try {
-        const platformFeePercentage = 0.05 // 5% platform fee
         const amount = paymentData.amount / 100 // Convert from kobo to naira
-        const platformFee = amount * platformFeePercentage
-        const vendorAmount = amount - platformFee
+        const platformFee = 100 // ₦100 customer platform fee
+        const vendorDeliveryFee = 200 // ₦200 vendor delivery charge
+        const totalPlatformRevenue = platformFee + vendorDeliveryFee
+        const vendorAmount = Math.max(0, amount - totalPlatformRevenue)
         const escrowHoldHours = 24 // 24 hours hold period
 
         await supabase
@@ -214,7 +215,7 @@ async function createEscrowTransaction(paymentTransaction: any, paymentData: any
                 vendor_id: paymentTransaction.vendor_id,
                 amount,
                 currency: paymentData.currency,
-                platform_fee: platformFee,
+                platform_fee: totalPlatformRevenue,
                 vendor_amount: vendorAmount,
                 status: 'held',
                 hold_until: new Date(Date.now() + escrowHoldHours * 60 * 60 * 1000).toISOString(),

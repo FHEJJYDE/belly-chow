@@ -27,7 +27,13 @@ const Signup = () => {
   const [vendorName, setVendorName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
-  const navigate = useNavigate();
+  const [vendorCount, setVendorCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    supabase.from('vendors').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (count !== null) setVendorCount(count);
+    });
+  }, []);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,9 +118,26 @@ const Signup = () => {
             </div>
 
             {selectedRole === 'vendor' && (
-              <div className="space-y-2">
-                <Label htmlFor="vendorName" className="text-sm font-medium">Business Name</Label>
-                <Input id="vendorName" placeholder="e.g. Mama's Kitchen" value={vendorName} onChange={e => setVendorName(e.target.value)} required />
+              <div className="space-y-3">
+                {vendorCount !== null && vendorCount < 25 ? (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-xs text-green-700 dark:text-green-400">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <span>🎉</span> Early Bird Offer: Registration FREE!
+                    </p>
+                    <p className="mt-0.5 opacity-90">{25 - vendorCount} of 25 free vendor spots remaining.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <span>💳</span> Vendor Registration Fee: ₦2,000
+                    </p>
+                    <p className="mt-0.5 opacity-90">First 25 free spots filled. Standard registration fee applies.</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="vendorName" className="text-sm font-medium">Business Name</Label>
+                  <Input id="vendorName" placeholder="e.g. Mama's Kitchen" value={vendorName} onChange={e => setVendorName(e.target.value)} required />
+                </div>
               </div>
             )}
 

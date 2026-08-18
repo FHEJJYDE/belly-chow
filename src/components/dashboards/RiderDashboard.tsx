@@ -316,7 +316,7 @@ const RiderDashboard = () => {
     const fetchOrders = async () => {
       const [avail, mine, history] = await Promise.all([
         supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }),
-        supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering']).order('created_at', { ascending: false }),
+        supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering', 'arrived']).order('created_at', { ascending: false }),
         supabase.from('orders').select('*').eq('rider_id', user.id).eq('status', 'delivered').order('created_at', { ascending: false }).limit(50),
       ]);
       const [enrichedAvail, enrichedMine, enrichedHistory] = await Promise.all([
@@ -382,13 +382,62 @@ const RiderDashboard = () => {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
   };
 
+  // Image compression helper for mobile phone camera uploads
+  const compressImage = (file: File, maxWidth = 1600, quality = 0.8): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                resolve(file);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  };
+
   // Delivery proof handlers
-  const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProofSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast({ title: 'File too large', description: 'Max 5MB', variant: 'destructive' }); return; }
-    setDeliveryProof(file);
-    setDeliveryProofPreview(URL.createObjectURL(file));
+    if (file.size > 25 * 1024 * 1024) { 
+      toast({ title: 'File too large', description: 'Photo must be under 25MB.', variant: 'destructive' }); 
+      return; 
+    }
+    const compressed = await compressImage(file);
+    setDeliveryProof(compressed);
+    setDeliveryProofPreview(URL.createObjectURL(compressed));
   };
 
   const uploadDeliveryProof = async (orderId: string): Promise<string | null> => {
@@ -408,37 +457,42 @@ const RiderDashboard = () => {
     if (deliveryProof) {
       proofUrl = await uploadDeliveryProof(orderId);
     }
-    const updateData: any = { status: 'delivered' };
+    const updateData: any = { status: 'arrived' };
     if (proofUrl) updateData.delivery_proof_url = proofUrl;
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Order delivered! 🎉' });
-    setActiveDeliveryId(null);
+    toast({ title: 'Ride ended! 🏁 Waiting for customer confirmation.' });
     setDeliveryProof(null);
     setDeliveryProofPreview(null);
   };
 
   // Withdrawal
   const submitWithdrawal = async () => {
-    if (!user || !withdrawAmount || Number(withdrawAmount) <= 0) return;
+    const grossAmount = Number(withdrawAmount);
+    if (!user || !withdrawAmount || grossAmount <= 0) return;
     if (!riderSettings.bank_name || !riderSettings.account_number) {
       toast({ title: 'Please set your bank details in Settings first', variant: 'destructive' });
       return;
     }
+    const serviceFee = Math.floor(grossAmount / 1000) * 50;
+    const netAmount = Math.max(0, grossAmount - serviceFee);
+
     setSubmittingWithdrawal(true);
     const { error } = await (supabase.from('withdrawal_requests') as any).insert({
       user_id: user.id,
-      amount: Number(withdrawAmount),
+      amount: grossAmount,
+      service_fee: serviceFee,
+      net_amount: netAmount,
       bank_name: riderSettings.bank_name,
       account_number: riderSettings.account_number,
       account_name: riderSettings.account_name,
     });
     setSubmittingWithdrawal(false);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Withdrawal request submitted! 💰' });
+    toast({ title: 'Withdrawal request submitted! 💰', description: `Service fee: ₦${serviceFee} · Net payout: ₦${netAmount.toLocaleString()}` });
     setWithdrawAmount('');
     // Refresh
-    const { data } = await (supabase.from('withdrawal_requests') as any).select('id, amount, status, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
+    const { data } = await (supabase.from('withdrawal_requests') as any).select('id, amount, service_fee, net_amount, status, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
     setWithdrawals(data || []);
   };
 
@@ -484,7 +538,8 @@ const RiderDashboard = () => {
     const statusSteps = [
       { key: 'picked_up', label: 'Picked Up', icon: Package },
       { key: 'delivering', label: 'On the Way', icon: Truck },
-      { key: 'delivered', label: 'Delivered', icon: CheckCircle2 },
+      { key: 'arrived', label: 'Arrived', icon: CheckCircle2 },
+      { key: 'delivered', label: 'Confirmed', icon: CheckCircle2 },
     ];
     const currentStepIndex = statusSteps.findIndex(s => s.key === activeOrder.status);
     const studentSharingLocation = !!activeOrder.delivery_lat && !!activeOrder.delivery_lng;
@@ -646,6 +701,18 @@ const RiderDashboard = () => {
             </div>
           )}
 
+          {activeOrder.status === 'arrived' && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 font-semibold text-sm text-amber-700 dark:text-amber-400">
+                <Clock className="h-4 w-4 animate-pulse" />
+                <span>Arrived — Waiting for Customer Confirmation ⏳</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ride ended. The customer is currently confirming delivery receipt.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3">
             {activeOrder.status === 'picked_up' && (
               <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivering')}>
@@ -656,17 +723,17 @@ const RiderDashboard = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button className="flex-1 h-12 text-base gap-2" disabled={uploadingProof}>
-                    <CheckCircle2 className="h-5 w-5" /> {uploadingProof ? 'Uploading...' : 'Mark Delivered ✓'}
+                    <CheckCircle2 className="h-5 w-5" /> {uploadingProof ? 'Uploading...' : 'End Ride (Arrived) 🏁'}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
-                    <AlertDialogDescription>Are you sure this order has been delivered to the customer?</AlertDialogDescription>
+                    <AlertDialogTitle>End Ride & Notify Customer</AlertDialogTitle>
+                    <AlertDialogDescription>Have you arrived at the customer's location? Ending the ride will notify the customer to confirm delivery receipt.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeliverWithProof(activeOrder.id)}>Yes, Delivered ✓</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleDeliverWithProof(activeOrder.id)}>Yes, Arrived 🏁</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -874,6 +941,13 @@ const RiderDashboard = () => {
                     {submittingWithdrawal ? '...' : 'Request'}
                   </Button>
                 </div>
+                {Number(withdrawAmount) > 0 && (
+                  <div className="rounded-md bg-muted p-2.5 text-xs space-y-1 border">
+                    <div className="flex justify-between"><span>Gross Amount:</span> <span className="font-semibold">₦{Number(withdrawAmount).toLocaleString()}</span></div>
+                    <div className="flex justify-between text-muted-foreground"><span>Service Fee (₦50 / ₦1,000):</span> <span>-₦{Math.floor(Number(withdrawAmount) / 1000) * 50}</span></div>
+                    <div className="flex justify-between text-primary font-bold pt-1 border-t"><span>Net Payout:</span> <span>₦{(Number(withdrawAmount) - Math.floor(Number(withdrawAmount) / 1000) * 50).toLocaleString()}</span></div>
+                  </div>
+                )}
                 {withdrawals.length > 0 && (
                   <div className="space-y-2 mt-3">
                     <p className="text-xs font-medium text-muted-foreground">Recent Requests</p>

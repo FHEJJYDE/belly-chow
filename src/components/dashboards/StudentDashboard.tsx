@@ -72,7 +72,11 @@ const StudentDashboard = () => {
   const filteredVendors = useMemo(() => {
     let list = vendors.filter(v => v.name.toLowerCase().includes(query));
     if (showFavourites) list = list.filter(v => favouriteVendorIds.has(v.id));
+    const tierWeights: Record<string, number> = { gold: 3, silver: 2, bronze: 1 };
     return list.sort((a, b) => {
+      const aWeight = (a as any).featured_tier ? tierWeights[(a as any).featured_tier] || 1 : (a.is_featured ? 1 : 0);
+      const bWeight = (b as any).featured_tier ? tierWeights[(b as any).featured_tier] || 1 : (b.is_featured ? 1 : 0);
+      if (aWeight !== bWeight) return bWeight - aWeight;
       const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
       const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
       if (aOpen === bOpen) return 0;
@@ -90,6 +94,13 @@ const StudentDashboard = () => {
         <Link to={`/vendor/${vendor.id}`}>
           <Card className={`overflow-hidden premium-card ${!open ? 'opacity-50 hover:translate-y-0 hover:border-border' : ''}`}>
             <div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden">
+              {(vendor as any).featured_tier && (
+                <span className={`absolute top-2 left-2 z-10 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white shadow ${
+                  (vendor as any).featured_tier === 'gold' ? 'bg-amber-500' : (vendor as any).featured_tier === 'silver' ? 'bg-slate-500' : 'bg-amber-700'
+                }`}>
+                  {(vendor as any).featured_tier === 'gold' ? '🥇 Gold Featured' : (vendor as any).featured_tier === 'silver' ? '🥈 Silver Featured' : '🥉 Featured'}
+                </span>
+              )}
               {vendor.logo_url ? (
                 <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover transition-transform duration-350 group-hover:scale-105" />
               ) : (

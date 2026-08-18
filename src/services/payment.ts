@@ -251,8 +251,10 @@ class PaymentService {
      */
     private async createEscrowTransaction(paymentTransaction: any): Promise<void> {
         try {
-            const platformFee = paymentTransaction.amount * this.platformFeePercentage;
-            const vendorAmount = paymentTransaction.amount - platformFee;
+            const customerPlatformFee = 100;
+            const vendorDeliveryFee = 200;
+            const totalPlatformRevenue = customerPlatformFee + vendorDeliveryFee;
+            const vendorAmount = Math.max(0, paymentTransaction.amount - totalPlatformRevenue);
 
             await supabase
                 .from('escrow_transactions')
@@ -262,7 +264,7 @@ class PaymentService {
                     vendor_id: paymentTransaction.vendor_id,
                     amount: paymentTransaction.amount,
                     currency: paymentTransaction.currency,
-                    platform_fee: platformFee,
+                    platform_fee: totalPlatformRevenue,
                     vendor_amount: vendorAmount,
                     status: 'held',
                     hold_until: paymentTransaction.escrow_release_date,
