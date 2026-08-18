@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { GraduationCap, Store, Bike } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { useToast } from '@/hooks/use-toast';
 import type { Enums } from '@/integrations/supabase/types';
+import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = Enums<"app_role">;
 
@@ -18,6 +19,7 @@ const roles: { value: AppRole; label: string; icon: React.ReactNode; desc: strin
 ];
 
 const Signup = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const defaultRole = (searchParams.get('role') as AppRole) || 'student';
   const [email, setEmail] = useState('');

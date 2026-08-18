@@ -36,7 +36,7 @@ const Cart = () => {
         const fetchFees = async () => {
             const [{ data: pSettings }, { data: zoneData }] = await Promise.all([
                 supabase.from('platform_settings').select('platform_fee').limit(1).maybeSingle(),
-                (supabase.from('delivery_zones') as any).select('id, zone_name, delivery_fee').eq('is_active', true),
+                (supabase.from as any)('delivery_zones').select('id, zone_name, delivery_fee').eq('is_active', true),
             ]);
             if (pSettings?.platform_fee) setPlatformFee(Number(pSettings.platform_fee));
             if (zoneData && zoneData.length > 0) {

@@ -74,8 +74,8 @@ const StudentDashboard = () => {
     if (showFavourites) list = list.filter(v => favouriteVendorIds.has(v.id));
     const tierWeights: Record<string, number> = { gold: 3, silver: 2, bronze: 1 };
     return list.sort((a, b) => {
-      const aWeight = (a as any).featured_tier ? tierWeights[(a as any).featured_tier] || 1 : (a.is_featured ? 1 : 0);
-      const bWeight = (b as any).featured_tier ? tierWeights[(b as any).featured_tier] || 1 : (b.is_featured ? 1 : 0);
+      const aWeight = (a as any).featured_tier ? tierWeights[(a as any).featured_tier] || 1 : ((a as any).is_featured ? 1 : 0);
+      const bWeight = (b as any).featured_tier ? tierWeights[(b as any).featured_tier] || 1 : ((b as any).is_featured ? 1 : 0);
       if (aWeight !== bWeight) return bWeight - aWeight;
       const aOpen = isVendorOpen(a.opening_time, a.closing_time, a.is_active);
       const bOpen = isVendorOpen(b.opening_time, b.closing_time, b.is_active);
