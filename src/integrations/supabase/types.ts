@@ -713,6 +713,9 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_approved: boolean | null
+          is_featured: boolean | null
+          featured_tier: string | null
+          featured_until: string | null
           logo_url: string | null
           name: string
           opening_time: string | null
@@ -729,6 +732,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_approved?: boolean | null
+          is_featured?: boolean | null
+          featured_tier?: string | null
+          featured_until?: string | null
           logo_url?: string | null
           name: string
           opening_time?: string | null
@@ -745,6 +751,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_approved?: boolean | null
+          is_featured?: boolean | null
+          featured_tier?: string | null
+          featured_until?: string | null
           logo_url?: string | null
           name?: string
           opening_time?: string | null

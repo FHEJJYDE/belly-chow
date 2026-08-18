@@ -159,6 +159,9 @@ CREATE TABLE IF NOT EXISTS public.vendors (
   closing_time TEXT DEFAULT '22:00',
   is_active BOOLEAN DEFAULT true,
   is_approved BOOLEAN DEFAULT false,
+  is_featured BOOLEAN DEFAULT false,
+  featured_tier TEXT DEFAULT NULL,
+  featured_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   rating NUMERIC DEFAULT 5.0,
   total_reviews INTEGER DEFAULT 0,
   logo_url TEXT DEFAULT NULL,
@@ -166,6 +169,10 @@ CREATE TABLE IF NOT EXISTS public.vendors (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS featured_tier TEXT DEFAULT NULL;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS featured_until TIMESTAMP WITH TIME ZONE DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS public.menu_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -145,9 +145,18 @@ const VendorSettings = () => {
                         featured_tier: plan.tier,
                         featured_until: nextWeek.toISOString(),
                         is_featured: true,
-                      } as any).eq('id', vendor.id);
-                      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-                      else {
+                      }).eq('id', vendor.id);
+                      if (error) {
+                        if (error.message?.includes('column') || error.message?.includes('schema cache')) {
+                          toast({
+                            title: 'Database Setup Required',
+                            description: 'Please run migration 20260408000004_add_featured_vendor_columns.sql in your Supabase SQL Editor to enable featured vendor promotions.',
+                            variant: 'destructive',
+                          });
+                        } else {
+                          toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                        }
+                      } else {
                         setVendor({ ...vendor, featured_tier: plan.tier, is_featured: true });
                         toast({ title: `${plan.name} Promotion Activated! 🚀`, description: 'Your store is now featured for 1 week.' });
                       }
