@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface GeoPosition {
+export interface GeoPosition {
   lat: number;
   lng: number;
   accuracy?: number; // metres
@@ -9,21 +9,33 @@ interface GeoPosition {
 /**
  * Provides one-shot and continuous (watch) geolocation.
  *
- * @param watch  When true, subscribes to watchPosition for live updates.
- * @param throttleMs  Minimum milliseconds between position state updates (default 4000ms).
- *                    Prevents hammering Supabase with every tiny GPS twitch.
+ * @param watch       When true, subscribes to watchPosition for live updates.
+ * @param throttleMs  Minimum ms between position state updates (default 4000ms).
  */
 export const useGeolocation = (watch = false, throttleMs = 4000) => {
   const [position, setPosition] = useState<GeoPosition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
   const lastEmittedAt = useRef<number>(0);
+  const watchIdRef = useRef<number | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const emitPosition = useCallback((pos: GeolocationPosition) => {
+  // Check browser permission state (Chrome/Firefox)
+  useEffect(() => {
+    if (!navigator.permissions) return;
+    navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+      setPermissionState(result.state);
+      result.onchange = () => setPermissionState(result.state);
+    }).catch(() => {});
+  }, []);
+
+  const applyPosition = useCallback((pos: GeolocationPosition, forceEmit = false) => {
     const now = Date.now();
-    // Throttle: only emit if enough time has passed since last emission
-    if (now - lastEmittedAt.current < throttleMs) return;
+    if (!forceEmit && now - lastEmittedAt.current < throttleMs) return;
     lastEmittedAt.current = now;
+    setError(null);
+    setLoading(false);
     setPosition({
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
@@ -31,46 +43,102 @@ export const useGeolocation = (watch = false, throttleMs = 4000) => {
     });
   }, [throttleMs]);
 
+  /** One-shot position request — always emits regardless of throttle */
   const getPosition = useCallback(() => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
       return;
     }
     setLoading(true);
+    setError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // One-shot always emits regardless of throttle
-        lastEmittedAt.current = Date.now();
-        setPosition({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-        setLoading(false);
-        setError(null);
-      },
+      (pos) => applyPosition(pos, true),
       (err) => {
-        setError(err.message);
+        // High-accuracy GPS failed or timed out (common on desktop/laptops without GPS hardware)
+        // Fallback to standard network/IP location
+        if (err.code === 3 || err.code === 2) {
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => applyPosition(fallbackPos, true),
+            (fallbackErr) => {
+              setLoading(false);
+              switch (fallbackErr.code) {
+                case 1: setError('Location permission denied. Please allow location access in your browser settings.'); break;
+                case 2: setError('Location unavailable. Check your device GPS or network connection.'); break;
+                case 3: setError('Location request timed out. Please type your delivery address manually.'); break;
+                default: setError(fallbackErr.message);
+              }
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+          );
+          return;
+        }
+
         setLoading(false);
+        switch (err.code) {
+          case 1: setError('Location permission denied. Please allow location access in your browser settings.'); break;
+          case 2: setError('Location unavailable. Check your device GPS or network connection.'); break;
+          case 3: setError('Location request timed out. Please type your delivery address manually.'); break;
+          default: setError(err.message);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+  }, [applyPosition]);
+
+  /** Start/restart the continuous watchPosition subscription */
+  const startWatch = useCallback(() => {
+    if (!navigator.geolocation) return;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => applyPosition(pos),
+      (err) => {
+        if (err.code === 3 || err.code === 2) {
+          // Fallback watch with standard accuracy
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+          }
+          watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => applyPosition(pos),
+            (fallbackErr) => {
+              if (fallbackErr.code === 1) setError('Location permission denied.');
+            },
+            { enableHighAccuracy: false, maximumAge: 10000 }
+          );
+          return;
+        }
+        if (err.code === 1) setError('Location permission denied. Allow access to enable live tracking.');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
-  }, []);
+  }, [applyPosition]);
 
   useEffect(() => {
-    if (!watch || !navigator.geolocation) return;
+    if (!watch || !navigator.geolocation) {
+      if (!navigator.geolocation) {
+        setError('Geolocation is not supported by your browser');
+        setLoading(false);
+      }
+      return;
+    }
 
-    // Immediately get a fix so the UI isn't blank on first render
+    // Kick off an immediate one-shot so UI has a fix right away
     getPosition();
+    startWatch();
 
-    const watchId = navigator.geolocation.watchPosition(
-      emitPosition,
-      (err) => setError(err.message),
-      { enableHighAccuracy: true, maximumAge: 3000 }
-    );
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [watch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [watch, getPosition, emitPosition]);
-
-  return { position, error, loading, getPosition };
+  return { position, error, loading, permissionState, getPosition };
 };

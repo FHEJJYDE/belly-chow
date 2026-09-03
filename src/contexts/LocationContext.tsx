@@ -84,7 +84,12 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
+    let watchId: number | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let active = true;
+
     const handleSuccess = async (pos: GeolocationPosition) => {
+      if (!active) return;
       const coords = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
@@ -129,19 +134,46 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     };
 
-    const handleError = (err: GeolocationPositionError) => {
-      setError(err.message);
-      setLoading(false);
+    const startWatch = () => {
+      if (!active) return;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = navigator.geolocation.watchPosition(
+        handleSuccess,
+        (err) => {
+          if (!active) return;
+          switch (err.code) {
+            case 1: setError('Location permission denied. Please allow access in browser settings.'); break;
+            case 2:
+              setError('GPS signal lost. Retrying…');
+              retryTimer = setTimeout(() => startWatch(), 8000);
+              break;
+            case 3:
+              setError('GPS timed out. Retrying…');
+              retryTimer = setTimeout(() => startWatch(), 8000);
+              break;
+            default: setError(err.message);
+          }
+          setLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+      );
     };
 
-    const watchId = navigator.geolocation.watchPosition(
+    // Immediately get a one-shot fix so the UI has coords right away
+    navigator.geolocation.getCurrentPosition(
       handleSuccess,
-      handleError,
-      { enableHighAccuracy: true, maximumAge: 3000 }
+      () => { /* ignore one-shot error; watch will handle it */ },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
 
+    startWatch();
+
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      active = false;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [user, role]);
 

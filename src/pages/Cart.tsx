@@ -24,6 +24,7 @@ const Cart = () => {
     const [isOrdering, setIsOrdering] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [orderData, setOrderData] = useState<any>(null);
+    const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null);
 
     const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
     const [defaultLocation, setDefaultLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
@@ -70,9 +71,10 @@ const Cart = () => {
     }, [user]);
 
     const handleLocationSelect = () => {
-        // position from useGeolocation returns {lat, lng}, not a GeolocationPosition object
         if (position?.lat && position?.lng) {
-            setDeliveryLocation(`${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`);
+            setDeliveryCoords({ lat: position.lat, lng: position.lng });
+            // Show a human-readable label alongside raw coords
+            setDeliveryLocation(`GPS Location (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})`);
         } else {
             getPosition();
         }
@@ -130,6 +132,14 @@ const Cart = () => {
                     total: total,
                     delivery_fee: deliveryFee,
                     delivery_location: deliveryLocation,
+                    // Persist GPS coordinates immediately so rider map has a pin from the start
+                    ...(deliveryCoords ? {
+                        delivery_lat: deliveryCoords.lat,
+                        delivery_lng: deliveryCoords.lng,
+                    } : position ? {
+                        delivery_lat: position.lat,
+                        delivery_lng: position.lng,
+                    } : {}),
                     notes: notes,
                     status: 'pending',
                     payment_status: 'pending',
@@ -292,9 +302,40 @@ const Cart = () => {
                                     className="text-xs"
                                 >
                                     <Navigation className="h-3 w-3 mr-1" />
-                                    {geoLoading ? 'Getting...' : 'Use Current'}
+                                    {geoLoading ? 'Getting GPS...' : 'Use Current GPS'}
                                 </Button>
                             </div>
+
+                            {/* GPS Status banner */}
+                            {geoError && !position && (
+                                <div className="flex items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+                                    <div className="flex items-start gap-2">
+                                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-semibold">Location Unavailable</p>
+                                            <p className="mt-0.5">{geoError} You can type your delivery address manually below.</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => getPosition()}
+                                        disabled={geoLoading}
+                                        className="shrink-0 text-[11px] h-7 px-2 border-destructive/30 hover:bg-destructive/10"
+                                    >
+                                        {geoLoading ? 'Retrying…' : 'Retry GPS'}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {position && !geoError && (
+                                <div className="flex items-center gap-1.5 rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
+                                    <Navigation className="h-3.5 w-3.5 shrink-0" />
+                                    <span>GPS active {position.accuracy ? `(±${Math.round(position.accuracy)}m accuracy)` : ''}</span>
+                                </div>
+                            )}
+
                             {zones.length > 0 && (
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-muted-foreground">Select Delivery Zone Rate</Label>
@@ -323,11 +364,6 @@ const Cart = () => {
                                 placeholder="Enter specific hostel room / delivery details"
                                 className="w-full"
                             />
-                            {geoError && (
-                                <p className="text-sm text-destructive">
-                                    Unable to get location: {geoError}
-                                </p>
-                            )}
                         </div>
                     </CardContent>
                 </Card>

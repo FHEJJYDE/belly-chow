@@ -43,6 +43,8 @@ interface EnrichedOrder {
   rider_id: string | null;
   vendor_name: string;
   vendor_address: string;
+  vendor_lat: number | null;
+  vendor_lng: number | null;
   vendor_user_id: string;
   customer_name: string;
   customer_phone: string;
@@ -240,10 +242,22 @@ const RiderDashboard = () => {
     } as any).eq('id', activeDeliveryId).then(() => {});
   }, [position, activeDeliveryId, user, isSimulating]);
 
+  /** Haversine distance in km between two GPS points */
+  const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
   const enrichOrders = async (orders: any[]): Promise<EnrichedOrder[]> => {
     if (orders.length === 0) return [];
     const vendorIds = [...new Set(orders.map(o => o.vendor_id))];
-    const { data: vendors } = await supabase.from('vendors').select('id, name, address, user_id').in('id', vendorIds);
+    // Also fetch lat/lng so we can do proximity sorting
+    const { data: vendors } = await (supabase.from('vendors') as any).select('id, name, address, user_id, lat, lng').in('id', vendorIds);
+
     const vendorMap = new Map(vendors?.map(v => [v.id, v]) || []);
     const studentIds = [...new Set(orders.map(o => o.student_id))];
     const { data: profiles } = await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', studentIds);
@@ -269,6 +283,8 @@ const RiderDashboard = () => {
         ...o,
         vendor_name: vendor?.name || 'Unknown Vendor',
         vendor_address: vendor?.address || '',
+        vendor_lat: vendor ? (Number((vendor as any).lat) || null) : null,
+        vendor_lng: vendor ? (Number((vendor as any).lng) || null) : null,
         vendor_user_id: vendor?.user_id || '',
         customer_name: profile?.full_name || 'Unknown',
         customer_phone: profile?.phone || '',
@@ -338,7 +354,6 @@ const RiderDashboard = () => {
         const newRow = payload.new as any;
         const oldRow = payload.old as any;
         if (newRow && oldRow && newRow.status === oldRow.status && newRow.rider_id === oldRow.rider_id) {
-          // If only coordinates changed, update local state coordinates directly instead of refetching
           setMyOrders(prev => prev.map(o => o.id === newRow.id ? {
             ...o,
             delivery_lat: newRow.delivery_lat,
@@ -353,6 +368,20 @@ const RiderDashboard = () => {
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  // Sort available orders by proximity to the rider (closest vendor first)
+  const sortedAvailableOrders = useMemo(() => {
+    if (!position || availableOrders.length === 0) return availableOrders;
+    return [...availableOrders].sort((a, b) => {
+      const distA = a.vendor_lat && a.vendor_lng
+        ? haversineKm(position.lat, position.lng, a.vendor_lat, a.vendor_lng)
+        : Infinity;
+      const distB = b.vendor_lat && b.vendor_lng
+        ? haversineKm(position.lat, position.lng, b.vendor_lat, b.vendor_lng)
+        : Infinity;
+      return distA - distB;
+    });
+  }, [availableOrders, position]);
 
   const acceptOrder = async (orderId: string) => {
     if (!user) return;
@@ -568,8 +597,8 @@ const RiderDashboard = () => {
             riderLng={isSimulating ? simulatedPos?.lng : position?.lng}
             customerLat={activeOrder.delivery_lat}
             customerLng={activeOrder.delivery_lng}
-            vendorLat={activeOrder.delivery_lat ? activeOrder.delivery_lat + 0.003 : null}
-            vendorLng={activeOrder.delivery_lng ? activeOrder.delivery_lng - 0.004 : null}
+            vendorLat={activeOrder.vendor_lat}
+            vendorLng={activeOrder.vendor_lng}
             riderLabel="You 🏍️"
             customerLabel="Customer 📍"
             vendorLabel={activeOrder.vendor_name}
@@ -835,19 +864,31 @@ const RiderDashboard = () => {
             )}
 
             <div>
-              <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2"><Package className="h-5 w-5 text-muted-foreground" /> Available Orders ({availableOrders.length})</h2>
+              <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2"><Package className="h-5 w-5 text-muted-foreground" /> Available Orders ({sortedAvailableOrders.length}){position && <span className="ml-auto text-xs font-normal text-muted-foreground flex items-center gap-1"><Navigation className="h-3 w-3" /> Sorted by distance</span>}</h2>
               {!isOnline ? (
                 <Card><CardContent className="py-10 text-center text-muted-foreground">Go online to see available orders</CardContent></Card>
-              ) : availableOrders.length === 0 ? (
+              ) : sortedAvailableOrders.length === 0 ? (
                 <Card><CardContent className="py-10 text-center text-muted-foreground">No orders available right now. Hang tight! 🍕</CardContent></Card>
               ) : (
                 <div className="space-y-3">
-                  {availableOrders.map(order => (
+                  {sortedAvailableOrders.map(order => {
+                    const distKm = position && order.vendor_lat && order.vendor_lng
+                      ? haversineKm(position.lat, position.lng, order.vendor_lat, order.vendor_lng)
+                      : null;
+                    return (
                     <Card key={order.id} className="overflow-hidden">
                       <CardContent className="p-0">
                         <div className="bg-primary/10 px-4 py-2 flex items-center justify-between">
                           <span className="text-xs font-medium text-primary flex items-center gap-1"><DollarSign className="h-3 w-3" /> Earn</span>
-                          <span className="font-bold text-primary">₦{riderFee.toLocaleString()}</span>
+                          <div className="flex items-center gap-2">
+                            {distKm !== null && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Navigation className="h-3 w-3" />
+                                {distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`} away
+                              </span>
+                            )}
+                            <span className="font-bold text-primary">₦{riderFee.toLocaleString()}</span>
+                          </div>
                         </div>
                         <div className="p-4 space-y-3">
                           <div className="space-y-2 flex-1">
@@ -879,7 +920,10 @@ const RiderDashboard = () => {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
+
+
                 </div>
               )}
             </div>
