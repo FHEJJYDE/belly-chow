@@ -26,11 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchRole = async (userId: string) => {
     try {
-      const { data } = await supabase.rpc('get_user_role', { _user_id: userId });
-      setRole(data as AppRole | null);
+      const { data, error } = await supabase.rpc('get_user_role', { _user_id: userId });
+      if (!error && data) {
+        setRole(data as AppRole);
+        return data as AppRole;
+      }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('user_id', userId).maybeSingle();
+      const userRole = (profile?.role as AppRole) || 'student';
+      setRole(userRole);
+      return userRole;
     } catch (error) {
       console.error('Error fetching user role:', error);
-      setRole(null);
+      setRole('student');
+      return 'student' as AppRole;
     }
   };
 
@@ -40,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       try {
-        // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -95,7 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRole(null);
       }
 
-      // Only set loading to false after we've processed the auth change
       if (event !== 'INITIAL_SESSION') {
         setLoading(false);
       }
@@ -116,7 +122,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
     if (!data.user) throw new Error('Signup failed');
 
-    // Use the secure function to handle role assignment and vendor creation
     const { error: signupError } = await supabase.rpc('handle_user_signup', {
       user_id: data.user.id,
       user_role: selectedRole,
@@ -128,8 +133,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    if (data.user) {
+      setUser(data.user);
+      setSession(data.session);
+      await fetchRole(data.user.id);
+    }
   };
 
   const signOut = async () => {

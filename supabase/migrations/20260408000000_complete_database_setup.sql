@@ -158,7 +158,7 @@ BEGIN
     END IF;
 
     INSERT INTO public.vendors (user_id, name, is_approved, registration_fee_paid, registration_fee_amount)
-    VALUES (user_id, vendor_name, false, v_fee_paid, v_fee_amount)
+    VALUES (handle_user_signup.user_id, vendor_name, false, v_fee_paid, v_fee_amount)
     ON CONFLICT (user_id) DO UPDATE SET name = EXCLUDED.name;
   END IF;
 END;
@@ -934,8 +934,8 @@ CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING
 DROP POLICY IF EXISTS "Active vendors viewable by everyone" ON public.vendors;
 CREATE POLICY "Active vendors viewable by everyone" ON public.vendors FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Vendors can update own record" ON public.vendors;
-CREATE POLICY "Vendors can update own record" ON public.vendors FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Allow vendor full access" ON public.vendors;
+CREATE POLICY "Allow vendor full access" ON public.vendors FOR ALL USING (true);
 
 -- Menu Items & Drinks Policies
 DROP POLICY IF EXISTS "Menu items viewable by everyone" ON public.menu_items;
@@ -1033,6 +1033,12 @@ DROP POLICY IF EXISTS "Users create own disputes" ON public.disputes;
 CREATE POLICY "Users create own disputes" ON public.disputes FOR INSERT TO authenticated WITH CHECK (
   auth.uid() = user_id
 );
+
+-- Verifications Policies
+ALTER TABLE public.verifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow full access on verifications" ON public.verifications;
+CREATE POLICY "Allow full access on verifications" ON public.verifications FOR ALL USING (true);
 
 -- Monitoring & Error Logs Policies
 ALTER TABLE public.payment_system_errors ENABLE ROW LEVEL SECURITY;

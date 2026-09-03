@@ -10,6 +10,7 @@ import { ChevronDown, ChevronUp, ImageIcon, CheckCircle, XCircle, Volume2, Volum
 import DeliveryChat from '@/components/chat/DeliveryChat';
 import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
+import { getOrCreateVendor } from '@/lib/vendorUtils';
 
 const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
 
@@ -33,7 +34,7 @@ const playNotificationSound = () => {
 };
 
 const VendorOrders = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
@@ -48,31 +49,40 @@ const VendorOrders = () => {
   };
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
-    const { data: v } = await supabase.from('vendors').select('id').eq('user_id', user.id).single();
-    if (v) {
-      setVendorId(v.id);
-      const { data } = await supabase.from('orders').select('*').eq('vendor_id', v.id).order('created_at', { ascending: false }).limit(200);
-      const newOrders = data || [];
-      const newPending = newOrders.filter(o => o.status === 'pending').length;
-      if (soundEnabled && newPending > prevOrderCountRef.current) playNotificationSound();
-      prevOrderCountRef.current = newPending;
-      setOrders(newOrders);
-      if (newOrders.length > 0) {
-        const { data: items } = await supabase.from('order_items').select('*, menu_items(name)').in('order_id', newOrders.map(o => o.id));
-        const grouped: Record<string, OrderItem[]> = {};
-        (items || []).forEach((item: any) => { if (!grouped[item.order_id]) grouped[item.order_id] = []; grouped[item.order_id].push(item); });
-        setOrderItems(grouped);
-      }
+    if (!user) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+    try {
+      const v = await getOrCreateVendor(user.id, user.user_metadata?.full_name);
+      if (v) {
+        setVendorId(v.id);
+        const { data } = await supabase.from('orders').select('*').eq('vendor_id', v.id).order('created_at', { ascending: false }).limit(200);
+        const newOrders = data || [];
+        const newPending = newOrders.filter(o => o.status === 'pending').length;
+        if (soundEnabled && newPending > prevOrderCountRef.current) playNotificationSound();
+        prevOrderCountRef.current = newPending;
+        setOrders(newOrders);
+        if (newOrders.length > 0) {
+          const { data: items } = await supabase.from('order_items').select('*, menu_items(name)').in('order_id', newOrders.map(o => o.id));
+          const grouped: Record<string, OrderItem[]> = {};
+          (items || []).forEach((item: any) => { if (!grouped[item.order_id]) grouped[item.order_id] = []; grouped[item.order_id].push(item); });
+          setOrderItems(grouped);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching vendor orders:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [user, soundEnabled]);
 
   useEffect(() => {
+    if (authLoading) return;
     fetchData();
     const channel = supabase.channel('vendor-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData]);
+  }, [user, authLoading, fetchData]);
 
   const updateStatus = async (orderId: string, status: string) => {
     const { error } = await supabase.from('orders').update({ status: status as any }).eq('id', orderId);

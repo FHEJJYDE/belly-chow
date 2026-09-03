@@ -61,7 +61,7 @@ const VendorPayouts = () => {
         if (!user) return;
         setLoading(true);
         try {
-            const { data: wData } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
+            const { data: wData } = await supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle();
             if (wData) setWalletBalance(Number(wData.balance));
 
             setPayouts(mockPayouts);

@@ -43,16 +43,26 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = async () => {
-    const { data: roles } = await supabase.from('user_roles').select('*');
-    const { data: profiles } = await supabase.from('profiles').select('*');
-
-    const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-    const merged = (roles || []).map(r => ({
-      ...r,
-      profile: profileMap.get(r.user_id) as UserWithRole['profile'],
+    const { data: profiles, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) {
+      toast({ title: 'Error loading users', description: error.message, variant: 'destructive' });
+      setLoading(false);
+      return;
+    }
+    const formatted = (profiles || []).map((p: any) => ({
+      id: p.id,
+      user_id: p.user_id,
+      role: p.role || 'student',
+      profile: {
+        full_name: p.full_name || 'Unnamed User',
+        phone: p.phone || null,
+        campus_location: p.campus_location || null,
+        created_at: p.created_at,
+        is_suspended: p.is_suspended || false,
+        suspension_reason: p.suspension_reason || null,
+      },
     }));
-
-    setUsers(merged);
+    setUsers(formatted);
     setLoading(false);
   };
 

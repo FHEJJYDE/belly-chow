@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getOrCreateVendor } from '@/lib/vendorUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ import type { Database } from '@/integrations/supabase/types';
 type MenuItem = Database['public']['Tables']['menu_items']['Row'];
 
 const VendorMenu = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -25,18 +26,27 @@ const VendorMenu = () => {
   const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: 'General' });
 
   useEffect(() => {
-    if (!user) return;
-    const fetch = async () => {
-      const { data: v } = await supabase.from('vendors').select('id').eq('user_id', user.id).single();
-      if (v) {
-        setVendorId(v.id);
-        const { data } = await supabase.from('menu_items').select('*').eq('vendor_id', v.id).order('category');
-        setItems(data || []);
-      }
+    if (authLoading) return;
+    if (!user) {
       setLoading(false);
+      return;
+    }
+    const fetch = async () => {
+      try {
+        const v = await getOrCreateVendor(user.id, user.user_metadata?.full_name);
+        if (v) {
+          setVendorId(v.id);
+          const { data } = await supabase.from('menu_items').select('*').eq('vendor_id', v.id).order('category');
+          setItems(data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching menu items:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetch();
-  }, [user]);
+  }, [user, authLoading]);
 
   const addItem = async () => {
     if (!vendorId || !newItem.name || !newItem.price) return;

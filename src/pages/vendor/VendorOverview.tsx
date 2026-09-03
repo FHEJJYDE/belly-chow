@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getOrCreateVendor } from '@/lib/vendorUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, Clock, DollarSign, TrendingUp, Star, ShoppingBag } from 'lucide-react';
@@ -25,28 +26,38 @@ const PIE_COLORS = [
 ];
 
 const VendorOverview = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    if (!user) return;
-    const { data: v } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
-    if (v) {
-      setVendor(v);
-      const { data: o } = await supabase.from('orders').select('*').eq('vendor_id', v.id).order('created_at', { ascending: false }).limit(500);
-      setOrders(o || []);
-      if (o && o.length > 0) {
-        const { data: items } = await supabase.from('order_items').select('*, menu_items(name)').in('order_id', o.map(ord => ord.id));
-        setOrderItems((items as unknown as OrderItem[]) || []);
-      }
+    if (!user) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+    try {
+      const v = await getOrCreateVendor(user.id, user.user_metadata?.full_name);
+      if (v) {
+        setVendor(v);
+        const { data: o } = await supabase.from('orders').select('*').eq('vendor_id', v.id).order('created_at', { ascending: false }).limit(500);
+        setOrders(o || []);
+        if (o && o.length > 0) {
+          const { data: items } = await supabase.from('order_items').select('*, menu_items(name)').in('order_id', o.map(ord => ord.id));
+          setOrderItems((items as unknown as OrderItem[]) || []);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching vendor overview:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchData(); }, [user]);
+  useEffect(() => {
+    if (!authLoading) fetchData();
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!vendor) return;

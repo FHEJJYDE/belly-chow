@@ -54,18 +54,17 @@ const AdminVerifications = () => {
     // Fetch profiles and roles
     if (vData.length > 0) {
       const userIds = [...new Set(vData.map(v => v.user_id))];
-      const [profilesRes, rolesRes] = await Promise.all([
-        supabase.from('profiles').select('user_id, full_name, phone').in('user_id', userIds),
-        supabase.from('user_roles').select('user_id, role').in('user_id', userIds),
-      ]);
-      const profileMap = new Map((profilesRes.data || []).map(p => [p.user_id, p]));
-      const roleMap = new Map((rolesRes.data || []).map(r => [r.user_id, r.role]));
+      const { data: profilesData } = await supabase.from('profiles').select('*').in('user_id', userIds);
+      const profileMap = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
 
-      setVerifications(vData.map(v => ({
-        ...v,
-        profile: profileMap.get(v.user_id) || null,
-        role: roleMap.get(v.user_id) || 'unknown',
-      })));
+      setVerifications(vData.map(v => {
+        const p = profileMap.get(v.user_id);
+        return {
+          ...v,
+          profile: p ? { full_name: p.full_name, phone: p.phone } : null,
+          role: p?.role || 'unknown',
+        };
+      }));
     } else {
       setVerifications([]);
     }

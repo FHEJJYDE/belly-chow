@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getOrCreateVendor } from '@/lib/vendorUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import type { Database } from '@/integrations/supabase/types';
 type Vendor = Database['public']['Tables']['vendors']['Row'];
 
 const VendorSettings = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -23,18 +24,27 @@ const VendorSettings = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const fetch = async () => {
-      const { data } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
-      if (data) {
-        setVendor(data);
-        setLogoUrl(data.logo_url || null);
-        setForm({ name: data.name, description: data.description || '', address: data.address || '' });
-      }
+    if (authLoading) return;
+    if (!user) {
       setLoading(false);
+      return;
+    }
+    const fetch = async () => {
+      try {
+        const data = await getOrCreateVendor(user.id, user.user_metadata?.full_name);
+        if (data) {
+          setVendor(data);
+          setLogoUrl(data.logo_url || null);
+          setForm({ name: data.name, description: data.description || '', address: data.address || '' });
+        }
+      } catch (err) {
+        console.error('Error fetching vendor settings:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetch();
-  }, [user]);
+  }, [user, authLoading]);
 
   const save = async () => {
     if (!vendor) return;

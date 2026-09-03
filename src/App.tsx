@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import AdminLayout from "./components/layout/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminVendors from "./pages/admin/AdminVendors";
+import AdminRiders from "./pages/admin/AdminRiders";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
@@ -99,6 +100,7 @@ const AppContent = () => {
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
             <Route index element={<AdminOverview />} />
             <Route path="vendors" element={<AdminVendors />} />
+            <Route path="riders" element={<AdminRiders />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="disputes" element={<AdminDisputes />} />
