@@ -66,20 +66,28 @@ const VendorMenu = () => {
       let imageUrl: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const filePath = `menu-${vendorId}-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('menu-items')
-          .upload(filePath, imageFile, { upsert: true });
+        const fileExt = imageFile.name.split('.').pop() || 'jpg';
+        const fileName = `menu-${vendorId}-${Date.now()}.${fileExt}`;
 
-        if (!uploadError) {
-          const { data: publicUrlData } = supabase.storage
-            .from('menu-items')
-            .getPublicUrl(filePath);
-          imageUrl = publicUrlData?.publicUrl || null;
-        } else {
-          console.warn('Image upload notice:', uploadError.message);
-        }
+        // Attempt upload with 5-second timeout safety race so it never hangs
+        const uploadTask = async () => {
+          let bucketName = 'vendor-logos';
+          let res = await supabase.storage.from('vendor-logos').upload(fileName, imageFile, { upsert: true });
+
+          if (res.error) {
+            bucketName = 'menu-items';
+            res = await supabase.storage.from('menu-items').upload(fileName, imageFile, { upsert: true });
+          }
+
+          if (!res.error) {
+            const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+            return publicUrlData?.publicUrl || null;
+          }
+          return null;
+        };
+
+        const timeoutTask = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+        imageUrl = await Promise.race([uploadTask(), timeoutTask]);
       }
 
       const { data, error } = await supabase.from('menu_items').insert({
@@ -92,7 +100,7 @@ const VendorMenu = () => {
       }).select().single();
 
       if (error) throw error;
-      if (data) setItems([...items, data]);
+      if (data) setItems(prev => [...prev, data]);
 
       setNewItem({ name: '', description: '', price: '', category: 'General' });
       setImageFile(null);
@@ -149,11 +157,11 @@ const VendorMenu = () => {
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Meal Photo (Optional)</Label>
                   <div className="flex items-center gap-3">
                     {imagePreview ? (
-                      <div className="relative h-16 w-16 rounded-lg overflow-hidden border bg-muted">
+                      <div className="relative h-16 w-16 rounded-lg overflow-hidden border bg-muted shrink-0">
                         <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
                       </div>
                     ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed bg-muted/30 text-muted-foreground">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed bg-muted/30 text-muted-foreground shrink-0">
                         <ImageIcon className="h-6 w-6" />
                       </div>
                     )}

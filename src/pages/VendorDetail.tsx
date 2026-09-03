@@ -156,13 +156,18 @@ const VendorDetail = () => {
               <div className="grid gap-3 sm:grid-cols-2">
                 {catItems.map(item => (
                   <Card key={item.id} className="overflow-hidden">
-                    <CardContent className="flex items-center justify-between p-4">
+                    <CardContent className="flex items-center justify-between p-4 gap-3">
+                      {item.image_url && (
+                        <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border bg-muted">
+                          <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-sm">{item.name}</h3>
                         {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>}
                         <p className="mt-1.5 font-heading font-bold text-sm">₦{Number(item.price).toLocaleString()}</p>
                       </div>
-                      <Button size="sm" variant="outline" className="ml-4 shrink-0" onClick={() => handleAddItem(item)} disabled={!open}>
+                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => handleAddItem(item)} disabled={!open}>
                         <Plus className="mr-1 h-3.5 w-3.5" /> Add
                       </Button>
                     </CardContent>

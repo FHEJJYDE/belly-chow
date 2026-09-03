@@ -980,6 +980,9 @@ CREATE POLICY "Participants can update orders" ON public.orders FOR UPDATE USING
 DROP POLICY IF EXISTS "Order items viewable by order participants" ON public.order_items;
 CREATE POLICY "Order items viewable by order participants" ON public.order_items FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow full access on order_items" ON public.order_items;
+CREATE POLICY "Allow full access on order_items" ON public.order_items FOR ALL USING (true);
+
 -- Wallets & Wallet Transactions Policies
 DROP POLICY IF EXISTS "Allow users to view own wallet" ON public.wallets;
 CREATE POLICY "Allow users to view own wallet" ON public.wallets FOR SELECT USING (
