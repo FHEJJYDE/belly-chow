@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Upload } from 'lucide-react';
 import VendorStatusToggle from '@/components/VendorStatusToggle';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -24,6 +24,9 @@ const VendorMenu = () => {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: 'General' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -48,17 +51,59 @@ const VendorMenu = () => {
     fetch();
   }, [user, authLoading]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const addItem = async () => {
     if (!vendorId || !newItem.name || !newItem.price) return;
-    const { data, error } = await supabase.from('menu_items').insert({
-      vendor_id: vendorId, name: newItem.name, description: newItem.description,
-      price: parseFloat(newItem.price), category: newItem.category,
-    }).select().single();
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    if (data) setItems([...items, data]);
-    setNewItem({ name: '', description: '', price: '', category: 'General' });
-    setShowAdd(false);
-    toast({ title: 'Item added' });
+    setUploading(true);
+    try {
+      let imageUrl: string | null = null;
+
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const filePath = `menu-${vendorId}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('menu-items')
+          .upload(filePath, imageFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: publicUrlData } = supabase.storage
+            .from('menu-items')
+            .getPublicUrl(filePath);
+          imageUrl = publicUrlData?.publicUrl || null;
+        } else {
+          console.warn('Image upload notice:', uploadError.message);
+        }
+      }
+
+      const { data, error } = await supabase.from('menu_items').insert({
+        vendor_id: vendorId,
+        name: newItem.name,
+        description: newItem.description,
+        price: parseFloat(newItem.price),
+        category: newItem.category,
+        image_url: imageUrl,
+      }).select().single();
+
+      if (error) throw error;
+      if (data) setItems([...items, data]);
+
+      setNewItem({ name: '', description: '', price: '', category: 'General' });
+      setImageFile(null);
+      setImagePreview(null);
+      setShowAdd(false);
+      toast({ title: 'Item added successfully! 🍲' });
+    } catch (err: any) {
+      toast({ title: 'Error adding item', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const toggleAvail = async (item: MenuItem) => {
@@ -94,11 +139,34 @@ const VendorMenu = () => {
                 <Plus className="h-4 w-4" /> Add menu item
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md bg-card/90 backdrop-blur-md border border-border/40 rounded-2xl">
+            <DialogContent className="max-w-md bg-card/95 backdrop-blur-md border border-border/40 rounded-2xl">
               <DialogHeader>
                 <DialogTitle className="font-heading text-xl font-bold tracking-tight">Add Menu Item</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-3">
+                {/* Meal Image Upload */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Meal Photo (Optional)</Label>
+                  <div className="flex items-center gap-3">
+                    {imagePreview ? (
+                      <div className="relative h-16 w-16 rounded-lg overflow-hidden border bg-muted">
+                        <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed bg-muted/30 text-muted-foreground">
+                        <ImageIcon className="h-6 w-6" />
+                      </div>
+                    )}
+                    <label className="cursor-pointer">
+                      <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-accent">
+                        <Upload className="h-3.5 w-3.5" />
+                        {imageFile ? 'Change Photo' : 'Upload Meal Photo'}
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Item Name</Label>
                   <Input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="Jollof Rice with Chicken" className="bg-background/50" />
@@ -117,8 +185,8 @@ const VendorMenu = () => {
                     <Input value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} placeholder="Mains, Sides, Drinks..." className="bg-background/50" />
                   </div>
                 </div>
-                <Button onClick={addItem} className="w-full font-semibold mt-2">
-                  Create Item
+                <Button onClick={addItem} disabled={uploading} className="w-full font-semibold mt-2">
+                  {uploading ? 'Uploading & Creating...' : 'Create Item'}
                 </Button>
               </div>
             </DialogContent>
@@ -141,6 +209,11 @@ const VendorMenu = () => {
                 {items.filter(i => i.category === cat).map(item => (
                   <Card key={item.id} className="premium-card bg-card/30 border-border/40 hover:bg-card/40 transition-all overflow-hidden">
                     <CardContent className="flex items-start justify-between p-4.5 gap-3">
+                      {item.image_url && (
+                        <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border bg-muted">
+                          <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-sm truncate">{item.name}</h4>
                         <p className="text-sm font-semibold text-primary mt-1">₦{Number(item.price).toLocaleString()}</p>

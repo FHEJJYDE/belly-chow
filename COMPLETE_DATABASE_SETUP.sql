@@ -941,6 +941,9 @@ CREATE POLICY "Allow vendor full access" ON public.vendors FOR ALL USING (true);
 DROP POLICY IF EXISTS "Menu items viewable by everyone" ON public.menu_items;
 CREATE POLICY "Menu items viewable by everyone" ON public.menu_items FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow full access on menu_items" ON public.menu_items;
+CREATE POLICY "Allow full access on menu_items" ON public.menu_items FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Drinks viewable by everyone" ON public.drinks;
 CREATE POLICY "Drinks viewable by everyone" ON public.drinks FOR SELECT USING (true);
 
@@ -1077,6 +1080,7 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('vendor-logos', 'vendor-l
 INSERT INTO storage.buckets (id, name, public) VALUES ('payment-proofs', 'payment-proofs', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('verifications', 'verifications', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('verification-docs', 'verification-docs', true) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('menu-items', 'menu-items', true) ON CONFLICT (id) DO NOTHING;
 
 DROP POLICY IF EXISTS "Authenticated users can upload objects" ON storage.objects;
 CREATE POLICY "Authenticated users can upload objects" ON storage.objects FOR INSERT TO authenticated WITH CHECK (true);
