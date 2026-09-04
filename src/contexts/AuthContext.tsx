@@ -17,12 +17,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper: nuke all Supabase auth keys from localStorage
+const clearSupabaseStorage = () => {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('sb-'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch (_) { /* ignore SSR / private-browsing edge cases */ }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  // Prevents the onAuthStateChange listener from re-hydrating during sign-out
+  const isSigningOut = React.useRef(false);
 
   const fetchRole = async (userId: string) => {
     try {
@@ -93,6 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!initialized) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Ignore all events fired while we are deliberately signing out
+      if (isSigningOut.current) return;
+
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -143,21 +157,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    isSigningOut.current = true;
     try {
-      setLoading(true);
+      // Clear React state first so UI responds immediately
       setUser(null);
       setSession(null);
       setRole(null);
-      await supabase.auth.signOut().catch((err) => {
-        console.warn('Supabase sign out warning (cleared local session):', err);
+
+      // Try to invalidate the server-side session
+      await supabase.auth.signOut({ scope: 'local' }).catch((err) => {
+        console.warn('Supabase signOut network error (local session will still be cleared):', err);
       });
     } catch (err) {
       console.error('Error during sign out:', err);
     } finally {
+      // Force-clear ALL Supabase keys from localStorage regardless of API outcome
+      clearSupabaseStorage();
       setUser(null);
       setSession(null);
       setRole(null);
       setLoading(false);
+      // Keep the flag true — reset after a tick so any in-flight events are dropped
+      setTimeout(() => { isSigningOut.current = false; }, 500);
     }
   };
 

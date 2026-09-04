@@ -1,9 +1,44 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, MapPin, Clock, ShieldCheck, Store, Bike } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Stats {
+  deliveries: number | null;
+  vendors: number | null;
+}
 
 const Landing = () => {
+  const [stats, setStats] = useState<Stats>({ deliveries: null, vendors: null });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const [{ count: deliveries }, { count: vendors }] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'delivered'),
+        supabase
+          .from('vendors')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_approved', true),
+      ]);
+      setStats({
+        deliveries: deliveries ?? 0,
+        vendors: vendors ?? 0,
+      });
+    };
+    fetchStats();
+  }, []);
+
+  // Format large numbers nicely: 1234 → "1,234+"
+  const fmt = (n: number | null) => {
+    if (n === null) return '—';
+    return n.toLocaleString() + '+';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -59,12 +94,16 @@ const Landing = () => {
       <div className="border-y">
         <div className="container grid grid-cols-3 divide-x">
           {[
-            { value: '500+', label: 'Deliveries' },
-            { value: '20+', label: 'Vendors' },
-            { value: '< 20 min', label: 'Avg. delivery' },
+            { value: fmt(stats.deliveries), label: 'Deliveries done' },
+            { value: fmt(stats.vendors), label: 'Active vendors' },
+            { value: '< 20 min', label: 'Avg. delivery time' },
           ].map(({ value, label }) => (
             <div key={label} className="py-8 text-center">
-              <p className="font-heading text-xl font-bold sm:text-2xl">{value}</p>
+              {value === '—' ? (
+                <div className="mx-auto mb-1 h-7 w-16 animate-pulse rounded-md bg-muted" />
+              ) : (
+                <p className="font-heading text-xl font-bold sm:text-2xl">{value}</p>
+              )}
               <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{label}</p>
             </div>
           ))}

@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext';
 import AppNavbar from '@/components/layout/AppNavbar';
 import LocationSelectorModal from '@/components/location/LocationSelectorModal';
 import WalletModal from '@/components/wallet/WalletModal';
+import HeroCarousel from '@/components/dashboard/HeroCarousel';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -75,13 +76,13 @@ const StudentDashboard = () => {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
 
-  // Search & Filters state
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filterOpenOnly, setFilterOpenOnly] = useState(false);
   const [filterTopRated, setFilterTopRated] = useState(false);
   const [showFavourites, setShowFavourites] = useState(false);
   const [sortBy, setSortBy] = useState<'default' | 'rating' | 'name'>('default');
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>('');
@@ -618,6 +619,16 @@ const StudentDashboard = () => {
           </div>
         </div>
 
+        {/* 3.5 HERO BANNER CAROUSEL (Admin-Managed Flash Deals & Spotlights) */}
+        <HeroCarousel
+          onFilterCategory={(cat) => {
+            setSelectedCategory(cat);
+            const vendorsEl = document.getElementById('all-vendors-section');
+            if (vendorsEl) vendorsEl.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onOpenPromo={() => setPromoDialogOpen(true)}
+        />
+
         {/* 4. QUICK ACTION & WALLET BAR */}
         {user && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -646,7 +657,7 @@ const StudentDashboard = () => {
             </Link>
 
             {/* Promo Codes Dialog */}
-            <Dialog>
+            <Dialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen}>
               <DialogTrigger asChild>
                 <button className="rounded-2xl border bg-card p-3.5 flex items-center justify-between text-left shadow-sm hover:shadow-md transition-all group">
                   <div>
@@ -738,28 +749,33 @@ const StudentDashboard = () => {
 
             <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pb-2 snap-x">
               {categoryStats.map(({ name, count }) => {
-                const isSelected = selectedCategory === name;
                 const visual = getCategoryVisual(name);
+                const catParam = name.toLowerCase().includes('rice') 
+                  ? 'rice' 
+                  : name.toLowerCase().includes('swallow') 
+                  ? 'swallow' 
+                  : name.toLowerCase().includes('fast') || name.toLowerCase().includes('burger')
+                  ? 'fastfood' 
+                  : name.toLowerCase().includes('shawarma') || name.toLowerCase().includes('grill')
+                  ? 'shawarma' 
+                  : name.toLowerCase().includes('drink') || name.toLowerCase().includes('pastr')
+                  ? 'drinks' 
+                  : 'all';
+
                 return (
-                  <button
+                  <Link
                     key={name}
-                    onClick={() => setSelectedCategory(prev => prev === name ? null : name)}
-                    className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all duration-200 shrink-0 w-28 text-center snap-start select-none ${
-                      isSelected
-                        ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-orange-500/20 scale-105 ring-2 ring-primary/30'
-                        : 'bg-card hover:bg-muted/60 text-foreground shadow-sm hover:border-primary/40'
-                    }`}
+                    to={`/vendors?category=${catParam}`}
+                    className="flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all duration-200 shrink-0 w-28 text-center snap-start select-none bg-card hover:bg-muted/60 text-foreground shadow-sm hover:border-primary/40 group hover:scale-[1.03]"
                   >
-                    <span className="text-3xl mb-1.5 filter drop-shadow-sm">{visual.icon}</span>
-                    <span className="font-semibold text-xs truncate max-w-full leading-tight">
+                    <span className="text-3xl mb-1.5 filter drop-shadow-sm group-hover:scale-110 transition-transform">{visual.icon}</span>
+                    <span className="font-semibold text-xs truncate max-w-full leading-tight group-hover:text-primary transition-colors">
                       {name}
                     </span>
-                    <span className={`text-[10px] mt-1 px-2 py-0.5 rounded-full font-bold ${
-                      isSelected ? 'bg-primary-foreground/20 text-white' : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <span className="text-[10px] mt-1 px-2 py-0.5 rounded-full font-bold bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
                       {count} items
                     </span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -810,80 +826,98 @@ const StudentDashboard = () => {
           </div>
         )}
 
-        {/* 7. FEATURED & SPONSORED VENDORS (Gold / Silver Highlights) */}
-        {!isSearching && featuredVendors.length > 0 && (
+        {/* 7. FEATURED & SPONSORED VENDORS (Admin Featured / Paid Placement) */}
+        {!isSearching && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-amber-500 font-bold flex items-center gap-1">
-                  <Sparkles className="h-3.5 w-3.5" /> Campus Favorites
+                  <Sparkles className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> Featured on Campus
                 </p>
                 <h2 className="font-heading text-lg sm:text-xl font-bold tracking-tight">Featured Restaurants</h2>
               </div>
+
+              <Link to="/vendors">
+                <Button variant="ghost" size="sm" className="text-xs font-bold text-primary gap-1 hover:underline">
+                  <span>View All Eateries</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredVendors.slice(0, 3).map(vendor => (
-                <VendorCard key={vendor.id} vendor={vendor} />
-              ))}
-            </div>
+            {featuredVendors.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {featuredVendors.map(vendor => (
+                  <VendorCard key={vendor.id} vendor={vendor} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-center space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Explore our verified campus restaurants, cafeterias, and fast food joints.
+                </p>
+                <Link to="/vendors">
+                  <Button size="sm" className="mt-1 gap-1.5 rounded-xl text-xs font-bold">
+                    <span>Browse Full Vendor Directory</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 8. ALL VENDORS & EXPLORE (Filters: Open Now, Top Rated, Price, Sort) */}
-        <div className="space-y-4 pt-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">All Spots</p>
-              <h2 className="font-heading text-xl font-bold tracking-tight">Available Vendors & Kitchens</h2>
+        {/* 8. EXPLORE ALL VENDORS MARKETPLACE BANNER */}
+        {!isSearching && (
+          <div className="rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-primary/10 border border-primary/20 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="font-heading font-bold text-base sm:text-lg text-foreground flex items-center gap-2">
+                <span>Looking for more meal options?</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Browse our complete campus directory with filters for open hours, top ratings, and hostel delivery.
+              </p>
             </div>
 
-            {/* Smart Filters & Sort */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant={filterOpenOnly ? 'default' : 'outline'}
-                className="rounded-full text-xs h-8 gap-1.5 shadow-sm"
-                onClick={() => setFilterOpenOnly(!filterOpenOnly)}
-              >
-                <span className={`h-2 w-2 rounded-full ${filterOpenOnly ? 'bg-white' : 'bg-emerald-500'}`} />
-                <span>Open Now</span>
+            <Link to="/vendors" className="shrink-0">
+              <Button className="w-full sm:w-auto font-bold rounded-xl text-xs sm:text-sm gap-2 shadow-md">
+                <span>Explore All Vendors ({vendors.length})</span>
+                <ArrowRight className="h-4 w-4" />
               </Button>
-
-              <Button
-                size="sm"
-                variant={filterTopRated ? 'default' : 'outline'}
-                className="rounded-full text-xs h-8 gap-1 shadow-sm"
-                onClick={() => setFilterTopRated(!filterTopRated)}
-              >
-                <Star className={`h-3 w-3 ${filterTopRated ? 'fill-white' : 'fill-amber-400 text-amber-500'}`} />
-                <span>Top Rated (4.5+)</span>
-              </Button>
-
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="h-8 rounded-full border border-input bg-card px-3 text-xs font-medium shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-              >
-                <option value="default">Default Sort</option>
-                <option value="rating">Highest Rated</option>
-                <option value="name">Name (A–Z)</option>
-              </select>
-            </div>
+            </Link>
           </div>
+        )}
 
-          {/* Results View */}
-          {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map(i => <VendorCardSkeleton key={i} />)}
+        {/* SEARCH RESULTS VIEW (Only active when searching) */}
+        {isSearching && (
+          <div id="all-vendors-section" className="space-y-4 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Search Results</p>
+                <h2 className="font-heading text-xl font-bold tracking-tight">Matching Dishes & Vendors</h2>
+              </div>
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7 text-primary">
+                Clear Search
+              </Button>
             </div>
-          ) : isSearching ? (
-            filteredMenuItems.length === 0 ? (
+
+            {loading ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map(i => <VendorCardSkeleton key={i} />)}
+              </div>
+            ) : filteredMenuItems.length === 0 ? (
               <EmptyState
                 emoji="🔍"
-                title="No results found"
-                description="Try a different search keyword or clear category filters"
-                action={<Button variant="link" onClick={clearFilters}>Clear all filters</Button>}
+                title="No dishes found"
+                description="Try a different search keyword or browse all verified vendors in the marketplace."
+                action={
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={clearFilters}>Clear search</Button>
+                    <Link to="/vendors">
+                      <Button size="sm">Browse All Vendors</Button>
+                    </Link>
+                  </div>
+                }
               />
             ) : (
               <div className="space-y-10">
@@ -891,9 +925,6 @@ const StudentDashboard = () => {
                   <p className="text-sm font-medium text-muted-foreground">
                     Found <span className="font-bold text-foreground">{filteredMenuItems.length}</span> matching dish{filteredMenuItems.length !== 1 ? 'es' : ''}
                   </p>
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7 text-primary">
-                    Clear Search
-                  </Button>
                 </div>
                 {itemsByVendor.map(({ vendor, items }) => {
                   const open = isVendorOpen(vendor.opening_time, vendor.closing_time, vendor.is_active);
@@ -937,20 +968,9 @@ const StudentDashboard = () => {
                   );
                 })}
               </div>
-            )
-          ) : filteredVendors.length === 0 ? (
-            <EmptyState
-              emoji={showFavourites ? '💔' : '🍽️'}
-              title={showFavourites ? 'No favourite vendors yet' : 'No vendors matching your filters'}
-              description={showFavourites ? 'Tap the heart icon on any vendor to save them here' : 'Try toggling off "Open Now" or clearing filter options'}
-              action={<Button variant="link" onClick={clearFilters}>Reset filters</Button>}
-            />
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredVendors.map(vendor => <VendorCard key={vendor.id} vendor={vendor} />)}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

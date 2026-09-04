@@ -16,6 +16,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import VendorsPage from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
 import Cart from "./pages/Cart";
 import Orders from "./pages/Orders";
@@ -38,6 +39,7 @@ import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminEscrow from "./pages/admin/AdminEscrow";
 import AdminLocations from "./pages/admin/AdminLocations";
+import AdminBanners from "./pages/admin/AdminBanners";
 import Support from "./pages/Support";
 import Install from "./pages/Install";
 import Notifications from "./pages/Notifications";
@@ -86,6 +88,7 @@ const AppContent = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/vendors" element={<ProtectedRoute allowedRoles={['student']}><VendorsPage /></ProtectedRoute>} />
           <Route path="/vendor/:id" element={<ProtectedRoute allowedRoles={['student']}><VendorDetail /></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute allowedRoles={['student']}><Cart /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute allowedRoles={['student']}><Orders /></ProtectedRoute>} />
@@ -100,6 +103,7 @@ const AppContent = () => {
           {/* Admin panel */}
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
             <Route index element={<AdminOverview />} />
+            <Route path="banners" element={<AdminBanners />} />
             <Route path="vendors" element={<AdminVendors />} />
             <Route path="riders" element={<AdminRiders />} />
             <Route path="orders" element={<AdminOrders />} />

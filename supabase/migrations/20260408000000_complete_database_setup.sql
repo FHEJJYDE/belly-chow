@@ -558,6 +558,35 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 
 ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS vendor_delivery_fee NUMERIC NOT NULL DEFAULT 200;
 
+CREATE TABLE IF NOT EXISTS public.campus_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'hostel',
+  short_code TEXT,
+  landmark TEXT,
+  estimated_delivery_mins INTEGER DEFAULT 20,
+  is_popular BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.hero_banners (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  badge_text TEXT,
+  cta_text TEXT DEFAULT 'Explore Now',
+  cta_action TEXT DEFAULT 'open_locations',
+  theme_gradient TEXT DEFAULT 'orange-amber',
+  image_url TEXT,
+  display_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ------------------------------------------------------------------------------
 -- 9. AUDIT & ERROR LOGGING TABLES
 -- ------------------------------------------------------------------------------
@@ -924,6 +953,13 @@ VALUES
     ('Off-Campus Zone B (Far Campus)', 1000, 1000)
 ON CONFLICT (zone_name) DO NOTHING;
 
+INSERT INTO public.hero_banners (title, subtitle, badge_text, cta_text, cta_action, theme_gradient, display_order, is_active)
+VALUES
+    ('Exam Crunch Chow: 20% OFF', 'Fuel your night study with hot Jollof & Shawarma. Use code CHOWPASS at checkout!', '⚡ Flash Deal', 'Claim 20% OFF', 'promo_code:CHOWPASS', 'orange-amber', 1, true),
+    ('₦0 Free Campus Delivery', 'Enjoy zero delivery fees to all Hostels and Faculty complexes on orders over ₦2,500.', '🛵 Campus Perk', 'Pick Your Hall', 'open_locations', 'emerald-teal', 2, true),
+    ('Instant Wallet Cashback', 'Top up ₦5,000 or more into your Belly-Chow wallet and get instant bonus food credit.', '💳 Bonus Credit', 'Top Up Wallet', 'open_wallet', 'midnight-purple', 3, true),
+    ('Late Night Grills & Combos', 'Craving juicy chicken & chips? Open late every night with rapid campus dispatch.', '🔥 Hot Pick', 'Explore Grills', 'filter_category:shawarma', 'crimson-fire', 4, true);
+
 -- ------------------------------------------------------------------------------
 -- 12. ROW LEVEL SECURITY (RLS) POLICIES
 -- ------------------------------------------------------------------------------
@@ -1085,6 +1121,12 @@ DROP POLICY IF EXISTS "Campus locations viewable by everyone" ON public.campus_l
 CREATE POLICY "Campus locations viewable by everyone" ON public.campus_locations FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Admins manage campus locations" ON public.campus_locations;
 CREATE POLICY "Admins manage campus locations" ON public.campus_locations FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+ALTER TABLE public.hero_banners ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Hero banners viewable by everyone" ON public.hero_banners;
+CREATE POLICY "Hero banners viewable by everyone" ON public.hero_banners FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage hero banners" ON public.hero_banners;
+CREATE POLICY "Admins manage hero banners" ON public.hero_banners FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
 
 -- Disputes Policies
 ALTER TABLE public.disputes ENABLE ROW LEVEL SECURITY;
