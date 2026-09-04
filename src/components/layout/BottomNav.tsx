@@ -20,36 +20,44 @@ const BottomNav = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/60 glass-nav md:hidden safe-area-bottom">
-      <div className="flex items-center justify-around h-14">
-        {items.map((item) => {
-          const active = location.pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[11px] transition-all relative',
-                active ? 'text-primary font-bold' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {active && (
-                <div className="absolute top-0 w-8 h-0.5 rounded-b-full bg-primary shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-              )}
-              <div className="relative">
-                <item.icon className={cn('h-5 w-5 transition-transform', active && 'scale-110')} />
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -right-2.5 -top-1 flex min-w-[1.125rem] h-[1.125rem] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground leading-none shadow-sm">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
-              </div>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+    <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none md:hidden pb-safe">
+      <div className="px-3 pb-3 pt-1">
+        <nav className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-border/60 bg-background/85 dark:bg-card/90 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/40 p-1.5 transition-all">
+          <div className="flex items-center justify-around gap-1">
+            {items.map((item) => {
+              const active = location.pathname === item.to;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    'relative flex flex-1 flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-medium transition-all duration-200 active:scale-95 select-none',
+                    active
+                      ? 'bg-primary/10 text-primary font-bold dark:bg-primary/20 shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                  )}
+                >
+                  <div className="relative mb-0.5 flex items-center justify-center">
+                    <item.icon
+                      className={cn(
+                        'h-5 w-5 transition-all duration-200',
+                        active ? 'scale-110 stroke-[2.5px] text-primary' : 'stroke-[1.75px]'
+                      )}
+                    />
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="absolute -right-2.5 -top-1.5 flex h-4.5 min-w-[1.125rem] px-1 items-center justify-center rounded-full bg-gradient-to-r from-primary to-amber-500 text-[10px] font-extrabold text-primary-foreground shadow-md animate-pulse">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className="tracking-tight leading-tight">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
-    </nav>
+    </div>
   );
 };
 

@@ -24,16 +24,18 @@ const AppNavbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 glass-nav">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl transition-all">
       <div className="container flex h-14 items-center justify-between">
-        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
+        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5 group select-none">
           <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 shadow-md shadow-orange-500/10 group-hover:scale-105 transition-transform duration-300">
             <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain bg-background" />
           </div>
-          <span className="font-heading text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">Belly-Chow</span>
+          <span className="font-heading text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">
+            Belly-Chow
+          </span>
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {user ? (
             <>
               {role === 'student' && <WalletModal />}
@@ -41,16 +43,16 @@ const AppNavbar = () => {
               {role === 'student' && (
                 <div className="hidden md:flex items-center gap-1">
                   <Link to="/orders">
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                      <Package className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
+                      <Package className="h-4.5 w-4.5" />
                     </Button>
                   </Link>
                   <Link to="/cart" className="relative">
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                      <ShoppingCart className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
+                      <ShoppingCart className="h-4.5 w-4.5" />
                       {itemCount > 0 && (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                          {itemCount}
+                        <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                          {itemCount > 99 ? '99+' : itemCount}
                         </span>
                       )}
                     </Button>
@@ -58,37 +60,43 @@ const AppNavbar = () => {
                 </div>
               )}
               <Link to="/profile" className="hidden md:inline-flex">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                  <User className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
+                  <User className="h-4.5 w-4.5" />
                 </Button>
               </Link>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <LogOut className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                    <LogOut className="h-4.5 w-4.5" />
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-2xl">
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
                     <AlertDialogDescription>Are you sure you want to log out of your Belly-Chow account?</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleSignOut} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Log Out</AlertDialogAction>
+                    <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSignOut} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Log Out
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </>
           ) : (
-            <>
-              <Link to="/login"><Button variant="ghost" size="sm" className="text-muted-foreground">Log in</Button></Link>
-              <Link to="/signup"><Button size="sm">Sign up</Button></Link>
-            </>
+            <div className="flex items-center gap-2">
+              <Link to="/login">
+                <Button variant="ghost" size="sm" className="rounded-xl text-muted-foreground font-medium">Log in</Button>
+              </Link>
+              <Link to="/signup">
+                <Button size="sm" className="rounded-xl font-bold shadow-md shadow-orange-500/20">Sign up</Button>
+              </Link>
+            </div>
           )}
         </div>
       </div>
-    </nav>
+    </header>
   );
 };
 
