@@ -129,13 +129,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        // Include role in metadata so handle_new_user trigger sets it correctly immediately
+        data: { full_name: fullName, role: selectedRole },
         emailRedirectTo: window.location.origin,
       },
     });
     if (error) throw error;
     if (!data.user) throw new Error('Signup failed');
 
+    // Call the RPC to set role + create vendor record if applicable
     const { error: signupError } = await supabase.rpc('handle_user_signup', {
       user_id: data.user.id,
       user_role: selectedRole,
@@ -143,6 +145,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     if (signupError) throw signupError;
 
+    // Hydrate auth state immediately (mirrors signIn behaviour)
+    if (data.session) {
+      setUser(data.user);
+      setSession(data.session);
+    } else {
+      // Email confirmation required — still track the user so Dashboard can redirect
+      setUser(data.user);
+    }
     setRole(selectedRole);
   };
 

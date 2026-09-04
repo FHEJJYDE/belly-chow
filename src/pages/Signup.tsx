@@ -48,7 +48,12 @@ const Signup = () => {
     try {
       await signUp(email, password, fullName, selectedRole, vendorName || undefined);
       toast({ title: 'Account created', description: 'Welcome to Belly-Chow' });
-      navigate('/dashboard');
+      // Navigate directly to the right dashboard based on the role they signed up with
+      if (selectedRole === 'vendor') {
+        navigate('/vendor-panel');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       toast({
         title: 'Signup failed',

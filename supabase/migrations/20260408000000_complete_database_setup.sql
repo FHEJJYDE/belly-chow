@@ -110,17 +110,28 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_role public.app_role;
 BEGIN
+  -- Only allow student/vendor/rider from self-registration — never admin
+  v_role := CASE
+    WHEN (NEW.raw_user_meta_data->>'role') IN ('vendor', 'rider')
+      THEN (NEW.raw_user_meta_data->>'role')::public.app_role
+    ELSE 'student'::public.app_role
+  END;
+
   INSERT INTO public.profiles (user_id, email, full_name, role)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.app_role, 'student'::public.app_role)
+    v_role
   )
   ON CONFLICT (user_id) DO UPDATE SET
     email = EXCLUDED.email,
     full_name = CASE WHEN EXCLUDED.full_name <> '' THEN EXCLUDED.full_name ELSE public.profiles.full_name END,
+    -- Preserve existing role if already set (don't downgrade vendor back to student)
+    role = CASE WHEN public.profiles.role = 'student'::public.app_role THEN EXCLUDED.role ELSE public.profiles.role END,
     updated_at = NOW();
   RETURN NEW;
 END;
