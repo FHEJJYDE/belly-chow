@@ -17,7 +17,7 @@ import {
   MapPin, Navigation, Phone, User, Store, FileText, CreditCard, Package,
   ArrowLeft, Clock, CheckCircle2, Truck, Wallet, History, Settings,
   Home, Bike, TrendingUp, Calendar, DollarSign, Hash, Locate, XCircle,
-  Camera, Upload, X, Banknote
+  Camera, Upload, X, Banknote, ShieldCheck
 } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import DeliveryChat from '@/components/chat/DeliveryChat';
@@ -77,7 +77,7 @@ const RiderDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeDeliveryId, setActiveDeliveryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home');
-  const { position, error: geoError } = useGeolocation(true);
+  const { position, error: geoError, getPosition } = useGeolocation(true);
 
   // Delivery proof state
   const [deliveryProof, setDeliveryProof] = useState<File | null>(null);
@@ -277,14 +277,14 @@ const RiderDashboard = () => {
       itemsByOrder.set(oi.order_id, list);
     });
     return orders.map(o => {
-      const vendor = vendorMap.get(o.vendor_id);
+      const vendor = vendorMap.get(o.vendor_id) as any;
       const profile = profileMap.get(o.student_id);
       return {
         ...o,
         vendor_name: vendor?.name || 'Unknown Vendor',
         vendor_address: vendor?.address || '',
-        vendor_lat: vendor ? (Number((vendor as any).lat) || null) : null,
-        vendor_lng: vendor ? (Number((vendor as any).lng) || null) : null,
+        vendor_lat: vendor ? (Number(vendor.lat) || null) : null,
+        vendor_lng: vendor ? (Number(vendor.lng) || null) : null,
         vendor_user_id: vendor?.user_id || '',
         customer_name: profile?.full_name || 'Unknown',
         customer_phone: profile?.phone || '',
@@ -809,6 +809,48 @@ const RiderDashboard = () => {
             <Switch checked={isOnline} onCheckedChange={setIsOnline} />
           </div>
         </div>
+
+        {/* Rider Location Setup & Verification Card */}
+        <Card className="mb-6 border-primary/30 bg-gradient-to-r from-primary/5 via-orange-500/5 to-background">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-heading font-bold text-sm flex items-center gap-1.5">
+                    <Locate className="h-4 w-4 text-primary animate-pulse" />
+                    Live Rider GPS Status:
+                  </span>
+                  <Badge variant={position ? 'default' : geoError ? 'destructive' : 'secondary'} className="text-[10px]">
+                    {position ? '🟢 Active GPS Signal' : geoError ? '🔴 Permission Required' : '⏳ Acquiring GPS...'}
+                  </Badge>
+                </div>
+                {position ? (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    Lat: {position.lat.toFixed(5)} · Lng: {position.lng.toFixed(5)} (Accuracy: ~{Math.round(position.accuracy || 10)}m)
+                  </p>
+                ) : (
+                  <p className="text-xs text-destructive font-medium">
+                    {geoError || 'Allow location permissions in your browser settings for order dispatch.'}
+                  </p>
+                )}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => getPosition()} className="gap-1.5 text-xs font-semibold shrink-0">
+                <Navigation className="h-3.5 w-3.5 text-primary" /> Verify Location Now
+              </Button>
+            </div>
+
+            <div className="rounded-lg bg-muted/40 p-3 text-xs space-y-1.5">
+              <p className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> How to Keep Your Location Active All Day:
+              </p>
+              <ul className="list-disc list-inside text-muted-foreground space-y-1 pl-1">
+                <li><strong className="text-foreground">Browser Permission:</strong> When prompted, select <em>"Always Allow Location"</em> or <em>"Allow while using app"</em> in Chrome/Safari.</li>
+                <li><strong className="text-foreground">Online Switch:</strong> Keep the <span className="text-primary font-bold">Online</span> toggle ON during work hours so vendor orders match your proximity.</li>
+                <li><strong className="text-foreground">Background Battery Settings:</strong> Disable "Battery Saver" throttling for your browser on Android/iOS to ensure continuous GPS updates when screen locks.</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card className="premium-card bg-primary/5 border-primary/20"><CardContent className="p-4 text-center">

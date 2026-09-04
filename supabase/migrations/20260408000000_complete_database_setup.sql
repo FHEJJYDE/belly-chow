@@ -232,6 +232,39 @@ CREATE TABLE IF NOT EXISTS public.delivery_zones (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.campus_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Hostel',
+  description TEXT DEFAULT '',
+  is_popular BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  lat NUMERIC DEFAULT NULL,
+  lng NUMERIC DEFAULT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Seed default campus locations if table is newly created
+INSERT INTO public.campus_locations (name, category, description, is_popular, is_active)
+VALUES
+  ('Hall 1 (Independence Hall)', 'Hostel', 'Male Hostel, Main Campus', true, true),
+  ('Hall 2 (Queen Elizabeth)', 'Hostel', 'Female Hostel, Central Area', true, true),
+  ('Hall 3 (Alexander Brown)', 'Hostel', 'Medical Hostel, East Wing', true, true),
+  ('Hall 4 (Sultan Bello)', 'Hostel', 'Male Hostel, North Gate', true, true),
+  ('Hall 5 (Queen Idia)', 'Hostel', 'Female Hostel, Close to Gate 2', true, true),
+  ('Main University Library (Kenneth Dike)', 'Library', 'Central Reading Halls & Quadrangle', true, true),
+  ('Faculty of Engineering', 'Faculty', 'Engineering Lecture Theatres & Labs', true, true),
+  ('Faculty of Social Sciences', 'Faculty', 'Faculty Complex & Departmental Blocks', false, true),
+  ('Faculty of Arts & Humanities', 'Faculty', 'Arts Quadrangle & Large Lecture Halls', false, true),
+  ('Faculty of Science', 'Faculty', 'Science Lecture Theatres & Blocks', false, true),
+  ('College of Medicine', 'Faculty', 'Medical Sciences Complex', true, true),
+  ('SUB (Student Union Building)', 'Landmark', 'Student Plaza, Arcade & Chow Square', true, true),
+  ('Main University Gate (Security Post)', 'Gate', 'Front Entrance & Transit Station', false, true),
+  ('Second Gate (North Exit)', 'Gate', 'North Campus Access Gate', false, true),
+  ('Postgraduate Hall (PG Hostel)', 'Hostel', 'PG Complex, Block A/B/C', false, true)
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS public.vendor_promotions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id UUID NOT NULL REFERENCES public.vendors(id) ON DELETE CASCADE,
@@ -947,6 +980,19 @@ CREATE POLICY "Allow full access on menu_items" ON public.menu_items FOR ALL USI
 DROP POLICY IF EXISTS "Drinks viewable by everyone" ON public.drinks;
 CREATE POLICY "Drinks viewable by everyone" ON public.drinks FOR SELECT USING (true);
 
+-- Favourites Table & Policies
+CREATE TABLE IF NOT EXISTS public.favourites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    vendor_id UUID REFERENCES public.vendors(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, vendor_id)
+);
+
+ALTER TABLE public.favourites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow full access on favourites" ON public.favourites;
+CREATE POLICY "Allow full access on favourites" ON public.favourites FOR ALL USING (true);
+
 -- Delivery Zones Policies
 DROP POLICY IF EXISTS "Allow public read on delivery_zones" ON public.delivery_zones;
 CREATE POLICY "Allow public read on delivery_zones" ON public.delivery_zones FOR SELECT USING (true);
@@ -1026,6 +1072,19 @@ CREATE POLICY "Platform settings viewable by everyone" ON public.platform_settin
 
 DROP POLICY IF EXISTS "Promo codes viewable by everyone" ON public.promo_codes;
 CREATE POLICY "Promo codes viewable by everyone" ON public.promo_codes FOR SELECT USING (true);
+
+-- Delivery Zones & Campus Locations Policies
+ALTER TABLE public.delivery_zones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Delivery zones viewable by everyone" ON public.delivery_zones;
+CREATE POLICY "Delivery zones viewable by everyone" ON public.delivery_zones FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage delivery zones" ON public.delivery_zones;
+CREATE POLICY "Admins manage delivery zones" ON public.delivery_zones FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+ALTER TABLE public.campus_locations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Campus locations viewable by everyone" ON public.campus_locations;
+CREATE POLICY "Campus locations viewable by everyone" ON public.campus_locations FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage campus locations" ON public.campus_locations;
+CREATE POLICY "Admins manage campus locations" ON public.campus_locations FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
 
 -- Disputes Policies
 ALTER TABLE public.disputes ENABLE ROW LEVEL SECURITY;

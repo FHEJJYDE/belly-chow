@@ -32,7 +32,7 @@ const statusColors: Record<string, string> = {
 
 const docTypeLabels: Record<string, string> = {
   national_id: 'National ID (NIN)',
-  student_id: 'Student ID Card',
+  student_id: 'Student / User ID Card',
   drivers_license: "Driver's License",
   passport: 'International Passport',
 };

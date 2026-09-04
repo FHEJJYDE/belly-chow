@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppNavbar from '@/components/layout/AppNavbar';
 import { Card, CardContent } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -234,16 +235,29 @@ const Profile = () => {
                 <p className="font-semibold text-sm text-destructive">Sign Out</p>
                 <p className="text-xs text-muted-foreground">Log out of your Belly-Chow account on this device.</p>
               </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleLogout}
-                disabled={signingOut}
-                className="gap-2 font-semibold shrink-0"
-              >
-                <LogOut className="h-4 w-4" />
-                {signingOut ? 'Signing out...' : 'Log out'}
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={signingOut}
+                    className="gap-2 font-semibold shrink-0"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {signingOut ? 'Signing out...' : 'Log out'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to log out of your Belly-Chow account?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Log Out</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardContent>
         </Card>

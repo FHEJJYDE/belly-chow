@@ -29,15 +29,18 @@ const BottomNav = () => {
               key={item.to}
               to={item.to}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[11px] transition-colors relative',
-                active ? 'text-foreground font-medium' : 'text-muted-foreground'
+                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[11px] transition-all relative',
+                active ? 'text-primary font-bold' : 'text-muted-foreground hover:text-foreground'
               )}
             >
+              {active && (
+                <div className="absolute top-0 w-8 h-0.5 rounded-b-full bg-primary shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+              )}
               <div className="relative">
-                <item.icon className="h-5 w-5" />
-                {item.badge && item.badge > 0 && (
-                  <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">
-                    {item.badge}
+                <item.icon className={cn('h-5 w-5 transition-transform', active && 'scale-110')} />
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="absolute -right-2.5 -top-1 flex min-w-[1.125rem] h-[1.125rem] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground leading-none shadow-sm">
+                    {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 )}
               </div>

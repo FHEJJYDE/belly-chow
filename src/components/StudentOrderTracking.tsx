@@ -131,21 +131,27 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const currentStatusIndex = STATUS_TIMELINE.findIndex(s => s.key === liveOrder.status);
   const isTerminal = ['delivered', 'cancelled', 'rejected'].includes(liveOrder.status);
   const canCancel = liveOrder.status === 'pending';
-  const hasRider = !!liveOrder.rider_id;
   const isBeingDelivered = ['picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
+  const hasRider = !!liveOrder.rider_id;
   // Show the map from 'accepted' onwards so both parties see each other as early as possible
   const showMap = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
   // Determine current student GPS for the map pin
   const studentMapLat = studentPos?.lat ?? liveOrder.delivery_lat ?? null;
   const studentMapLng = studentPos?.lng ?? liveOrder.delivery_lng ?? null;
 
-  // Estimated time calculation (simple: based on status)
+  // Build chat participants
+  const chatParticipants = [
+    ...(liveOrder.rider_id && riderProfile ? [{ id: liveOrder.rider_id, name: riderProfile.full_name, role: 'rider' }] : []),
+    ...(vendorInfo ? [{ id: vendorInfo.user_id, name: vendorInfo.name, role: 'vendor' }] : []),
+  ].filter(p => p.id !== user?.id);
+
+  // Estimated time calculation (fast dispatch for pre-made meals)
   const getETA = () => {
     switch (liveOrder.status) {
-      case 'pending': return '20-35 min';
-      case 'accepted': return '15-30 min';
-      case 'preparing': return '10-25 min';
-      case 'ready': return '5-15 min';
+      case 'pending': return '10-20 min (Fast Dispatch)';
+      case 'accepted': return '5-15 min (Food Ready)';
+      case 'preparing': return '5-15 min (Food Ready)';
+      case 'ready': return '5-12 min (Rider Dispatching)';
       case 'picked_up': return '5-10 min';
       case 'delivering': return '2-5 min';
       case 'arrived': return 'Arrived';
@@ -160,42 +166,31 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
       return;
     }
     setCancelling(true);
-    const { error } = await supabase.from('orders').update({ status: 'cancelled' as any }).eq('id', order.id);
-    if (!error) {
-      // Trigger instant wallet refund if paid via wallet
-      await (supabase.rpc as any)('refund_wallet_order', { p_order_id: order.id });
-    }
+    const { error } = await supabase.from('orders').update({
+      status: 'cancelled',
+      cancellation_reason: cancelReason,
+    } as any).eq('id', liveOrder.id);
     setCancelling(false);
     if (error) {
-      toast({ title: 'Error cancelling order', description: error.message, variant: 'destructive' });
-      return;
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Order cancelled' });
+      onCancelled?.();
     }
-    toast({ title: 'Order cancelled ❌', description: 'Any wallet payment has been refunded to your wallet.' });
-    onCancelled?.();
   };
 
   const handleConfirmDelivery = async () => {
     if (!user) return;
     setConfirmingDelivery(true);
-    const { error } = await supabase.from('orders').update({ status: 'delivered' as any }).eq('id', order.id);
-    if (!error) {
-      // Release escrow funds to vendor and rider platform wallets
-      await (supabase.rpc as any)('release_order_escrow', { p_order_id: order.id });
-    }
+    const { error } = await supabase.from('orders').update({ status: 'delivered' } as any).eq('id', liveOrder.id);
     setConfirmingDelivery(false);
     if (error) {
       toast({ title: 'Error confirming delivery', description: error.message, variant: 'destructive' });
-      return;
+    } else {
+      toast({ title: 'Delivery confirmed 🎉', description: 'Enjoy your meal!' });
+      setLiveOrder(prev => ({ ...prev, status: 'delivered' }));
     }
-    toast({ title: 'Order delivery confirmed! 🎉', description: 'Funds have been credited to vendor and rider platform wallets.' });
-    onBack();
   };
-
-  // Build chat participants
-  const chatParticipants = [
-    ...(liveOrder.rider_id && riderProfile ? [{ id: liveOrder.rider_id, name: riderProfile.full_name, role: 'rider' }] : []),
-    ...(vendorInfo ? [{ id: vendorInfo.user_id, name: vendorInfo.name, role: 'vendor' }] : []),
-  ].filter(p => p.id !== user?.id);
 
   const eta = getETA();
 
@@ -205,26 +200,18 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-30 bg-card border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
+    <div className="flex flex-col min-h-screen bg-background pb-16 md:pb-0">
+      {/* Top Header */}
+      <div className="sticky top-0 z-30 bg-card border-b px-4 py-3 flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs font-semibold">
+          <ArrowLeft className="h-4 w-4" /> Back to Orders
         </Button>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">Order #{order.id.slice(0, 8)}</p>
-          <div className="flex items-center gap-2">
-            <LivePulse label="Tracking" />
-            {eta && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" /> ETA: {eta}
-              </span>
-            )}
-          </div>
+        <div className="text-right">
+          <p className="text-xs font-bold text-muted-foreground uppercase">Order #{liveOrder.id.slice(0, 8)}</p>
+          <Badge variant={liveOrder.status === 'delivered' ? 'default' : 'secondary'} className="text-[10px]">
+            {liveOrder.status.replace('_', ' ')}
+          </Badge>
         </div>
-        <Badge variant="default" className="shrink-0 capitalize">
-          {liveOrder.status.replace('_', ' ')}
-        </Badge>
       </div>
 
       {/* Status banner */}
@@ -235,15 +222,15 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
           </span>
           <div>
             <p className="font-semibold text-sm">
-              {liveOrder.status === 'pending' && 'Finding your order a home...'}
-              {liveOrder.status === 'accepted' && 'Vendor accepted your order!'}
-              {liveOrder.status === 'preparing' && 'Your food is being prepared'}
-              {liveOrder.status === 'ready' && 'Ready! Waiting for a rider...'}
+              {liveOrder.status === 'pending' && 'Order sent to vendor...'}
+              {liveOrder.status === 'accepted' && 'Vendor confirmed! Food is ready for pickup/delivery 🍱'}
+              {liveOrder.status === 'preparing' && 'Food ready & packaged 🍱'}
+              {liveOrder.status === 'ready' && 'Food ready! Dispatching rider...'}
               {liveOrder.status === 'picked_up' && 'Rider picked up your order'}
               {liveOrder.status === 'delivering' && 'Your rider is on the way!'}
               {liveOrder.status === 'arrived' && 'Your rider has arrived outside!'}
             </p>
-            {eta && <p className="text-xs text-muted-foreground">Estimated: {eta}</p>}
+            {eta && <p className="text-xs text-primary font-medium">Estimated arrival: {eta}</p>}
           </div>
         </div>
       </div>

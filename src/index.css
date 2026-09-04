@@ -4,43 +4,82 @@
 
 @layer base {
   :root {
-    --background: 35 30% 98%;
-    --foreground: 20 20% 12%;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 20 20% 12%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 20% 12%;
+    --popover-foreground: 222 47% 11%;
 
     --primary: 24 95% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 35 90% 95%;
-    --secondary-foreground: 24 95% 45%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 30 20% 94%;
-    --muted-foreground: 20 10% 45%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 145 60% 40%;
+    --accent: 142 70% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 24 95% 53%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 24 95% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 24 95% 53%;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 24 95% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 18%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 142 70% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 20% 89%;
-    --input: 30 20% 89%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
     --ring: 24 95% 53%;
 
-    --radius: 1rem;
-
-    --sidebar-background: 35 25% 97%;
-    --sidebar-foreground: 20 15% 25%;
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 90%;
     --sidebar-primary: 24 95% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 20% 92%;
-    --sidebar-accent-foreground: 20 15% 25%;
-    --sidebar-border: 30 20% 89%;
+    --sidebar-accent: 217 33% 16%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 18%;
     --sidebar-ring: 24 95% 53%;
   }
 }
@@ -51,12 +90,21 @@
   }
 
   body {
-    @apply text-foreground font-body min-h-screen antialiased;
-    background: linear-gradient(135deg, #fdfbf7 0%, #f7f2ea 50%, #fef5ea 100%) fixed;
+    @apply text-foreground font-body min-h-screen antialiased selection:bg-primary/20 selection:text-primary bg-background;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+  .dark body {
+    @apply bg-background text-foreground;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Outfit', 'Space Grotesk', sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -66,8 +114,13 @@
   }
 
   @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(100%);
+    }
   }
 }
 
@@ -75,66 +128,93 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Premium Custom Glassmorphism System */
+/* Modern Glassmorphism & Card System */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.2);
   border-radius: 99px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.4);
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.75) !important;
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 32px 0 rgba(24, 20, 15, 0.05);
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(18px) saturate(190%);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 10px 35px -5px rgba(24, 20, 15, 0.06);
+}
+
+.dark .glass-panel {
+  background: rgba(20, 18, 16, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.4);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.78) !important;
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 0 10px 30px -5px rgba(24, 20, 15, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(16px) saturate(190%);
+  -webkit-backdrop-filter: blur(16px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 12px 35px -6px rgba(255, 85, 0, 0.06), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .glass-card {
+  background: rgba(24, 20, 17, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 12px 35px -6px rgba(0, 0, 0, 0.35);
 }
 
 .glass-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 16px 36px -6px rgba(245, 124, 0, 0.12), 0 4px 12px 0 rgba(0, 0, 0, 0.03);
-  border-color: rgba(249, 115, 22, 0.4) !important;
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -8px rgba(255, 85, 0, 0.16), 0 6px 16px 0 rgba(0, 0, 0, 0.04);
+  border-color: rgba(255, 85, 0, 0.45) !important;
 }
 
 .glass-nav {
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 25px 0 rgba(0, 0, 0, 0.03);
+}
+
+.dark .glass-nav {
+  background: rgba(15, 12, 10, 0.85) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 25px 0 rgba(0, 0, 0, 0.5);
 }
 
 .premium-card {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 8px 24px -4px rgba(24, 20, 15, 0.05);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 28px -5px rgba(24, 20, 15, 0.05);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .premium-card {
+  background: rgba(24, 20, 17, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 28px -5px rgba(0, 0, 0, 0.35);
 }
 
 .premium-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 32px -6px rgba(24, 20, 15, 0.09);
-  border-color: rgba(249, 115, 22, 0.35) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 18px 38px -6px rgba(255, 85, 0, 0.12);
+  border-color: rgba(255, 85, 0, 0.4) !important;
 }
 
 .no-breakout {
@@ -146,7 +226,32 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.orange-promo-banner {
+  background: linear-gradient(135deg, #2a1205 0%, #3d1a08 50%, #240e04 100%);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.orange-plus-btn {
+  background-color: #F97316;
+  color: #FFFFFF;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.orange-plus-btn:hover {
+  background-color: #EA580C;
+  transform: scale(1.08);
+}
+
+.orange-discount-badge {
+  background-color: #F97316;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 10px;
 }

@@ -140,7 +140,7 @@ const VerificationUpload = () => {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="national_id">National ID (NIN)</SelectItem>
-              <SelectItem value="student_id">Student ID Card</SelectItem>
+              <SelectItem value="student_id">Student / User ID Card</SelectItem>
               <SelectItem value="drivers_license">Driver's License</SelectItem>
               <SelectItem value="passport">International Passport</SelectItem>
             </SelectContent>

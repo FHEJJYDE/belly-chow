@@ -185,7 +185,7 @@ const AdminUsers = () => {
       <Tabs defaultValue="all">
         <TabsList>
           <TabsTrigger value="all">All ({grouped.all.length})</TabsTrigger>
-          <TabsTrigger value="student">Students ({grouped.student.length})</TabsTrigger>
+          <TabsTrigger value="student">Users ({grouped.student.length})</TabsTrigger>
           <TabsTrigger value="vendor">Vendors ({grouped.vendor.length})</TabsTrigger>
           <TabsTrigger value="rider">Riders ({grouped.rider.length})</TabsTrigger>
           <TabsTrigger value="admin">Admins ({grouped.admin.length})</TabsTrigger>

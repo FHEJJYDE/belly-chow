@@ -28,17 +28,17 @@ const Landing = () => {
       <section className="container py-28 md:py-40">
         <div className="mx-auto max-w-2xl">
           <p className="mb-6 text-sm font-medium uppercase tracking-widest text-muted-foreground">
-            Campus food delivery
+            Fast & Fresh Food Delivery
           </p>
           <h1 className="font-heading text-4xl font-bold leading-[1.15] tracking-tight sm:text-5xl md:text-6xl">
             Order food from
             <br />
-            campus vendors,
+            top local vendors,
             <br />
             <span className="text-primary">delivered to you.</span>
           </h1>
           <p className="mt-8 max-w-md text-base leading-relaxed text-muted-foreground">
-            Browse menus, place orders, and track your delivery in real&#8209;time — all from one app built for students.
+            Browse menus, place orders, and track your delivery in real&#8209;time — all from one app built for food lovers & users.
           </p>
           <div className="mt-10 flex gap-3">
             <Link to="/signup">

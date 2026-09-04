@@ -153,22 +153,26 @@ const VendorDetail = () => {
           Object.entries(categories).map(([category, catItems]) => (
             <div key={category} className="mb-10">
               <h2 className="mb-4 text-sm font-medium uppercase tracking-widest text-muted-foreground">{category}</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {catItems.map(item => (
-                  <Card key={item.id} className="overflow-hidden">
-                    <CardContent className="flex items-center justify-between p-4 gap-3">
-                      {item.image_url && (
-                        <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border bg-muted">
+                  <Card key={item.id} className="overflow-hidden glass-card transition-all group">
+                    <CardContent className="flex items-center justify-between p-4 gap-3.5">
+                      {item.image_url ? (
+                        <div className="h-20 w-20 shrink-0 rounded-xl overflow-hidden border border-primary/20 bg-muted/30 shadow-sm relative group-hover:scale-105 transition-transform duration-300">
                           <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="h-20 w-20 shrink-0 rounded-xl border border-primary/10 bg-gradient-to-br from-primary/10 to-amber-500/5 flex items-center justify-center text-2xl">
+                          🍲
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm">{item.name}</h3>
-                        {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>}
-                        <p className="mt-1.5 font-heading font-bold text-sm">₦{Number(item.price).toLocaleString()}</p>
+                        <h3 className="font-heading font-bold text-sm tracking-tight group-hover:text-primary transition-colors">{item.name}</h3>
+                        {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">{item.description}</p>}
+                        <p className="mt-2 font-heading font-extrabold text-base text-primary">₦{Number(item.price).toLocaleString()}</p>
                       </div>
-                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => handleAddItem(item)} disabled={!open}>
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                      <Button size="sm" className="shrink-0 rounded-full px-3.5 font-bold shadow-md gap-1" onClick={() => handleAddItem(item)} disabled={!open}>
+                        <Plus className="h-4 w-4" /> Add
                       </Button>
                     </CardContent>
                   </Card>

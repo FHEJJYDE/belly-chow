@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ShoppingCart, LogOut, User, Package } from 'lucide-react';
 import NotificationCenter from '@/components/NotificationCenter';
 import WalletModal from '@/components/wallet/WalletModal';
@@ -25,9 +26,11 @@ const AppNavbar = () => {
   return (
     <nav className="sticky top-0 z-50 glass-nav">
       <div className="container flex h-14 items-center justify-between">
-        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
-          <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="font-heading text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">Belly-Chow</span>
+        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
+          <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 shadow-md shadow-orange-500/10 group-hover:scale-105 transition-transform duration-300">
+            <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain bg-background" />
+          </div>
+          <span className="font-heading text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">Belly-Chow</span>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -59,9 +62,23 @@ const AppNavbar = () => {
                   <User className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to log out of your Belly-Chow account?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSignOut} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Log Out</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           ) : (
             <>

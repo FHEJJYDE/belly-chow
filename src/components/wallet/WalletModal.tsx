@@ -148,6 +148,19 @@ export default function WalletModal({ trigger, open, onOpenChange }: WalletModal
               </div>
             ) : (
               <>
+                {/* Coming Soon Pending Gateway Verification Banner */}
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-amber-500 text-white font-bold border-none text-[10px] px-2 py-0.5">
+                      COMING SOON 🚀
+                    </Badge>
+                    <span className="text-xs font-bold text-amber-800 dark:text-amber-300">Payment Gateway Verification Pending</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+                    In-app wallet top-ups and balance payments will be activated automatically once our merchant compliance documents are verified by the payment gateway.
+                  </p>
+                </div>
+
                 {/* Balance Card */}
                 <Card className="bg-gradient-to-br from-primary/10 via-orange-500/5 to-background border-primary/20">
                   <CardContent className="p-5 text-center space-y-2">
@@ -163,30 +176,20 @@ export default function WalletModal({ trigger, open, onOpenChange }: WalletModal
                 </Card>
 
                 {/* Deposit Form */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Top-Up Wallet</label>
+                <div className="space-y-2 opacity-70">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Top-Up Wallet (Disabled temporarily)</label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
-                      placeholder="Enter amount (e.g. 2000)"
+                      placeholder="Verification pending..."
+                      disabled
                       value={depositAmount}
                       onChange={e => setDepositAmount(e.target.value)}
-                      className="bg-muted/40"
+                      className="bg-muted/40 cursor-not-allowed"
                     />
-                    <Button onClick={handleDeposit} disabled={depositing || !depositAmount || Number(depositAmount) <= 0} className="gap-1.5 font-semibold shrink-0">
-                      <PlusCircle className="h-4 w-4" /> {depositing ? 'Processing...' : 'Deposit'}
+                    <Button disabled className="gap-1.5 font-semibold shrink-0 cursor-not-allowed">
+                      <PlusCircle className="h-4 w-4" /> Deposit
                     </Button>
-                  </div>
-                  <div className="flex gap-1.5 pt-1">
-                    {[1000, 2000, 5000, 10000].map(amt => (
-                      <button
-                        key={amt}
-                        onClick={() => setDepositAmount(amt.toString())}
-                        className="rounded-md border bg-muted/30 px-2.5 py-1 text-xs font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors"
-                      >
-                        +₦{amt.toLocaleString()}
-                      </button>
-                    ))}
                   </div>
                 </div>
 

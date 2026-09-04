@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,22 +9,37 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, Navigation } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, MapPin, Tag, Navigation, Star, Sparkles, Building, ChevronDown, Check } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import PaymentModal from '@/components/payment/PaymentModal';
+import LocationSelectorModal from '@/components/location/LocationSelectorModal';
 
 const Cart = () => {
     const { items, updateQuantity, removeItem, clearCart, total, vendorId } = useCart();
     const { user } = useAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [deliveryLocation, setDeliveryLocation] = useState('');
+    const [deliveryLocation, setDeliveryLocation] = useState(() => {
+        return localStorage.getItem('selected_campus_location') || '';
+    });
     const [notes, setNotes] = useState('');
     const [isOrdering, setIsOrdering] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [orderData, setOrderData] = useState<any>(null);
-    const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(() => {
+        try {
+            const raw = localStorage.getItem('selected_campus_coords');
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    });
+
+    const [campusLocations, setCampusLocations] = useState<any[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const { position, error: geoError, loading: geoLoading, getPosition } = useGeolocation();
     const [defaultLocation, setDefaultLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
@@ -32,6 +47,25 @@ const Cart = () => {
     const [platformFee, setPlatformFee] = useState(100);
     const [deliveryFee, setDeliveryFee] = useState(500);
     const [zones, setZones] = useState<{ id: string; zone_name: string; delivery_fee: number }[]>([]);
+
+    useEffect(() => {
+        const fetchCampusLocations = async () => {
+            try {
+                const { data } = await supabase
+                    .from('campus_locations')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('is_popular', { ascending: false })
+                    .order('name', { ascending: true });
+                if (data && data.length > 0) {
+                    setCampusLocations(data);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchCampusLocations();
+    }, []);
 
     useEffect(() => {
         const fetchFees = async () => {
@@ -49,26 +83,30 @@ const Cart = () => {
     }, []);
 
     useEffect(() => {
-        if (user) {
+        if (user && !deliveryLocation) {
             // Profiles table stores location as separate columns: default_lat, default_lng, default_location_name
             supabase
                 .from('profiles')
-                .select('default_lat, default_lng, default_location_name')
+                .select('default_lat, default_lng, default_location_name, campus_location')
                 .eq('user_id', user.id)
                 .single()
                 .then(({ data, error }) => {
                     if (error || !data) return;
-                    if (data.default_lat && data.default_lng && data.default_location_name) {
+                    const loc = data.default_location_name || data.campus_location;
+                    if (loc) {
+                        setDeliveryLocation(loc);
+                    }
+                    if (data.default_lat && data.default_lng) {
                         setDefaultLocation({
                             lat: data.default_lat,
                             lng: data.default_lng,
-                            name: data.default_location_name,
+                            name: loc || 'My Saved Spot',
                         });
-                        setDeliveryLocation(data.default_location_name);
+                        setDeliveryCoords({ lat: data.default_lat, lng: data.default_lng });
                     }
                 });
         }
-    }, [user]);
+    }, [user, deliveryLocation]);
 
     const handleLocationSelect = () => {
         if (position?.lat && position?.lng) {
@@ -290,20 +328,37 @@ const Cart = () => {
                     <CardContent className="p-6">
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="location" className="text-base font-medium flex items-center">
-                                    <MapPin className="h-4 w-4 mr-2" />
-                                    Delivery Location & Zone
+                                <Label htmlFor="location" className="text-base font-semibold flex items-center">
+                                    <MapPin className="h-4 w-4 mr-2 text-primary" />
+                                    Delivery Location & Campus Spot
                                 </Label>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleLocationSelect}
-                                    disabled={geoLoading}
-                                    className="text-xs"
-                                >
-                                    <Navigation className="h-3 w-3 mr-1" />
-                                    {geoLoading ? 'Getting GPS...' : 'Use Current GPS'}
-                                </Button>
+                                <div className="flex items-center gap-1.5">
+                                    <LocationSelectorModal
+                                        currentLocation={deliveryLocation}
+                                        onLocationSelect={(name, obj) => {
+                                            setDeliveryLocation(name);
+                                            if (obj?.lat && obj?.lng) {
+                                                setDeliveryCoords({ lat: obj.lat, lng: obj.lng });
+                                            }
+                                        }}
+                                        triggerButton={
+                                            <Button variant="outline" size="sm" className="text-xs h-8 gap-1">
+                                                <Building className="h-3.5 w-3.5 text-orange-500" />
+                                                <span>Pick Campus Spot</span>
+                                            </Button>
+                                        }
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleLocationSelect}
+                                        disabled={geoLoading}
+                                        className="text-xs h-8"
+                                    >
+                                        <Navigation className="h-3 w-3 mr-1" />
+                                        {geoLoading ? 'Getting GPS...' : 'Use GPS'}
+                                    </Button>
+                                </div>
                             </div>
 
                             {/* GPS Status banner */}
@@ -313,7 +368,7 @@ const Cart = () => {
                                         <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                                         <div>
                                             <p className="font-semibold">Location Unavailable</p>
-                                            <p className="mt-0.5">{geoError} You can type your delivery address manually below.</p>
+                                            <p className="mt-0.5">{geoError} You can select from campus spots or type your hostel room below.</p>
                                         </div>
                                     </div>
                                     <Button
@@ -336,6 +391,41 @@ const Cart = () => {
                                 </div>
                             )}
 
+                            {/* Quick 1-Tap Popular Campus Spots */}
+                            {campusLocations.filter(l => l.is_popular).length > 0 && (
+                                <div className="space-y-1.5">
+                                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                                        <Sparkles className="h-3 w-3 text-amber-500" /> Popular Spots (1-Tap):
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {campusLocations.filter(l => l.is_popular).slice(0, 6).map(loc => {
+                                            const isSelected = deliveryLocation.includes(loc.name);
+                                            return (
+                                                <button
+                                                    key={loc.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDeliveryLocation(loc.name);
+                                                        if (loc.lat && loc.lng) {
+                                                            setDeliveryCoords({ lat: loc.lat, lng: loc.lng });
+                                                        }
+                                                        localStorage.setItem('selected_campus_location', loc.name);
+                                                    }}
+                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                                                        isSelected
+                                                            ? 'bg-primary text-primary-foreground border-primary'
+                                                            : 'bg-muted hover:bg-muted/80 text-foreground'
+                                                    }`}
+                                                >
+                                                    <Star className={`h-2.5 w-2.5 ${isSelected ? 'fill-primary-foreground' : 'fill-amber-400 text-amber-500'}`} />
+                                                    <span>{loc.name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {zones.length > 0 && (
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-muted-foreground">Select Delivery Zone Rate</Label>
@@ -345,7 +435,9 @@ const Cart = () => {
                                             const selected = zones.find(z => z.zone_name === e.target.value);
                                             if (selected) {
                                                 setDeliveryFee(Number(selected.delivery_fee));
-                                                setDeliveryLocation(selected.zone_name);
+                                                if (!deliveryLocation) {
+                                                    setDeliveryLocation(selected.zone_name);
+                                                }
                                             }
                                         }}
                                     >
@@ -357,13 +449,76 @@ const Cart = () => {
                                     </select>
                                 </div>
                             )}
-                            <Input
-                                id="location"
-                                value={deliveryLocation}
-                                onChange={(e) => setDeliveryLocation(e.target.value)}
-                                placeholder="Enter specific hostel room / delivery details"
-                                className="w-full"
-                            />
+
+                            {/* Autocomplete Input & Suggestions */}
+                            <div className="relative">
+                                <Label htmlFor="location" className="text-xs text-muted-foreground block mb-1">
+                                    Delivery Address / Room / Landmark
+                                </Label>
+                                <Input
+                                    id="location"
+                                    value={deliveryLocation}
+                                    onFocus={() => setShowSuggestions(true)}
+                                    onChange={(e) => {
+                                        setDeliveryLocation(e.target.value);
+                                        setShowSuggestions(true);
+                                    }}
+                                    placeholder="Type keyword (e.g. Hall 1, Room 204, Library, SUB)..."
+                                    className="w-full"
+                                />
+
+                                {/* Dropdown suggestions */}
+                                {showSuggestions && deliveryLocation.trim().length > 0 && (
+                                    <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-xl border bg-popover text-popover-foreground shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                                        {campusLocations
+                                            .filter(loc =>
+                                                loc.name.toLowerCase().includes(deliveryLocation.toLowerCase()) ||
+                                                (loc.description && loc.description.toLowerCase().includes(deliveryLocation.toLowerCase())) ||
+                                                loc.category.toLowerCase().includes(deliveryLocation.toLowerCase())
+                                            )
+                                            .slice(0, 6)
+                                            .map(loc => (
+                                                <button
+                                                    key={loc.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDeliveryLocation(loc.name);
+                                                        if (loc.lat && loc.lng) {
+                                                            setDeliveryCoords({ lat: loc.lat, lng: loc.lng });
+                                                        }
+                                                        localStorage.setItem('selected_campus_location', loc.name);
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                    className="w-full p-2.5 text-left flex items-start gap-2.5 hover:bg-muted/70 transition-colors border-b last:border-b-0"
+                                                >
+                                                    <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-semibold text-xs truncate">{loc.name}</span>
+                                                            <Badge variant="outline" className="text-[10px] px-1 py-0 capitalize">
+                                                                {loc.category}
+                                                            </Badge>
+                                                        </div>
+                                                        {loc.description && (
+                                                            <p className="text-[11px] text-muted-foreground truncate">{loc.description}</p>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        <div className="p-2 bg-muted/40 border-t flex justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 text-[10px]"
+                                                onClick={() => setShowSuggestions(false)}
+                                            >
+                                                Close Suggestions
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

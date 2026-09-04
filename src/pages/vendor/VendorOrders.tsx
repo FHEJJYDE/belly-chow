@@ -149,22 +149,17 @@ const VendorOrders = () => {
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {order.status === 'pending' && (
                 <>
-                  <Button size="sm" onClick={() => updateStatus(order.id, 'accepted')} className="font-semibold gap-1">
-                    Accept Order
+                  <Button size="sm" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1">
+                    Accept & Mark Ready 🍱
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => updateStatus(order.id, 'rejected')} className="font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive border-destructive/30">
                     Reject
                   </Button>
                 </>
               )}
-              {order.status === 'accepted' && (
-                <Button size="sm" onClick={() => updateStatus(order.id, 'preparing')} className="font-semibold gap-1">
-                  Start Preparing
-                </Button>
-              )}
-              {order.status === 'preparing' && (
+              {['accepted', 'preparing'].includes(order.status) && (
                 <Button size="sm" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1">
-                  Mark Ready
+                  Mark Ready for Pickup 🍱
                 </Button>
               )}
             </div>

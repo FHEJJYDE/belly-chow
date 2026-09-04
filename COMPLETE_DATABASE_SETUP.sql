@@ -947,6 +947,19 @@ CREATE POLICY "Allow full access on menu_items" ON public.menu_items FOR ALL USI
 DROP POLICY IF EXISTS "Drinks viewable by everyone" ON public.drinks;
 CREATE POLICY "Drinks viewable by everyone" ON public.drinks FOR SELECT USING (true);
 
+-- Favourites Table & Policies
+CREATE TABLE IF NOT EXISTS public.favourites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    vendor_id UUID REFERENCES public.vendors(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, vendor_id)
+);
+
+ALTER TABLE public.favourites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow full access on favourites" ON public.favourites;
+CREATE POLICY "Allow full access on favourites" ON public.favourites FOR ALL USING (true);
+
 -- Delivery Zones Policies
 DROP POLICY IF EXISTS "Allow public read on delivery_zones" ON public.delivery_zones;
 CREATE POLICY "Allow public read on delivery_zones" ON public.delivery_zones FOR SELECT USING (true);

@@ -160,15 +160,12 @@ const VendorDashboard = () => {
                       <Badge variant={order.status === 'pending' ? 'destructive' : 'default'}>{order.status}</Badge>
                       {order.status === 'pending' && (
                         <div className="flex gap-1">
-                          <Button size="sm" onClick={() => updateOrderStatus(order.id, 'accepted')}>Accept</Button>
+                          <Button size="sm" onClick={() => updateOrderStatus(order.id, 'ready')}>Accept & Mark Ready 🍱</Button>
                           <Button size="sm" variant="destructive" onClick={() => updateOrderStatus(order.id, 'rejected')}>Reject</Button>
                         </div>
                       )}
-                      {order.status === 'accepted' && (
-                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'preparing')}>Start Preparing</Button>
-                      )}
-                      {order.status === 'preparing' && (
-                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'ready')}>Mark Ready</Button>
+                      {['accepted', 'preparing'].includes(order.status) && (
+                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'ready')}>Mark Ready 🍱</Button>
                       )}
                     </div>
                   </CardContent>

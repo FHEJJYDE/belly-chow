@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      campus_locations: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_popular: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          lat?: number | null
+          lng?: number | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_popular?: boolean
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       disputes: {
         Row: {
           admin_notes: string | null

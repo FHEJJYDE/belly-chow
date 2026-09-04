@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GraduationCap, Store, Bike } from 'lucide-react';
+import { User, Store, Bike } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { useToast } from '@/hooks/use-toast';
 import type { Enums } from '@/integrations/supabase/types';
@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 type AppRole = Enums<"app_role">;
 
 const roles: { value: AppRole; label: string; icon: React.ReactNode; desc: string }[] = [
-  { value: 'student', label: 'Student', icon: <GraduationCap className="h-5 w-5" />, desc: 'Order food on campus' },
+  { value: 'student', label: 'User / Customer', icon: <User className="h-5 w-5" />, desc: 'Order food & drinks' },
   { value: 'vendor', label: 'Vendor', icon: <Store className="h-5 w-5" />, desc: 'Sell your food' },
   { value: 'rider', label: 'Rider', icon: <Bike className="h-5 w-5" />, desc: 'Deliver & earn' },
 ];
