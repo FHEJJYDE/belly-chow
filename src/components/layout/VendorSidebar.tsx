@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, UtensilsCrossed } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, UtensilsCrossed, Wallet } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { NavLink } from '@/components/NavLink';
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: 'Overview', url: '/vendor-panel', icon: LayoutDashboard },
   { title: 'Orders', url: '/vendor-panel/orders', icon: Package },
   { title: 'Menu', url: '/vendor-panel/menu', icon: UtensilsCrossed },
+  { title: 'Payouts', url: '/vendor-panel/payouts', icon: Wallet },
   { title: 'Settings', url: '/vendor-panel/settings', icon: Settings },
 ];
 

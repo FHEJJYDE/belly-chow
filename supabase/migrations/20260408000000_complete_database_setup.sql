@@ -245,36 +245,85 @@ CREATE TABLE IF NOT EXISTS public.delivery_zones (
 
 CREATE TABLE IF NOT EXISTS public.campus_locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   category TEXT NOT NULL DEFAULT 'Hostel',
   description TEXT DEFAULT '',
+  short_code TEXT DEFAULT NULL,
+  aliases TEXT[] DEFAULT '{}',
+  zone_name VARCHAR(100) DEFAULT NULL,
+  delivery_fee NUMERIC NOT NULL DEFAULT 500,
+  estimated_delivery_mins INTEGER DEFAULT 15,
+  dropoff_points TEXT[] DEFAULT ARRAY['Main Gate / Porter''s Lodge', 'Main Entrance'],
   is_popular BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true,
+  display_order INTEGER DEFAULT 0,
   lat NUMERIC DEFAULT NULL,
   lng NUMERIC DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Seed default campus locations if table is newly created
-INSERT INTO public.campus_locations (name, category, description, is_popular, is_active)
-VALUES
-  ('Hall 1 (Independence Hall)', 'Hostel', 'Male Hostel, Main Campus', true, true),
-  ('Hall 2 (Queen Elizabeth)', 'Hostel', 'Female Hostel, Central Area', true, true),
-  ('Hall 3 (Alexander Brown)', 'Hostel', 'Medical Hostel, East Wing', true, true),
-  ('Hall 4 (Sultan Bello)', 'Hostel', 'Male Hostel, North Gate', true, true),
-  ('Hall 5 (Queen Idia)', 'Hostel', 'Female Hostel, Close to Gate 2', true, true),
-  ('Main University Library (Kenneth Dike)', 'Library', 'Central Reading Halls & Quadrangle', true, true),
-  ('Faculty of Engineering', 'Faculty', 'Engineering Lecture Theatres & Labs', true, true),
-  ('Faculty of Social Sciences', 'Faculty', 'Faculty Complex & Departmental Blocks', false, true),
-  ('Faculty of Arts & Humanities', 'Faculty', 'Arts Quadrangle & Large Lecture Halls', false, true),
-  ('Faculty of Science', 'Faculty', 'Science Lecture Theatres & Blocks', false, true),
-  ('College of Medicine', 'Faculty', 'Medical Sciences Complex', true, true),
-  ('SUB (Student Union Building)', 'Landmark', 'Student Plaza, Arcade & Chow Square', true, true),
-  ('Main University Gate (Security Post)', 'Gate', 'Front Entrance & Transit Station', false, true),
-  ('Second Gate (North Exit)', 'Gate', 'North Campus Access Gate', false, true),
-  ('Postgraduate Hall (PG Hostel)', 'Hostel', 'PG Complex, Block A/B/C', false, true)
-ON CONFLICT DO NOTHING;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS short_code TEXT DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS aliases TEXT[] DEFAULT '{}';
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS zone_name VARCHAR(100) DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC NOT NULL DEFAULT 500;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS estimated_delivery_mins INTEGER DEFAULT 15;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS dropoff_points TEXT[] DEFAULT ARRAY['Main Gate / Porter''s Lodge', 'Main Entrance'];
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS lat NUMERIC DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS lng NUMERIC DEFAULT NULL;
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS saved_locations JSONB DEFAULT '[]'::jsonb;
+
+-- RPC: Allow authenticated students to contribute a slang / nickname to any campus location
+CREATE OR REPLACE FUNCTION public.add_location_slang(
+  p_location_id UUID,
+  p_slang TEXT
+)
+RETURNS TEXT[] AS $$
+DECLARE
+  v_clean TEXT;
+  v_existing TEXT[];
+  v_updated TEXT[];
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'You must be logged in to add a campus slang or nickname';
+  END IF;
+
+  v_clean := TRIM(REGEXP_REPLACE(p_slang, '\s+', ' ', 'g'));
+
+  IF LENGTH(v_clean) < 2 OR LENGTH(v_clean) > 30 THEN
+    RAISE EXCEPTION 'Campus slang must be between 2 and 30 characters';
+  END IF;
+
+  SELECT COALESCE(aliases, '{}') INTO v_existing
+  FROM public.campus_locations
+  WHERE id = p_location_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Campus location not found';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unnest(v_existing) AS elem
+    WHERE LOWER(elem) = LOWER(v_clean)
+  ) THEN
+    RETURN v_existing;
+  END IF;
+
+  IF COALESCE(array_length(v_existing, 1), 0) >= 25 THEN
+    RAISE EXCEPTION 'Maximum number of slang tags reached for this location';
+  END IF;
+
+  UPDATE public.campus_locations
+  SET aliases = array_append(COALESCE(aliases, '{}'), v_clean),
+      updated_at = NOW()
+  WHERE id = p_location_id
+  RETURNING aliases INTO v_updated;
+
+  RETURN v_updated;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TABLE IF NOT EXISTS public.vendor_promotions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -323,6 +372,18 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_lat NUMERIC DEFAULT 
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_lng NUMERIC DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS rider_lat NUMERIC DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS rider_lng NUMERIC DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS dropoff_point TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS room_number TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_instruction TEXT DEFAULT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_campus_locations_active_popular
+  ON public.campus_locations (is_active, is_popular DESC, display_order ASC);
+CREATE INDEX IF NOT EXISTS idx_orders_active_rider_tracking
+  ON public.orders (rider_id, status)
+  WHERE status IN ('accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
+CREATE INDEX IF NOT EXISTS idx_orders_active_student_tracking
+  ON public.orders (student_id, status)
+  WHERE status IN ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
 
 CREATE TABLE IF NOT EXISTS public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -568,20 +629,6 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 );
 
 ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS vendor_delivery_fee NUMERIC NOT NULL DEFAULT 200;
-
-CREATE TABLE IF NOT EXISTS public.campus_locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  category TEXT NOT NULL DEFAULT 'hostel',
-  short_code TEXT,
-  landmark TEXT,
-  estimated_delivery_mins INTEGER DEFAULT 20,
-  is_popular BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true,
-  display_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS public.hero_banners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

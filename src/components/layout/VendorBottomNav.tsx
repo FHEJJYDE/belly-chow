@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, UtensilsCrossed, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, UtensilsCrossed, Settings, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
   { to: '/vendor-panel', icon: LayoutDashboard, label: 'Overview' },
   { to: '/vendor-panel/orders', icon: Package, label: 'Orders' },
   { to: '/vendor-panel/menu', icon: UtensilsCrossed, label: 'Menu' },
+  { to: '/vendor-panel/payouts', icon: Wallet, label: 'Payouts' },
   { to: '/vendor-panel/settings', icon: Settings, label: 'Settings' },
 ];
 

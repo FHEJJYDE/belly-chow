@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getDistanceMeters } from '@/hooks/useCampusLocations';
 
 interface Location {
   lat: number;
@@ -12,6 +13,9 @@ interface LocationContextType {
   location: Location | null;
   error: string | null;
   loading: boolean;
+  isSharingLiveStudentGps: boolean;
+  setIsSharingLiveStudentGps: (share: boolean) => void;
+  requestCurrentLocation: () => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -20,14 +24,19 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { user, role } = useAuth();
   const [location, setLocation] = useState<Location | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+  const [isSharingLiveStudentGps, setIsSharingLiveStudentGps] = useState(false);
+
   const lastUpdated = useRef<number>(0);
+  const lastBroadcastCoords = useRef<{ lat: number; lng: number } | null>(null);
   const activeOrderRef = useRef<string | null>(null);
 
-  // 1. Fetch current active order to update
+  // 1. Fetch current active order scoped strictly to the logged-in user (prevents 10k-user broadcast storm)
   useEffect(() => {
-    if (!user) {
+    if (!user || (role !== 'rider' && role !== 'student')) {
       activeOrderRef.current = null;
+      setHasActiveOrder(false);
       return;
     }
 
@@ -43,6 +52,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             .limit(1)
             .maybeSingle();
           activeOrderRef.current = data?.id || null;
+          setHasActiveOrder(Boolean(data?.id));
         } else if (role === 'student') {
           const { data } = await supabase
             .from('orders')
@@ -53,6 +63,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             .limit(1)
             .maybeSingle();
           activeOrderRef.current = data?.id || null;
+          setHasActiveOrder(Boolean(data?.id));
         }
       } catch (err) {
         console.error('Error fetching active order for location tracking:', err);
@@ -61,12 +72,13 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     fetchActiveOrder();
 
-    // Subscribe to database changes to update the active order in real time
+    // Filter realtime subscription strictly to this user's column so 10,000 students don't receive each other's events
+    const filterColumn = role === 'rider' ? `rider_id=eq.${user.id}` : `student_id=eq.${user.id}`;
     const channel = supabase
-      .channel('location-order-sync')
+      .channel(`location-order-sync-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
+        { event: '*', schema: 'public', table: 'orders', filter: filterColumn },
         () => fetchActiveOrder()
       )
       .subscribe();
@@ -76,8 +88,44 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [user, role]);
 
-  // 2. Track GPS continuously
+  // One-shot manual GPS fix helper
+  const requestCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+        setError(null);
+        setLoading(false);
+      },
+      (err) => {
+        setLoading(false);
+        setError(err.message || 'Unable to retrieve GPS position');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+    );
+  }, []);
+
+  // 2. Track continuous GPS ONLY for active riders (or students who explicitly opt into live walk tracking)
+  // This prevents student live GPS from overwriting their chosen hostel/faculty coordinates!
+  const shouldWatchContinuously =
+    Boolean(user) &&
+    hasActiveOrder &&
+    (role === 'rider' || (role === 'student' && isSharingLiveStudentGps));
+
   useEffect(() => {
+    if (!shouldWatchContinuously) {
+      setLoading(false);
+      return;
+    }
+
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
       setLoading(false);
@@ -100,10 +148,22 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLoading(false);
       setError(null);
 
-      // Throttled database update (once every 4 seconds)
+      // Throttled database update (minimum 5 seconds AND at least 12 meters movement)
       const now = Date.now();
-      if (now - lastUpdated.current < 4000) return;
+      if (now - lastUpdated.current < 5000) return;
+
+      if (lastBroadcastCoords.current) {
+        const movedMeters = getDistanceMeters(
+          lastBroadcastCoords.current.lat,
+          lastBroadcastCoords.current.lng,
+          coords.lat,
+          coords.lng
+        );
+        if (movedMeters < 12) return; // Skip redundant DB write if stationary
+      }
+
       lastUpdated.current = now;
+      lastBroadcastCoords.current = { lat: coords.lat, lng: coords.lng };
 
       // Skip database update if simulating in Rider Dashboard
       const isSimulating = localStorage.getItem(`rider_sim_${activeOrderRef.current}`) === 'true';
@@ -119,7 +179,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 rider_lng: coords.lng,
               } as any)
               .eq('id', activeOrderRef.current);
-          } else if (role === 'student') {
+          } else if (role === 'student' && isSharingLiveStudentGps) {
             await supabase
               .from('orders')
               .update({
@@ -144,7 +204,9 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (err) => {
           if (!active) return;
           switch (err.code) {
-            case 1: setError('Location permission denied. Please allow access in browser settings.'); break;
+            case 1:
+              setError('Location permission denied. Please allow access in browser settings.');
+              break;
             case 2:
               setError('GPS signal lost. Retrying…');
               retryTimer = setTimeout(() => startWatch(), 8000);
@@ -153,18 +215,18 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               setError('GPS timed out. Retrying…');
               retryTimer = setTimeout(() => startWatch(), 8000);
               break;
-            default: setError(err.message);
+            default:
+              setError(err.message);
           }
           setLoading(false);
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 4000 }
       );
     };
 
-    // Immediately get a one-shot fix so the UI has coords right away
     navigator.geolocation.getCurrentPosition(
       handleSuccess,
-      () => { /* ignore one-shot error; watch will handle it */ },
+      () => { /* watch will handle retry */ },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
 
@@ -175,10 +237,19 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [user, role]);
+  }, [shouldWatchContinuously, user, role, isSharingLiveStudentGps]);
 
   return (
-    <LocationContext.Provider value={{ location, error, loading }}>
+    <LocationContext.Provider
+      value={{
+        location,
+        error,
+        loading,
+        isSharingLiveStudentGps,
+        setIsSharingLiveStudentGps,
+        requestCurrentLocation,
+      }}
+    >
       {children}
     </LocationContext.Provider>
   );

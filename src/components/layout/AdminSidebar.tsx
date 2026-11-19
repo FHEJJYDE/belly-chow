@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package, Users, Settings, CreditCard, AlertTriangle, RefreshCw, ShieldCheck, MessageSquare, Tag, Shield, Bike, MapPin, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Store, Package, Users, Settings, CreditCard, AlertTriangle, RefreshCw, ShieldCheck, MessageSquare, Tag, Shield, Bike, MapPin, Sparkles, CupSoda } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -20,6 +20,7 @@ const items = [
   { title: 'Vendors', url: '/admin/vendors', icon: Store },
   { title: 'Riders & Vetting', url: '/admin/riders', icon: Bike },
   { title: 'Orders', url: '/admin/orders', icon: Package },
+  { title: 'Drinks Upsell', url: '/admin/drinks', icon: CupSoda },
   { title: 'Delivery Locations', url: '/admin/locations', icon: MapPin },
   { title: 'Payments', url: '/admin/payments', icon: CreditCard },
   { title: 'Escrow', url: '/admin/escrow', icon: Shield },
