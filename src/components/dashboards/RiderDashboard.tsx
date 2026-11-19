@@ -254,37 +254,45 @@ const RiderDashboard = () => {
 
   const enrichOrders = async (orders: any[]): Promise<EnrichedOrder[]> => {
     if (orders.length === 0) return [];
-    const vendorIds = [...new Set(orders.map(o => o.vendor_id))];
-    // Also fetch lat/lng so we can do proximity sorting
-    const { data: vendors } = await (supabase.from('vendors') as any).select('id, name, address, user_id, lat, lng').in('id', vendorIds);
+    const vendorIds = [...new Set(orders.map((o) => o.vendor_id))];
+    const studentIds = [...new Set(orders.map((o) => o.student_id))];
+    const orderIds = orders.map((o) => o.id);
 
-    const vendorMap = new Map(vendors?.map(v => [v.id, v]) || []);
-    const studentIds = [...new Set(orders.map(o => o.student_id))];
-    const { data: profiles } = await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', studentIds);
-    const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-    const orderIds = orders.map(o => o.id);
-    const { data: orderItems } = await supabase.from('order_items').select('order_id, quantity, price, menu_item_id').in('order_id', orderIds);
-    const menuItemIds = [...new Set(orderItems?.map(oi => oi.menu_item_id) || [])];
-    let menuMap = new Map<string, string>();
-    if (menuItemIds.length > 0) {
-      const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds);
-      menuMap = new Map(menuItems?.map(m => [m.id, m.name]) || []);
-    }
+    // Fetch vendors, student profiles, and order items with nested menu_items in 1 parallel round-trip
+    const [{ data: vendors }, { data: profiles }, { data: orderItems }] = await Promise.all([
+      (supabase.from('vendors') as any)
+        .select('id, name, address, user_id, lat, lng')
+        .in('id', vendorIds),
+      supabase.from('profiles').select('user_id, full_name, phone').in('user_id', studentIds),
+      supabase
+        .from('order_items')
+        .select('order_id, quantity, price, menu_item_id, menu_items(name)')
+        .in('order_id', orderIds),
+    ]);
+
+    const vendorMap = new Map(vendors?.map((v: any) => [v.id, v]) || []);
+    const profileMap = new Map(profiles?.map((p: any) => [p.user_id, p]) || []);
+
     const itemsByOrder = new Map<string, { name: string; quantity: number; price: number }[]>();
-    orderItems?.forEach(oi => {
+    orderItems?.forEach((oi: any) => {
       const list = itemsByOrder.get(oi.order_id) || [];
-      list.push({ name: menuMap.get(oi.menu_item_id) || 'Unknown', quantity: oi.quantity, price: oi.price });
+      list.push({
+        name: oi.menu_items?.name || 'Item',
+        quantity: oi.quantity,
+        price: oi.price,
+      });
       itemsByOrder.set(oi.order_id, list);
     });
-    return orders.map(o => {
+
+    return orders.map((o) => {
       const vendor = vendorMap.get(o.vendor_id) as any;
-      const profile = profileMap.get(o.student_id);
+      const profile = profileMap.get(o.student_id) as any;
       return {
         ...o,
         vendor_name: vendor?.name || 'Unknown Vendor',
         vendor_address: vendor?.address || '',
-        vendor_lat: vendor ? (Number(vendor.lat) || null) : null,
-        vendor_lng: vendor ? (Number(vendor.lng) || null) : null,
+        vendor_lat: vendor ? Number(vendor.lat) || null : null,
+        vendor_lng: vendor ? Number(vendor.lng) || null : null,
         vendor_user_id: vendor?.user_id || '',
         customer_name: profile?.full_name || 'Unknown',
         customer_phone: profile?.phone || '',
@@ -331,15 +339,23 @@ const RiderDashboard = () => {
     if (!user) return;
     const fetchOrders = async () => {
       const [avail, mine, history] = await Promise.all([
-        supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }),
-        supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering', 'arrived']).order('created_at', { ascending: false }),
+        supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }).limit(30),
+        supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering', 'arrived']).order('created_at', { ascending: false }).limit(10),
         supabase.from('orders').select('*').eq('rider_id', user.id).eq('status', 'delivered').order('created_at', { ascending: false }).limit(50),
       ]);
-      const [enrichedAvail, enrichedMine, enrichedHistory] = await Promise.all([
-        enrichOrders(avail.data || []),
-        enrichOrders(mine.data || []),
-        enrichOrders(history.data || []),
-      ]);
+      const availList = avail.data || [];
+      const mineList = mine.data || [];
+      const historyList = history.data || [];
+
+      // Deduplicate & enrich all orders in a single batch instead of 3 separate enrichOrders calls
+      const combinedMap = new Map<string, any>();
+      [...availList, ...mineList, ...historyList].forEach((o) => combinedMap.set(o.id, o));
+      const allEnriched = await enrichOrders(Array.from(combinedMap.values()));
+      const enrichedById = new Map(allEnriched.map((o) => [o.id, o]));
+
+      const enrichedAvail = availList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
+      const enrichedMine = mineList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
+      const enrichedHistory = historyList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
       setAvailableOrders(enrichedAvail);
       setMyOrders(enrichedMine);
       setDeliveryHistory(enrichedHistory);

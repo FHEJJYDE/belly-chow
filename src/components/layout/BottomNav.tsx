@@ -9,13 +9,13 @@ const BottomNav = () => {
   const { itemCount } = useCart();
   const location = useLocation();
 
-  if (!user || role === 'admin' || role === 'vendor') return null;
+  if (!user || role !== 'student') return null;
 
   const items = [
     { to: '/dashboard', icon: Home, label: 'Home' },
-    ...(role === 'student' ? [{ to: '/vendors', icon: Store, label: 'Vendors' }] : []),
+    { to: '/vendors', icon: Store, label: 'Vendors' },
     { to: '/orders', icon: Package, label: 'Orders' },
-    ...(role === 'student' ? [{ to: '/cart', icon: ShoppingCart, label: 'Cart', badge: itemCount }] : []),
+    { to: '/cart', icon: ShoppingCart, label: 'Cart', badge: itemCount },
     { to: '/profile', icon: User, label: 'Profile' },
   ];
 

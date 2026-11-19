@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
@@ -184,19 +185,36 @@ const StudentDashboard = () => {
     };
   }, [user]);
 
-  // 5. Fetch vendors and menu items
-  useEffect(() => {
-    const fetchData = async () => {
+  // 5. Fetch vendors and menu items via React Query cache (instant 0ms load on revisit)
+  const { data: cachedCatalog, isLoading: catalogLoading } = useQuery({
+    queryKey: ['student_marketplace_catalog'],
+    queryFn: async () => {
       const [vendorRes, menuRes] = await Promise.all([
         supabase.from('vendors').select('*').eq('is_approved', true).order('name'),
-        supabase.from('menu_items').select('*, vendor:vendors!menu_items_vendor_id_fkey(id, name, logo_url, opening_time, closing_time, is_active)').eq('is_available', true),
+        supabase
+          .from('menu_items')
+          .select(
+            '*, vendor:vendors!menu_items_vendor_id_fkey(id, name, logo_url, opening_time, closing_time, is_active)'
+          )
+          .eq('is_available', true),
       ]);
-      setVendors(vendorRes.data || []);
-      setMenuItems((menuRes.data as unknown as MenuItemWithVendor[]) || []);
+      return {
+        vendors: vendorRes.data || [],
+        menuItems: (menuRes.data as unknown as MenuItemWithVendor[]) || [],
+      };
+    },
+    staleTime: 1000 * 60 * 3, // 3 mins cache
+  });
+
+  useEffect(() => {
+    if (cachedCatalog) {
+      setVendors(cachedCatalog.vendors);
+      setMenuItems(cachedCatalog.menuItems);
       setLoading(false);
-    };
-    fetchData();
-  }, []);
+    } else if (!catalogLoading) {
+      setLoading(false);
+    }
+  }, [cachedCatalog, catalogLoading]);
 
   // 6. Fetch authentic most ordered meals
   useEffect(() => {

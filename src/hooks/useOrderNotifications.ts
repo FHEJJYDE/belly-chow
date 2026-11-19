@@ -89,18 +89,37 @@ export function useOrderNotifications() {
 
     const init = async () => {
       if (role === 'student') {
-        const { data } = await supabase.from('orders').select('id, status').eq('student_id', user.id);
-        data?.forEach(o => orderStatuses.current.set(o.id, o.status));
+        const { data } = await supabase
+          .from('orders')
+          .select('id, status')
+          .eq('student_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
       } else if (role === 'vendor') {
-        const { data: v } = await supabase.from('vendors').select('id').eq('user_id', user.id).single();
+        const { data: v } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
         if (v) {
           vendorIdRef.current = v.id;
-          const { data } = await supabase.from('orders').select('id, status').eq('vendor_id', v.id);
-          data?.forEach(o => orderStatuses.current.set(o.id, o.status));
+          const { data } = await supabase
+            .from('orders')
+            .select('id, status')
+            .eq('vendor_id', v.id)
+            .order('created_at', { ascending: false })
+            .limit(30);
+          data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
         }
       } else if (role === 'rider') {
-        const { data } = await supabase.from('orders').select('id, status').or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`);
-        data?.forEach(o => orderStatuses.current.set(o.id, o.status));
+        const { data } = await supabase
+          .from('orders')
+          .select('id, status')
+          .or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`)
+          .order('created_at', { ascending: false })
+          .limit(30);
+        data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
       }
     };
     init();

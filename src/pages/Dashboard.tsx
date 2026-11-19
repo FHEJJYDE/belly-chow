@@ -1,12 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
-import RiderDashboard from '@/components/dashboards/RiderDashboard';
+
+const RiderDashboard = lazy(() => import('@/components/dashboards/RiderDashboard'));
 
 const Dashboard = () => {
   const { user, role, loading } = useAuth();
 
-  if (loading) {
+  if (loading || (user && !role)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -22,7 +24,17 @@ const Dashboard = () => {
     case 'vendor':
       return <Navigate to="/vendor-panel" replace />;
     case 'rider':
-      return <RiderDashboard />;
+      return (
+        <Suspense
+          fallback={
+            <div className="flex min-h-screen items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          }
+        >
+          <RiderDashboard />
+        </Suspense>
+      );
     default:
       return <StudentDashboard />;
   }

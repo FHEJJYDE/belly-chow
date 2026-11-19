@@ -9,309 +9,347 @@ import { mockPaymentService } from '@/services/mockPayment';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
-    CreditCard,
-    Building2,
-    Smartphone,
-    Shield,
-    Clock,
-    CheckCircle,
-    AlertCircle,
-    Loader2,
-    Wallet
+  CreditCard,
+  Building2,
+  Shield,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Wallet,
 } from 'lucide-react';
 
 interface PaymentModalProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    order: {
-        id: string;
-        total: number;
-        delivery_fee: number;
-        vendor_id: string;
-        items: Array<{
-            name: string;
-            quantity: number;
-            price: number;
-        }>;
-    };
-    onPaymentSuccess: (reference: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  order: {
+    id: string;
+    subtotal: number;
+    drink_total?: number;
+    discount_amount?: number;
+    delivery_fee: number;
+    platform_fee?: number;
+    total: number; // Exact grandTotal to pay
+    vendor_id: string;
+    items: Array<{
+      name: string;
+      quantity: number;
+      price: number;
+    }>;
+  };
+  onPaymentSuccess: (reference: string) => void;
 }
 
 const PaymentModal = ({ open, onOpenChange, order, onPaymentSuccess }: PaymentModalProps) => {
-    const { user } = useAuth();
-    const { toast } = useToast();
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [selectedMethod, setSelectedMethod] = useState<string>('wallet');
-    const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<string>('wallet');
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
-    const totalAmount = order.total + order.delivery_fee + 100;
-    const currency = import.meta.env.VITE_PAYMENT_CURRENCY || 'NGN';
-    const escrowHours = import.meta.env.VITE_ESCROW_RELEASE_DELAY_HOURS || '24';
+  const platformFee = order.platform_fee ?? 100;
+  const subtotal = order.subtotal ?? order.total;
+  const drinkTotal = order.drink_total ?? 0;
+  const discountAmount = order.discount_amount ?? 0;
+  // Exact amount without double-adding fees
+  const totalAmount =
+    order.subtotal !== undefined
+      ? Math.max(0, subtotal + drinkTotal - discountAmount + order.delivery_fee + platformFee)
+      : order.total;
 
-    useEffect(() => {
-        if (open && user) {
-            (supabase.rpc as any)('get_or_create_wallet', { p_user_id: user.id }).then(({ data }: any) => {
-                if (data) setWalletBalance(Number(data.balance));
-            });
+  const currency = import.meta.env.VITE_PAYMENT_CURRENCY || 'NGN';
+  const escrowHours = import.meta.env.VITE_ESCROW_RELEASE_DELAY_HOURS || '24';
+
+  useEffect(() => {
+    if (open && user) {
+      (supabase.rpc as any)('get_or_create_wallet', { p_user_id: user.id }).then(
+        ({ data }: any) => {
+          if (data) setWalletBalance(Number(data.balance));
         }
-    }, [open, user]);
+      );
+    }
+  }, [open, user]);
 
-    const paymentMethods = [
-        {
-            id: 'wallet',
-            name: 'Belly-Chow Wallet 💳',
-            icon: Wallet,
-            description: walletBalance !== null ? `Pay instantly from your wallet balance (Balance: ₦${walletBalance.toLocaleString()})` : 'Pay instantly from your in-app wallet balance',
-            recommended: true,
-        },
-        {
-            id: 'card',
-            name: 'Debit/Credit Card',
-            icon: CreditCard,
-            description: 'Pay with your Visa, Mastercard, or Verve card',
-            recommended: false,
-        },
-        {
-            id: 'bank_transfer',
-            name: 'Bank Transfer',
-            icon: Building2,
-            description: 'Direct transfer from your bank account',
-            recommended: false,
-        },
-    ];
+  const paymentMethods = [
+    {
+      id: 'wallet',
+      name: 'Belly-Chow Wallet 💳',
+      icon: Wallet,
+      description:
+        walletBalance !== null
+          ? `Pay instantly from your wallet balance (Balance: ₦${walletBalance.toLocaleString()})`
+          : 'Pay instantly from your in-app wallet balance',
+      recommended: true,
+    },
+    {
+      id: 'card',
+      name: 'Debit/Credit Card (Test Checkout)',
+      icon: CreditCard,
+      description: 'Pay via simulated card checkout',
+      recommended: false,
+    },
+    {
+      id: 'bank_transfer',
+      name: 'Bank Transfer (Test Checkout)',
+      icon: Building2,
+      description: 'Pay via simulated bank transfer',
+      recommended: false,
+    },
+  ];
 
-    const handlePayment = async () => {
-        if (!user) {
-            toast({
-                title: 'Authentication required',
-                description: 'Please log in to make a payment',
-                variant: 'destructive',
-            });
-            return;
+  const handlePayment = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to make a payment',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      if (selectedMethod === 'wallet') {
+        if (walletBalance === null || walletBalance < totalAmount) {
+          toast({
+            title: 'Insufficient Wallet Balance',
+            description: `Your wallet balance (₦${(walletBalance || 0).toLocaleString()}) is less than order total ₦${totalAmount.toLocaleString()}. Please top up your wallet or select Card / Bank Transfer.`,
+            variant: 'destructive',
+          });
+          setIsProcessing(false);
+          return;
         }
 
-        setIsProcessing(true);
+        // Call pay_with_wallet RPC
+        const { error: walletErr } = await (supabase.rpc as any)('pay_with_wallet', {
+          p_user_id: user.id,
+          p_amount: totalAmount,
+          p_order_id: order.id,
+        });
 
-        try {
-            if (selectedMethod === 'wallet') {
-                if (walletBalance === null || walletBalance < totalAmount) {
-                    toast({
-                        title: 'Insufficient Wallet Balance',
-                        description: `Your wallet balance (₦${(walletBalance || 0).toLocaleString()}) is less than order total ₦${totalAmount.toLocaleString()}. Please top up your wallet.`,
-                        variant: 'destructive',
-                    });
-                    setIsProcessing(false);
-                    return;
-                }
+        if (walletErr) throw walletErr;
 
-                // Call pay_with_wallet RPC
-                const { error: walletErr } = await (supabase.rpc as any)('pay_with_wallet', {
-                    p_user_id: user.id,
-                    p_amount: totalAmount,
-                    p_order_id: order.id,
-                });
+        // Update order payment status
+        await supabase
+          .from('orders')
+          .update({
+            payment_method: 'wallet' as any,
+            payment_status: 'confirmed' as any,
+            status: 'pending' as any,
+          })
+          .eq('id', order.id);
 
-                if (walletErr) throw walletErr;
+        // Create escrow record
+        const totalPlatformCut = platformFee + 200; // customer platform fee + vendor charge
+        const vendorNet = Math.max(0, subtotal + drinkTotal - 200);
+        await supabase.from('escrow_transactions').insert({
+          order_id: order.id,
+          vendor_id: order.vendor_id,
+          amount: totalAmount,
+          platform_fee: totalPlatformCut,
+          vendor_amount: vendorNet,
+          status: 'held',
+          hold_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          auto_release: true,
+        } as any);
 
-                // Update order payment status
-                await supabase.from('orders').update({
-                    payment_method: 'wallet' as any,
-                    payment_status: 'confirmed' as any,
-                    status: 'pending' as any,
-                }).eq('id', order.id);
+        toast({
+          title: 'Payment Successful! 🎉',
+          description: 'Order paid via Belly-Chow Wallet and sent to vendor.',
+        });
 
-                // Create escrow record
-                const platformFee = 300; // 100 platform + 200 vendor charge
-                const vendorNet = Math.max(0, order.total - 200);
-                await supabase.from('escrow_transactions').insert({
-                    order_id: order.id,
-                    vendor_id: order.vendor_id,
-                    amount: totalAmount,
-                    platform_fee: platformFee,
-                    vendor_amount: vendorNet,
-                    status: 'held',
-                    hold_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                    auto_release: true,
-                } as any);
+        onPaymentSuccess(`WAL_${order.id.slice(0, 8)}`);
+        onOpenChange(false);
+        return;
+      }
 
-                toast({
-                    title: 'Payment Successful! 🎉',
-                    description: 'Order paid via Belly-Chow Wallet and sent to vendor.',
-                });
+      const reference = mockPaymentService.generateReference('ORDER');
 
-                onPaymentSuccess(`WAL_${order.id.slice(0, 8)}`);
-                onOpenChange(false);
-                return;
-            }
+      // Save payment reference to order before redirecting to mock checkout
+      await supabase
+        .from('orders')
+        .update({
+          payment_reference: reference,
+          payment_method: 'bank_transfer' as any,
+        } as any)
+        .eq('id', order.id);
 
-            const reference = mockPaymentService.generateReference('ORDER');
-            const paymentRequest = {
-                amount: totalAmount,
-                currency,
-                reference,
-                customer: {
-                    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Customer',
-                    email: user.email!,
-                },
-                redirect_url: `${window.location.origin}/orders?payment=success&ref=${reference}`,
-            };
+      const paymentRequest = {
+        amount: totalAmount,
+        currency,
+        reference,
+        customer: {
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Customer',
+          email: user.email!,
+        },
+        redirect_url: `${window.location.origin}/orders?payment=success&ref=${reference}`,
+      };
 
-            const result = await mockPaymentService.initializePayment(paymentRequest);
+      const result = await mockPaymentService.initializePayment(paymentRequest);
 
-            if (result.status && result.data) {
-                // Redirect to mock checkout
-                window.location.href = result.data.checkout_url;
-            } else {
-                toast({
-                    title: 'Payment initialization failed',
-                    description: result.message || 'Unable to initialize payment',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error: any) {
-            console.error('Payment error:', error);
-            toast({
-                title: 'Payment error',
-                description: error.message || 'An unexpected error occurred',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+      if (result.status && result.data) {
+        // Pass orderId to MockCheckout so it can mark the order as confirmed in DB
+        window.location.href = `${result.data.checkout_url}&orderId=${order.id}`;
+      } else {
+        toast({
+          title: 'Payment initialization failed',
+          description: result.message || 'Unable to initialize payment',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast({
+        title: 'Payment error',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-green-500" />
-                        Secure Payment
-                    </DialogTitle>
-                </DialogHeader>
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-green-500" />
+            Secure Order Payment
+          </DialogTitle>
+        </DialogHeader>
 
-                <div className="space-y-4">
-                    {/* Order Summary */}
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm">Order Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span>Subtotal</span>
-                                <span>₦{order.total.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span>Delivery Fee</span>
-                                <span>₦{order.delivery_fee.toLocaleString()}</span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between font-semibold">
-                                <span>Total</span>
-                                <span>₦{totalAmount.toLocaleString()}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Payment Methods */}
-                    <div className="space-y-3">
-                        <h3 className="font-medium text-sm">Select Payment Method</h3>
-                        {paymentMethods.map((method) => (
-                            <Card
-                                key={method.id}
-                                className={`cursor-pointer transition-all ${selectedMethod === method.id
-                                    ? 'ring-2 ring-primary border-primary'
-                                    : 'hover:border-primary/50'
-                                    }`}
-                                onClick={() => setSelectedMethod(method.id)}
-                            >
-                                <CardContent className="flex items-center gap-3 p-3">
-                                    <method.icon className="h-5 w-5 text-muted-foreground" />
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-medium text-sm">{method.name}</span>
-                                            {method.recommended && (
-                                                <Badge variant="secondary" className="text-xs">
-                                                    Recommended
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">{method.description}</p>
-                                    </div>
-                                    <div className={`h-4 w-4 rounded-full border-2 ${selectedMethod === method.id
-                                        ? 'border-primary bg-primary'
-                                        : 'border-muted-foreground'
-                                        }`}>
-                                        {selectedMethod === method.id && (
-                                            <CheckCircle className="h-3 w-3 text-primary-foreground" />
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-
-                    {/* Security Notice */}
-                    <Card className="bg-muted/50">
-                        <CardContent className="flex items-start gap-3 p-3">
-                            <Shield className="h-4 w-4 text-green-500 mt-0.5" />
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium">Secure Escrow Protection</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Your payment is held securely for {escrowHours} hours until order delivery is confirmed.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Security Features */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                            <span>SSL Encrypted</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                            <span>PCI Compliant</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Clock className="h-3 w-3 text-blue-500" />
-                            <span>Escrow Protected</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <AlertCircle className="h-3 w-3 text-orange-500" />
-                            <span>Refund Available</span>
-                        </div>
-                    </div>
-
-                    {/* Payment Button */}
-                    <Button
-                        onClick={handlePayment}
-                        disabled={isProcessing}
-                        className="w-full"
-                        size="lg"
-                    >
-                        {isProcessing ? (
-                            <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Processing...
-                            </>
-                        ) : (
-                            <>
-                                <Shield className="h-4 w-4 mr-2" />
-                                Pay ₦{totalAmount.toLocaleString()} Securely
-                            </>
-                        )}
-                    </Button>
-
-                    <p className="text-xs text-center text-muted-foreground">
-                        By proceeding, you agree to our terms and conditions.
-                        Test Mode - No real payment will be processed.
-                    </p>
+        <div className="space-y-4">
+          {/* Transparent Order Breakdown (No Double Fees) */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm">Payment Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Food Subtotal</span>
+                <span>₦{subtotal.toLocaleString()}</span>
+              </div>
+              {drinkTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Drinks Add-on</span>
+                  <span>₦{drinkTotal.toLocaleString()}</span>
                 </div>
-            </DialogContent>
-        </Dialog>
-    );
+              )}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span>Promo Discount</span>
+                  <span>-₦{discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Delivery Fee</span>
+                <span>₦{order.delivery_fee.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Platform Service Fee</span>
+                <span>₦{platformFee.toLocaleString()}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-bold text-base">
+                <span>Total Payable</span>
+                <span className="text-primary">₦{totalAmount.toLocaleString()}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Methods */}
+          <div className="space-y-2.5">
+            <h3 className="font-medium text-sm">Select Payment Method</h3>
+            {paymentMethods.map((method) => (
+              <Card
+                key={method.id}
+                className={`cursor-pointer transition-all ${
+                  selectedMethod === method.id
+                    ? 'ring-2 ring-primary border-primary bg-primary/5'
+                    : 'hover:border-primary/50'
+                }`}
+                onClick={() => setSelectedMethod(method.id)}
+              >
+                <CardContent className="flex items-center gap-3 p-3">
+                  <method.icon className="h-5 w-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{method.name}</span>
+                      {method.recommended && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Recommended
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{method.description}</p>
+                  </div>
+                  <div
+                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedMethod === method.id
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground'
+                    }`}
+                  >
+                    {selectedMethod === method.id && (
+                      <CheckCircle className="h-3 w-3 text-primary-foreground" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Security Notice */}
+          <Card className="bg-muted/50">
+            <CardContent className="flex items-start gap-3 p-3">
+              <Shield className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-xs font-medium">Secure Escrow Protection</p>
+                <p className="text-xs text-muted-foreground">
+                  Your payment is held securely in escrow for {escrowHours} hours until you confirm
+                  delivery receipt.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Security Features */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              <span>SSL Encrypted</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-3 w-3 text-blue-500" />
+              <span>Escrow Protected</span>
+            </div>
+          </div>
+
+          {/* Payment Button */}
+          <Button
+            onClick={handlePayment}
+            disabled={isProcessing}
+            className="w-full"
+            size="lg"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4 mr-2" />
+                Pay ₦{totalAmount.toLocaleString()} Securely
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export default PaymentModal;

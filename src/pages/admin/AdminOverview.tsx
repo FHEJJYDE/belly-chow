@@ -140,9 +140,9 @@ const AdminOverview = () => {
     setRefreshing(true);
     try {
       const [vendorsRes, ordersRes, usersRes] = await Promise.all([
-        supabase.from('vendors').select('*').order('created_at', { ascending: false }),
-        supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*').order('created_at', { ascending: false })
+        supabase.from('vendors').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500)
       ]);
 
       setVendors(vendorsRes.data || []);

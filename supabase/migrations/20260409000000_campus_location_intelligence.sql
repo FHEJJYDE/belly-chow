@@ -58,6 +58,12 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS saved_locations JSONB DEFAU
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS dropoff_point TEXT DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS room_number TEXT DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_instruction TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
+
+-- 3b. Align promo_codes columns with AdminPromoCodes & Cart checkout
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS discount_amount NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS min_order NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS used_count INTEGER NOT NULL DEFAULT 0;
 
 -- 4. RPC: Allow authenticated students to contribute a slang / nickname to any campus location
 -- Safely validates length, prevents duplicates, and caps aliases per location.
@@ -111,7 +117,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5. High-Concurrency Indexes for 10,000+ Campus Users
+-- 5. High-Concurrency Indexes for 10,000+ Campus Users & Fast Page Loads
 CREATE INDEX IF NOT EXISTS idx_campus_locations_active_popular
   ON public.campus_locations (is_active, is_popular DESC, display_order ASC);
 
@@ -125,3 +131,21 @@ CREATE INDEX IF NOT EXISTS idx_orders_active_rider_tracking
 CREATE INDEX IF NOT EXISTS idx_orders_active_student_tracking
   ON public.orders (student_id, status)
   WHERE status IN ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
+
+CREATE INDEX IF NOT EXISTS idx_orders_vendor_created
+  ON public.orders (vendor_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_student_created
+  ON public.orders (student_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+  ON public.order_items (order_id);
+
+CREATE INDEX IF NOT EXISTS idx_menu_items_vendor_available
+  ON public.menu_items (vendor_id, is_available);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+  ON public.notifications (user_id, is_read, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_vendors_approved
+  ON public.vendors (is_approved, is_active);

@@ -384,6 +384,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_active_rider_tracking
 CREATE INDEX IF NOT EXISTS idx_orders_active_student_tracking
   ON public.orders (student_id, status)
   WHERE status IN ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
+CREATE INDEX IF NOT EXISTS idx_orders_vendor_created
+  ON public.orders (vendor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_student_created
+  ON public.orders (student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+  ON public.order_items (order_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_vendor_available
+  ON public.menu_items (vendor_id, is_available);
+CREATE INDEX IF NOT EXISTS idx_vendors_approved
+  ON public.vendors (is_approved, is_active);
 
 CREATE TABLE IF NOT EXISTS public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -607,13 +617,21 @@ CREATE TABLE IF NOT EXISTS public.verifications (
 CREATE TABLE IF NOT EXISTS public.promo_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,
+  discount_amount NUMERIC NOT NULL DEFAULT 0,
   discount_percent NUMERIC NOT NULL DEFAULT 0,
+  min_order NUMERIC NOT NULL DEFAULT 0,
   max_uses INTEGER NOT NULL DEFAULT 100,
+  used_count INTEGER NOT NULL DEFAULT 0,
   uses_count INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS discount_amount NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS min_order NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS used_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.platform_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

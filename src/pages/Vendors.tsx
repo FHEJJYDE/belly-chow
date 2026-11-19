@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import AppNavbar from '@/components/layout/AppNavbar';
@@ -64,27 +65,28 @@ export default function VendorsPage() {
 
   const { isFavourite, toggleFavourite, favouriteVendorIds } = useFavourites();
 
-  useEffect(() => {
-    const fetchVendors = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('vendors')
-          .select('*')
-          .eq('is_approved', true)
-          .order('name');
+  const { data: queriedVendors, isLoading: queryLoading } = useQuery({
+    queryKey: ['approved_vendors_list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('is_approved', true)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 3,
+  });
 
-        if (!error && data) {
-          setVendors(data);
-        }
-      } catch (err) {
-        console.error('Error fetching vendors:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchVendors();
-  }, []);
+  useEffect(() => {
+    if (queriedVendors) {
+      setVendors(queriedVendors);
+      setLoading(false);
+    } else if (!queryLoading) {
+      setLoading(false);
+    }
+  }, [queriedVendors, queryLoading]);
 
   // Sync category state from URL if it changes
   useEffect(() => {
