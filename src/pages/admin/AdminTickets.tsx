@@ -85,7 +85,15 @@ const AdminTickets = () => {
               ) : tickets.map((ticket: any) => (
                 <TableRow key={ticket.id}>
                   <TableCell className="text-sm">{format(new Date(ticket.created_at), 'MMM d, yyyy')}</TableCell>
-                  <TableCell>{ticket.name}<br /><span className="text-xs text-muted-foreground">{ticket.email}</span></TableCell>
+                  <TableCell>
+                    {ticket.name || ticket.subject || 'Support Ticket'}
+                    {ticket.email && (
+                      <>
+                        <br />
+                        <span className="text-xs text-muted-foreground">{ticket.email}</span>
+                      </>
+                    )}
+                  </TableCell>
                   <TableCell><Badge variant="outline" className="capitalize">{ticket.category}</Badge></TableCell>
                   <TableCell><Badge className={statusColor(ticket.status)}>{ticket.status}</Badge></TableCell>
                   <TableCell>
@@ -96,7 +104,7 @@ const AdminTickets = () => {
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
-                        <DialogHeader><DialogTitle>Ticket from {ticket.name}</DialogTitle></DialogHeader>
+                        <DialogHeader><DialogTitle>{ticket.subject || `Ticket from ${ticket.name || 'User'}`}</DialogTitle></DialogHeader>
                         <div className="space-y-4">
                           <div>
                             <p className="text-sm font-medium text-muted-foreground">Category</p>
@@ -112,8 +120,9 @@ const AdminTickets = () => {
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="investigating">Investigating</SelectItem>
                                 <SelectItem value="resolved">Resolved</SelectItem>
+                                <SelectItem value="dismissed">Dismissed</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

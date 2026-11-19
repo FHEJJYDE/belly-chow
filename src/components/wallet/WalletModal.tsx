@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Wallet, ArrowDownRight, ArrowUpRight, ShieldCheck, History, RefreshCw, PlusCircle } from 'lucide-react';
-import { koraPayService } from '@/services/korapay';
+import { mockPaymentService } from '@/services/mockPayment';
 
 interface WalletModalProps {
   trigger?: React.ReactNode;
@@ -63,47 +63,32 @@ export default function WalletModal({ trigger, open, onOpenChange }: WalletModal
   const handleDeposit = async () => {
     const amount = Number(depositAmount);
     if (!user || !amount || amount <= 0) return;
-    if (amount > 20000) {
-      toast({ title: 'Deposit Limit Exceeded', description: 'Single deposit limit is ₦20,000 to prevent fraud.', variant: 'destructive' });
+    if (amount > 50000) {
+      toast({ title: 'Deposit Limit Exceeded', description: 'Single deposit limit is ₦50,000.', variant: 'destructive' });
       return;
     }
-    if (wallet && (wallet.balance + amount) > 50000) {
-      toast({ title: 'Balance Limit Exceeded', description: 'Maximum wallet balance limit is ₦50,000.', variant: 'destructive' });
+    if (wallet && wallet.balance + amount > 100000) {
+      toast({ title: 'Balance Limit Exceeded', description: 'Maximum wallet balance limit is ₦100,000.', variant: 'destructive' });
       return;
     }
 
     setDepositing(true);
     try {
-      const reference = `WAL_DEP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const reference = mockPaymentService.generateReference('WAL_DEP');
 
-      // Launch Korapay checkout for wallet top-up
-      const checkoutResult = await koraPayService.initializePayment({
-        amount,
-        currency: 'NGN',
-        reference,
-        narration: 'Belly-Chow Wallet Top-Up',
-        customer: {
-          name: user.user_metadata?.full_name || 'Student Customer',
-          email: user.email || '',
-        },
-        redirect_url: `${window.location.origin}/dashboard?wallet=success&ref=${reference}`,
+      const { error } = await (supabase.rpc as any)('deposit_to_wallet', {
+        p_user_id: user.id,
+        p_amount: amount,
+        p_reference: reference,
       });
 
-      if (checkoutResult.status && checkoutResult.data?.checkout_url) {
-        window.location.href = checkoutResult.data.checkout_url;
-      } else {
-        // Fallback for simulation or instant top up if key is mock
-        const { error } = await (supabase.rpc as any)('deposit_to_wallet', {
-          p_user_id: user.id,
-          p_amount: amount,
-          p_reference: reference,
-        });
-
-        if (error) throw error;
-        toast({ title: 'Wallet Top-Up Successful! 🎉', description: `₦${amount.toLocaleString()} added to your Belly-Chow wallet.` });
-        setDepositAmount('');
-        fetchWallet();
-      }
+      if (error) throw error;
+      toast({
+        title: 'Wallet Top-Up Successful! 🎉',
+        description: `₦${amount.toLocaleString()} added to your Belly-Chow wallet (Sandbox Mode).`,
+      });
+      setDepositAmount('');
+      fetchWallet();
     } catch (err: any) {
       toast({ title: 'Deposit failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -175,20 +160,25 @@ export default function WalletModal({ trigger, open, onOpenChange }: WalletModal
                   </CardContent>
                 </Card>
 
-                {/* Deposit Form */}
-                <div className="space-y-2 opacity-70">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Top-Up Wallet (Disabled temporarily)</label>
+                {/* Sandbox Top-Up Form */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Instant Wallet Top-Up (Sandbox / Test Mode)
+                  </label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
-                      placeholder="Verification pending..."
-                      disabled
+                      placeholder="Enter amount (e.g. 5000)"
                       value={depositAmount}
-                      onChange={e => setDepositAmount(e.target.value)}
-                      className="bg-muted/40 cursor-not-allowed"
+                      onChange={(e) => setDepositAmount(e.target.value)}
                     />
-                    <Button disabled className="gap-1.5 font-semibold shrink-0 cursor-not-allowed">
-                      <PlusCircle className="h-4 w-4" /> Deposit
+                    <Button
+                      onClick={handleDeposit}
+                      disabled={depositing || !depositAmount || Number(depositAmount) <= 0}
+                      className="gap-1.5 font-semibold shrink-0"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      {depositing ? 'Adding...' : 'Deposit'}
                     </Button>
                   </div>
                 </div>

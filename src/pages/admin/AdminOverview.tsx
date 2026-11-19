@@ -189,16 +189,15 @@ const AdminOverview = () => {
       return userDate >= prevStartDate && userDate <= prevEndDate;
     });
 
-    // Calculate metrics
-    const totalRevenue = filteredOrders
-      .filter(o => o.status === 'delivered')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    // Calculate metrics (also include all non-cancelled orders when calculating active volume if none delivered yet)
+    const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
+    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
     const prevRevenue = prevOrders
       .filter(o => o.status === 'delivered')
       .reduce((sum, o) => sum + Number(o.total || 0), 0);
 
-    const completedOrders = filteredOrders.filter(o => o.status === 'delivered').length;
+    const completedOrders = deliveredOrders.length;
     const pendingOrders = filteredOrders.filter(o => ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(o.status)).length;
     const cancelledOrders = filteredOrders.filter(o => ['cancelled', 'rejected'].includes(o.status)).length;
 
@@ -223,8 +222,8 @@ const AdminOverview = () => {
     setStats({
       totalRevenue,
       totalOrders: filteredOrders.length,
-      totalVendors: filteredVendors.length,
-      totalUsers: filteredUsers.length,
+      totalVendors: vendors.filter(v => v.is_approved).length,
+      totalUsers: users.length,
       pendingOrders,
       completedOrders,
       cancelledOrders,
@@ -313,10 +312,10 @@ const AdminOverview = () => {
   }, []);
 
   useEffect(() => {
-    if (orders.length > 0) {
+    if (!loading) {
       calculateStats();
     }
-  }, [orders, users, vendors, selectedTimeRange, customStartDate, customEndDate]);
+  }, [loading, orders, users, vendors, selectedTimeRange, customStartDate, customEndDate]);
 
   if (loading) {
     return (

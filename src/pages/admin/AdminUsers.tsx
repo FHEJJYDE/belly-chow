@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Search, User, Bike, Store, Shield, Ban, CheckCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getOrCreateVendor } from '@/lib/vendorUtils';
 
 interface UserWithRole {
   id: string;
@@ -88,6 +90,26 @@ const AdminUsers = () => {
     toast({ title: newStatus ? 'User suspended ⛔' : 'User unsuspended ✅' });
   };
 
+  const changeUserRole = async (u: UserWithRole, newRole: string) => {
+    if (newRole === u.role) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole as any })
+      .eq('user_id', u.user_id);
+
+    if (error) {
+      toast({ title: 'Role update failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    if (newRole === 'vendor') {
+      await getOrCreateVendor(u.user_id, u.profile?.full_name);
+    }
+
+    setUsers(prev => prev.map(item => item.user_id === u.user_id ? { ...item, role: newRole } : item));
+    toast({ title: `${u.profile?.full_name || 'User'} role updated to ${newRole.toUpperCase()} ✓` });
+  };
+
   const filtered = users.filter(u =>
     u.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     u.role.includes(search.toLowerCase()) ||
@@ -126,10 +148,18 @@ const AdminUsers = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${roleColors[u.role]}`}>
-              {u.role}
-            </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={u.role} onValueChange={(val) => changeUserRole(u, val)}>
+              <SelectTrigger className={`h-8 w-[115px] rounded-full px-3 text-xs font-medium capitalize border-0 ${roleColors[u.role]}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="student">Student</SelectItem>
+                <SelectItem value="vendor">Vendor</SelectItem>
+                <SelectItem value="rider">Rider</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
             {u.role !== 'admin' && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

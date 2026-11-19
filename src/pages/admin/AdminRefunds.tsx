@@ -57,7 +57,8 @@ const AdminRefunds = () => {
     if (!selected) return;
     const updates: any = {};
     if (newRefundStatus) updates.refund_status = newRefundStatus;
-    if (refundAmount) updates.refund_amount = parseFloat(refundAmount);
+    const parsedAmount = refundAmount ? parseFloat(refundAmount) : Number(selected.refund_amount || selected.total);
+    if (refundAmount) updates.refund_amount = parsedAmount;
     if (refundNotes) updates.refund_notes = refundNotes;
 
     const { error } = await supabase.from('orders').update(updates).eq('id', selected.id);
@@ -65,7 +66,22 @@ const AdminRefunds = () => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Refund updated' });
+
+    // Credit student wallet automatically when refund is marked as processed
+    if (newRefundStatus === 'processed' && selected.refund_status !== 'processed' && selected.student_id && parsedAmount > 0) {
+      try {
+        await supabase.rpc('deposit_to_wallet', {
+          p_user_id: selected.student_id,
+          p_amount: parsedAmount,
+          p_reference: `ADMIN_REFUND_${selected.id.slice(0, 8)}_${Date.now()}`,
+        });
+        await supabase.from('orders').update({ payment_status: 'refunded' as any }).eq('id', selected.id);
+      } catch (err) {
+        console.error('Wallet refund credit error:', err);
+      }
+    }
+
+    toast({ title: newRefundStatus === 'processed' ? 'Refund processed & credited to student wallet ✓' : 'Refund updated' });
     setSelected(null);
     fetchOrders();
   };

@@ -123,6 +123,10 @@ const VendorOrders = () => {
 
   const OrderCard = ({ order }: { order: Order }) => {
     const items = orderItems[order.id] || [];
+    const drinkItems: { name: string; quantity: number; price: number }[] = Array.isArray((order as any).drink_items)
+      ? (order as any).drink_items
+      : [];
+    const totalLineItems = items.length + drinkItems.length;
     const isExpanded = expandedOrders.has(order.id);
     return (
       <Card className="premium-card bg-card/30 border-border/40 overflow-hidden shadow-sm">
@@ -205,16 +209,22 @@ const VendorOrders = () => {
 
           {/* Order items toggle */}
           <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground hover:bg-muted/10 py-1.5" onClick={() => toggleExpand(order.id)}>
-            <span className="font-semibold">📦 {items.length} item{items.length !== 1 ? 's' : ''} listed</span>
+            <span className="font-semibold">📦 {totalLineItems} item{totalLineItems !== 1 ? 's' : ''} listed</span>
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
 
-          {isExpanded && items.length > 0 && (
+          {isExpanded && totalLineItems > 0 && (
             <div className="space-y-2 border-t border-border/40 pt-3">
               {items.map(item => (
                 <div key={item.id} className="flex justify-between text-xs font-medium p-1">
                   <span className="text-muted-foreground">{item.menu_items?.name || 'Dish Item'} × {item.quantity}</span>
                   <span>₦{(Number(item.price) * item.quantity).toLocaleString()}</span>
+                </div>
+              ))}
+              {drinkItems.map((drink, idx) => (
+                <div key={`drink-${idx}`} className="flex justify-between text-xs font-medium p-1">
+                  <span className="text-muted-foreground">🥤 {drink.name} × {drink.quantity}</span>
+                  <span>₦{(Number(drink.price) * Number(drink.quantity)).toLocaleString()}</span>
                 </div>
               ))}
             </div>

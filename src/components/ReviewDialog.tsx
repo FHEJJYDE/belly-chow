@@ -62,6 +62,23 @@ const ReviewDialog = ({ open, onOpenChange, orderId, vendorId, riderId, onReview
 
     setSubmitting(false);
     if (!vendorErr) {
+      // Recalculate and update vendor's average rating and total_reviews
+      const { data: allReviews } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('vendor_id', vendorId);
+
+      if (allReviews && allReviews.length > 0) {
+        const totalReviews = allReviews.length;
+        const avgRating = Number(
+          (allReviews.reduce((sum, r) => sum + Number(r.rating), 0) / totalReviews).toFixed(1)
+        );
+        await supabase
+          .from('vendors')
+          .update({ rating: avgRating, total_reviews: totalReviews })
+          .eq('id', vendorId);
+      }
+
       toast({ title: 'Thanks for your review! ⭐' });
       onOpenChange(false);
       setVendorRating(0);

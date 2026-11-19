@@ -149,3 +149,378 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
 
 CREATE INDEX IF NOT EXISTS idx_vendors_approved
   ON public.vendors (is_approved, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_messages_order_created
+  ON public.messages (order_id, created_at ASC);
+
+-- 6. Enable Realtime Replication & Complete Missing RLS Policies for Chat, Notifications, Reviews, Support & Ledger
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.wallets;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
+
+-- Messages Policies (Select, Insert, Delete)
+DROP POLICY IF EXISTS "Order participants can view messages" ON public.messages;
+CREATE POLICY "Order participants can view messages" ON public.messages FOR SELECT TO authenticated USING (
+  auth.uid() = sender_id
+  OR EXISTS (
+    SELECT 1 FROM public.orders
+    WHERE orders.id = messages.order_id
+      AND (
+        orders.student_id = auth.uid()
+        OR orders.rider_id = auth.uid()
+        OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+      )
+  )
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Order participants can send messages" ON public.messages;
+CREATE POLICY "Order participants can send messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (auth.uid() = sender_id);
+
+DROP POLICY IF EXISTS "Senders can delete own messages" ON public.messages;
+CREATE POLICY "Senders can delete own messages" ON public.messages FOR DELETE TO authenticated USING (auth.uid() = sender_id);
+
+-- Notifications Policies
+DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
+CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Authenticated users create notifications" ON public.notifications;
+CREATE POLICY "Authenticated users create notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users update own notifications" ON public.notifications;
+CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+-- Push Subscriptions Policies
+DROP POLICY IF EXISTS "Users manage own push subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Users manage own push subscriptions" ON public.push_subscriptions FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Reviews Policies
+DROP POLICY IF EXISTS "Reviews viewable by everyone" ON public.reviews;
+CREATE POLICY "Reviews viewable by everyone" ON public.reviews FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users create reviews" ON public.reviews;
+CREATE POLICY "Authenticated users create reviews" ON public.reviews FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- Support Tickets Policies
+DROP POLICY IF EXISTS "Users view own support tickets" ON public.support_tickets;
+CREATE POLICY "Users view own support tickets" ON public.support_tickets FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Users create own support tickets" ON public.support_tickets;
+CREATE POLICY "Users create own support tickets" ON public.support_tickets FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins update support tickets" ON public.support_tickets;
+CREATE POLICY "Admins update support tickets" ON public.support_tickets FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Payment, Escrow, Refund & Payout Policies
+DROP POLICY IF EXISTS "Participants view payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants view payment transactions" ON public.payment_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = payment_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants insert payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants insert payment transactions" ON public.payment_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Participants update payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants update payment transactions" ON public.payment_transactions FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants view escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants view escrow transactions" ON public.escrow_transactions FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = escrow_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM public.orders WHERE orders.id = escrow_transactions.order_id AND orders.student_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Authenticated insert escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Authenticated insert escrow transactions" ON public.escrow_transactions FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Participants update escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants update escrow transactions" ON public.escrow_transactions FOR UPDATE TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Participants view refund transactions" ON public.refund_transactions;
+CREATE POLICY "Participants view refund transactions" ON public.refund_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins and users manage refund transactions" ON public.refund_transactions;
+CREATE POLICY "Admins and users manage refund transactions" ON public.refund_transactions FOR ALL TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Vendors and admins view vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins view vendor payouts" ON public.vendor_payouts FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Vendors and admins manage vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins manage vendor payouts" ON public.vendor_payouts FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage withdrawal requests" ON public.withdrawal_requests;
+CREATE POLICY "Admins manage withdrawal requests" ON public.withdrawal_requests FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage drinks" ON public.drinks;
+CREATE POLICY "Admins manage drinks" ON public.drinks FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage promo codes" ON public.promo_codes;
+CREATE POLICY "Admins manage promo codes" ON public.promo_codes FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage platform settings" ON public.platform_settings;
+CREATE POLICY "Admins manage platform settings" ON public.platform_settings FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins update disputes" ON public.disputes;
+CREATE POLICY "Admins update disputes" ON public.disputes FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Admin profile & wallet management policies
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
+CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins can update wallets" ON public.wallets;
+CREATE POLICY "Admins can update wallets" ON public.wallets FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Storage Bucket & Automatic Vendor Rating Trigger
+INSERT INTO storage.buckets (id, name, public) VALUES ('food-images', 'food-images', true) ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.update_vendor_rating_from_reviews()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.vendor_id IS NOT NULL THEN
+    UPDATE public.vendors
+    SET rating = COALESCE((SELECT ROUND(AVG(rating)::numeric, 1) FROM public.reviews WHERE vendor_id = NEW.vendor_id), 0),
+        total_reviews = (SELECT COUNT(*) FROM public.reviews WHERE vendor_id = NEW.vendor_id)
+    WHERE id = NEW.vendor_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_update_vendor_rating ON public.reviews;
+CREATE TRIGGER trg_update_vendor_rating
+AFTER INSERT OR UPDATE OR DELETE ON public.reviews
+FOR EACH ROW EXECUTE FUNCTION public.update_vendor_rating_from_reviews();
+
+CREATE INDEX IF NOT EXISTS idx_messages_order_created
+  ON public.messages (order_id, created_at ASC);
+
+-- 6. Enable Realtime Replication & Complete Missing RLS Policies for Chat, Notifications, Reviews, Support & Ledger
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.wallets;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
+
+-- Messages Policies (Select, Insert, Delete)
+DROP POLICY IF EXISTS "Order participants can view messages" ON public.messages;
+CREATE POLICY "Order participants can view messages" ON public.messages FOR SELECT TO authenticated USING (
+  auth.uid() = sender_id
+  OR EXISTS (
+    SELECT 1 FROM public.orders
+    WHERE orders.id = messages.order_id
+      AND (
+        orders.student_id = auth.uid()
+        OR orders.rider_id = auth.uid()
+        OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+      )
+  )
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Order participants can send messages" ON public.messages;
+CREATE POLICY "Order participants can send messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (auth.uid() = sender_id);
+
+DROP POLICY IF EXISTS "Senders can delete own messages" ON public.messages;
+CREATE POLICY "Senders can delete own messages" ON public.messages FOR DELETE TO authenticated USING (auth.uid() = sender_id);
+
+-- Notifications Policies
+DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
+CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Authenticated users create notifications" ON public.notifications;
+CREATE POLICY "Authenticated users create notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users update own notifications" ON public.notifications;
+CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+-- Push Subscriptions Policies
+DROP POLICY IF EXISTS "Users manage own push subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Users manage own push subscriptions" ON public.push_subscriptions FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Reviews Policies
+DROP POLICY IF EXISTS "Reviews viewable by everyone" ON public.reviews;
+CREATE POLICY "Reviews viewable by everyone" ON public.reviews FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users create reviews" ON public.reviews;
+CREATE POLICY "Authenticated users create reviews" ON public.reviews FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- Support Tickets Policies
+DROP POLICY IF EXISTS "Users view own support tickets" ON public.support_tickets;
+CREATE POLICY "Users view own support tickets" ON public.support_tickets FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Users create own support tickets" ON public.support_tickets;
+CREATE POLICY "Users create own support tickets" ON public.support_tickets FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins update support tickets" ON public.support_tickets;
+CREATE POLICY "Admins update support tickets" ON public.support_tickets FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Payment, Escrow, Refund & Payout Policies
+DROP POLICY IF EXISTS "Participants view payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants view payment transactions" ON public.payment_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = payment_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants insert payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants insert payment transactions" ON public.payment_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Participants update payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants update payment transactions" ON public.payment_transactions FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants view escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants view escrow transactions" ON public.escrow_transactions FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = escrow_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM public.orders WHERE orders.id = escrow_transactions.order_id AND orders.student_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Authenticated insert escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Authenticated insert escrow transactions" ON public.escrow_transactions FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Participants update escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants update escrow transactions" ON public.escrow_transactions FOR UPDATE TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Participants view refund transactions" ON public.refund_transactions;
+CREATE POLICY "Participants view refund transactions" ON public.refund_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins and users manage refund transactions" ON public.refund_transactions;
+CREATE POLICY "Admins and users manage refund transactions" ON public.refund_transactions FOR ALL TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Vendors and admins view vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins view vendor payouts" ON public.vendor_payouts FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Vendors and admins manage vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins manage vendor payouts" ON public.vendor_payouts FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage withdrawal requests" ON public.withdrawal_requests;
+CREATE POLICY "Admins manage withdrawal requests" ON public.withdrawal_requests FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage drinks" ON public.drinks;
+CREATE POLICY "Admins manage drinks" ON public.drinks FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage promo codes" ON public.promo_codes;
+CREATE POLICY "Admins manage promo codes" ON public.promo_codes FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage platform settings" ON public.platform_settings;
+CREATE POLICY "Admins manage platform settings" ON public.platform_settings FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins update disputes" ON public.disputes;
+CREATE POLICY "Admins update disputes" ON public.disputes FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Storage Bucket & Automatic Vendor Rating Trigger
+INSERT INTO storage.buckets (id, name, public) VALUES ('food-images', 'food-images', true) ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.update_vendor_rating_from_reviews()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.vendor_id IS NOT NULL THEN
+    UPDATE public.vendors
+    SET rating = COALESCE((SELECT ROUND(AVG(rating)::numeric, 1) FROM public.reviews WHERE vendor_id = NEW.vendor_id), 0),
+        total_reviews = (SELECT COUNT(*) FROM public.reviews WHERE vendor_id = NEW.vendor_id)
+    WHERE id = NEW.vendor_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_update_vendor_rating ON public.reviews;
+CREATE TRIGGER trg_update_vendor_rating
+AFTER INSERT OR UPDATE OR DELETE ON public.reviews
+FOR EACH ROW EXECUTE FUNCTION public.update_vendor_rating_from_reviews();

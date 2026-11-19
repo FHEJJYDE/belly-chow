@@ -66,8 +66,11 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(
     order.rider_lat && order.rider_lng ? { lat: order.rider_lat, lng: order.rider_lng } : null
   );
+  // Only auto-enable continuous student GPS overwrite if the order originally had no coordinates
   const autoShareStatuses = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'];
-  const shouldAutoShare = autoShareStatuses.includes(liveOrder.status);
+  const shouldAutoShare =
+    autoShareStatuses.includes(liveOrder.status) &&
+    (!order.delivery_lat || !order.delivery_lng || order.delivery_location?.startsWith('Live GPS'));
   const [sharingLocation, setSharingLocation] = useState(shouldAutoShare);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
@@ -183,11 +186,14 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     if (!user) return;
     setConfirmingDelivery(true);
     const { error } = await supabase.from('orders').update({ status: 'delivered' } as any).eq('id', liveOrder.id);
+    if (!error) {
+      await (supabase.rpc as any)('release_order_escrow', { p_order_id: liveOrder.id });
+    }
     setConfirmingDelivery(false);
     if (error) {
       toast({ title: 'Error confirming delivery', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Delivery confirmed 🎉', description: 'Enjoy your meal!' });
+      toast({ title: 'Delivery confirmed 🎉', description: 'Funds released to vendor & rider wallets. Enjoy your meal!' });
       setLiveOrder(prev => ({ ...prev, status: 'delivered' }));
     }
   };

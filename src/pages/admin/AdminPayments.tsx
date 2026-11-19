@@ -65,10 +65,69 @@ const AdminPayments = () => {
         escrowHeld: 0,
     });
 
+    // Withdrawal requests state (for Vendors & Riders)
+    const [withdrawals, setWithdrawals] = useState<any[]>([]);
+    const [processingId, setProcessingId] = useState<string | null>(null);
+
     useEffect(() => {
         fetchPayments();
         fetchStats();
+        fetchWithdrawals();
     }, []);
+
+    const fetchWithdrawals = async () => {
+        try {
+            const { data: reqs } = await supabase
+                .from('withdrawal_requests' as any)
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            const list = (reqs as any[]) || [];
+            if (list.length > 0) {
+                const userIds = [...new Set(list.map(r => r.user_id))];
+                const { data: profs } = await supabase.from('profiles').select('user_id, full_name, role, phone').in('user_id', userIds);
+                const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+                setWithdrawals(list.map(r => ({ ...r, profile: profMap.get(r.user_id) || null })));
+            } else {
+                setWithdrawals([]);
+            }
+        } catch (err) {
+            console.error('Error fetching withdrawals:', err);
+        }
+    };
+
+    const handleWithdrawalAction = async (req: any, newStatus: 'completed' | 'rejected') => {
+        setProcessingId(req.id);
+        try {
+            if (newStatus === 'completed') {
+                // Deduct from user's wallet balance when marking withdrawal as paid
+                const { data: wallet } = await supabase.rpc('get_or_create_wallet' as any, { p_user_id: req.user_id });
+                const currentBalance = Number((wallet as any)?.balance ?? 0);
+                if (currentBalance < Number(req.amount)) {
+                    toast({ title: 'Insufficient wallet balance', description: `User only has ₦${currentBalance.toLocaleString()} in wallet.`, variant: 'destructive' });
+                    setProcessingId(null);
+                    return;
+                }
+                await supabase
+                    .from('wallets' as any)
+                    .update({ balance: currentBalance - Number(req.amount), updated_at: new Date().toISOString() })
+                    .eq('user_id', req.user_id);
+            }
+
+            const { error } = await supabase
+                .from('withdrawal_requests' as any)
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('id', req.id);
+
+            if (error) throw error;
+            toast({ title: newStatus === 'completed' ? 'Payout marked as Completed ✓' : 'Withdrawal request rejected' });
+            fetchWithdrawals();
+        } catch (err: any) {
+            toast({ title: 'Update failed', description: err.message, variant: 'destructive' });
+        } finally {
+            setProcessingId(null);
+        }
+    };
 
     const fetchPayments = async () => {
         try {
@@ -303,6 +362,70 @@ const AdminPayments = () => {
                             </SelectContent>
                         </Select>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Vendor & Rider Bank Withdrawal Requests */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        <span>Vendor & Rider Bank Withdrawal Requests</span>
+                        <Badge variant="outline">
+                            {withdrawals.filter(w => w.status === 'pending').length} Pending
+                        </Badge>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {withdrawals.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground text-sm">
+                            No bank withdrawal requests submitted yet by vendors or riders.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {withdrawals.map((req) => (
+                                <div key={req.id} className="border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-semibold text-base">₦{Number(req.amount).toLocaleString()}</p>
+                                            <Badge variant="outline" className="capitalize text-xs">
+                                                {req.profile?.role || 'User'}
+                                            </Badge>
+                                            <Badge variant={req.status === 'completed' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize text-xs">
+                                                {req.status}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-sm font-medium">
+                                            {req.profile?.full_name || 'Account Holder'} · {req.bank_name} — <span className="font-mono">{req.account_number}</span> ({req.account_name})
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Requested {format(new Date(req.created_at), 'MMM dd, yyyy HH:mm')}
+                                        </p>
+                                    </div>
+                                    {req.status === 'pending' && (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Button
+                                                size="sm"
+                                                disabled={processingId === req.id}
+                                                onClick={() => handleWithdrawalAction(req, 'completed')}
+                                                className="gap-1"
+                                            >
+                                                <CheckCircle className="h-3.5 w-3.5" /> Approve & Mark Paid
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                disabled={processingId === req.id}
+                                                onClick={() => handleWithdrawalAction(req, 'rejected')}
+                                                className="gap-1"
+                                            >
+                                                <XCircle className="h-3.5 w-3.5" /> Reject
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

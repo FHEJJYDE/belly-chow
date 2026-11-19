@@ -15,9 +15,11 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Notifications = () => {
     const navigate = useNavigate();
+    const { role } = useAuth();
     const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useInAppNotifications();
 
     const getNotificationIcon = (type: string) => {
@@ -54,7 +56,10 @@ const Notifications = () => {
         }
 
         if (notification.order_id) {
-            navigate('/orders');
+            if (role === 'vendor') navigate('/vendor-panel/orders');
+            else if (role === 'rider') navigate('/dashboard');
+            else if (role === 'admin') navigate('/admin/orders');
+            else navigate('/orders');
         }
     };
 

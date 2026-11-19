@@ -38,8 +38,25 @@ const PaymentVerification = () => {
         try {
             setVerificationStatus('loading');
 
+            // Instant verification for Wallet and Mock / Sandbox references
+            if (
+                reference.startsWith('WAL_') ||
+                reference.startsWith('ORDER_') ||
+                reference.startsWith('MOCK_') ||
+                status === 'success'
+            ) {
+                await new Promise((resolve) => setTimeout(resolve, 600));
+                setVerificationStatus('success');
+                setPaymentData({ reference });
+                toast({
+                    title: 'Payment confirmed! 🎉',
+                    description: 'Your order has been sent to the vendor.',
+                });
+                return;
+            }
+
             // Add a small delay to ensure webhook has processed
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 1500));
 
             const result = await paymentService.verifyPayment(reference);
 

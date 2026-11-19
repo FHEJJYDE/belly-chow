@@ -52,14 +52,23 @@ const AdminDrinks = () => {
   const uploadImage = async (): Promise<string> => {
     if (!imageFile) return '';
     setUploading(true);
-    const compressed = await compressImage(imageFile);
-    const ext = imageFile.name.split('.').pop() || 'jpg';
-    const path = `drinks/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('food-images').upload(path, compressed, { upsert: true });
-    setUploading(false);
-    if (error) throw error;
-    const { data: urlData } = supabase.storage.from('food-images').getPublicUrl(path);
-    return urlData.publicUrl;
+    try {
+      const compressed = await compressImage(imageFile);
+      const ext = imageFile.name.split('.').pop() || 'jpg';
+      const path = `drinks/${Date.now()}.${ext}`;
+      let targetBucket = 'menu-items';
+      let { error } = await supabase.storage.from(targetBucket).upload(path, compressed, { upsert: true });
+      if (error) {
+        targetBucket = 'vendor-logos';
+        const fallback = await supabase.storage.from(targetBucket).upload(path, compressed, { upsert: true });
+        error = fallback.error;
+      }
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from(targetBucket).getPublicUrl(path);
+      return urlData.publicUrl;
+    } finally {
+      setUploading(false);
+    }
   };
 
   const addDrink = async () => {

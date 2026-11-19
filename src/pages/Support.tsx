@@ -42,12 +42,11 @@ const Support = () => {
     setLoading(true);
     try {
       const { error } = await supabase.from('support_tickets').insert({
-        user_id: user?.id || null,
-        name: result.data.name,
-        email: result.data.email,
+        user_id: user?.id,
+        subject: `${result.data.category.toUpperCase()} — ${result.data.name} (${result.data.email})`,
         category: result.data.category,
         message: result.data.message,
-      });
+      } as any);
       if (error) throw error;
       toast({ title: 'Ticket submitted', description: 'We\'ll get back to you soon.' });
       setForm({ name: '', email: '', category: '', message: '' });

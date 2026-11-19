@@ -110,17 +110,28 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_role public.app_role;
 BEGIN
+  -- Only allow student/vendor/rider from self-registration — never admin
+  v_role := CASE
+    WHEN (NEW.raw_user_meta_data->>'role') IN ('vendor', 'rider')
+      THEN (NEW.raw_user_meta_data->>'role')::public.app_role
+    ELSE 'student'::public.app_role
+  END;
+
   INSERT INTO public.profiles (user_id, email, full_name, role)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.app_role, 'student'::public.app_role)
+    v_role
   )
   ON CONFLICT (user_id) DO UPDATE SET
     email = EXCLUDED.email,
     full_name = CASE WHEN EXCLUDED.full_name <> '' THEN EXCLUDED.full_name ELSE public.profiles.full_name END,
+    -- Preserve existing role if already set (don't downgrade vendor back to student)
+    role = CASE WHEN public.profiles.role = 'student'::public.app_role THEN EXCLUDED.role ELSE public.profiles.role END,
     updated_at = NOW();
   RETURN NEW;
 END;
@@ -232,6 +243,88 @@ CREATE TABLE IF NOT EXISTS public.delivery_zones (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.campus_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL DEFAULT 'Hostel',
+  description TEXT DEFAULT '',
+  short_code TEXT DEFAULT NULL,
+  aliases TEXT[] DEFAULT '{}',
+  zone_name VARCHAR(100) DEFAULT NULL,
+  delivery_fee NUMERIC NOT NULL DEFAULT 500,
+  estimated_delivery_mins INTEGER DEFAULT 15,
+  dropoff_points TEXT[] DEFAULT ARRAY['Main Gate / Porter''s Lodge', 'Main Entrance'],
+  is_popular BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  display_order INTEGER DEFAULT 0,
+  lat NUMERIC DEFAULT NULL,
+  lng NUMERIC DEFAULT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS short_code TEXT DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS aliases TEXT[] DEFAULT '{}';
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS zone_name VARCHAR(100) DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC NOT NULL DEFAULT 500;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS estimated_delivery_mins INTEGER DEFAULT 15;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS dropoff_points TEXT[] DEFAULT ARRAY['Main Gate / Porter''s Lodge', 'Main Entrance'];
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS lat NUMERIC DEFAULT NULL;
+ALTER TABLE public.campus_locations ADD COLUMN IF NOT EXISTS lng NUMERIC DEFAULT NULL;
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS saved_locations JSONB DEFAULT '[]'::jsonb;
+
+-- RPC: Allow authenticated students to contribute a slang / nickname to any campus location
+CREATE OR REPLACE FUNCTION public.add_location_slang(
+  p_location_id UUID,
+  p_slang TEXT
+)
+RETURNS TEXT[] AS $$
+DECLARE
+  v_clean TEXT;
+  v_existing TEXT[];
+  v_updated TEXT[];
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'You must be logged in to add a campus slang or nickname';
+  END IF;
+
+  v_clean := TRIM(REGEXP_REPLACE(p_slang, '\s+', ' ', 'g'));
+
+  IF LENGTH(v_clean) < 2 OR LENGTH(v_clean) > 30 THEN
+    RAISE EXCEPTION 'Campus slang must be between 2 and 30 characters';
+  END IF;
+
+  SELECT COALESCE(aliases, '{}') INTO v_existing
+  FROM public.campus_locations
+  WHERE id = p_location_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Campus location not found';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unnest(v_existing) AS elem
+    WHERE LOWER(elem) = LOWER(v_clean)
+  ) THEN
+    RETURN v_existing;
+  END IF;
+
+  IF COALESCE(array_length(v_existing, 1), 0) >= 25 THEN
+    RAISE EXCEPTION 'Maximum number of slang tags reached for this location';
+  END IF;
+
+  UPDATE public.campus_locations
+  SET aliases = array_append(COALESCE(aliases, '{}'), v_clean),
+      updated_at = NOW()
+  WHERE id = p_location_id
+  RETURNING aliases INTO v_updated;
+
+  RETURN v_updated;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE TABLE IF NOT EXISTS public.vendor_promotions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id UUID NOT NULL REFERENCES public.vendors(id) ON DELETE CASCADE,
@@ -279,6 +372,28 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_lat NUMERIC DEFAULT 
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_lng NUMERIC DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS rider_lat NUMERIC DEFAULT NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS rider_lng NUMERIC DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS dropoff_point TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS room_number TEXT DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_instruction TEXT DEFAULT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_campus_locations_active_popular
+  ON public.campus_locations (is_active, is_popular DESC, display_order ASC);
+CREATE INDEX IF NOT EXISTS idx_orders_active_rider_tracking
+  ON public.orders (rider_id, status)
+  WHERE status IN ('accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
+CREATE INDEX IF NOT EXISTS idx_orders_active_student_tracking
+  ON public.orders (student_id, status)
+  WHERE status IN ('pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived');
+CREATE INDEX IF NOT EXISTS idx_orders_vendor_created
+  ON public.orders (vendor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_student_created
+  ON public.orders (student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+  ON public.order_items (order_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_vendor_available
+  ON public.menu_items (vendor_id, is_available);
+CREATE INDEX IF NOT EXISTS idx_vendors_approved
+  ON public.vendors (is_approved, is_active);
 
 CREATE TABLE IF NOT EXISTS public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -502,13 +617,21 @@ CREATE TABLE IF NOT EXISTS public.verifications (
 CREATE TABLE IF NOT EXISTS public.promo_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,
+  discount_amount NUMERIC NOT NULL DEFAULT 0,
   discount_percent NUMERIC NOT NULL DEFAULT 0,
+  min_order NUMERIC NOT NULL DEFAULT 0,
   max_uses INTEGER NOT NULL DEFAULT 100,
+  used_count INTEGER NOT NULL DEFAULT 0,
   uses_count INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS discount_amount NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS min_order NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS used_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.platform_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -524,6 +647,21 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 );
 
 ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS vendor_delivery_fee NUMERIC NOT NULL DEFAULT 200;
+
+CREATE TABLE IF NOT EXISTS public.hero_banners (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  badge_text TEXT,
+  cta_text TEXT DEFAULT 'Explore Now',
+  cta_action TEXT DEFAULT 'open_locations',
+  theme_gradient TEXT DEFAULT 'orange-amber',
+  image_url TEXT,
+  display_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- ------------------------------------------------------------------------------
 -- 9. AUDIT & ERROR LOGGING TABLES
@@ -891,6 +1029,13 @@ VALUES
     ('Off-Campus Zone B (Far Campus)', 1000, 1000)
 ON CONFLICT (zone_name) DO NOTHING;
 
+INSERT INTO public.hero_banners (title, subtitle, badge_text, cta_text, cta_action, theme_gradient, display_order, is_active)
+VALUES
+    ('Exam Crunch Chow: 20% OFF', 'Fuel your night study with hot Jollof & Shawarma. Use code CHOWPASS at checkout!', '⚡ Flash Deal', 'Claim 20% OFF', 'promo_code:CHOWPASS', 'orange-amber', 1, true),
+    ('₦0 Free Campus Delivery', 'Enjoy zero delivery fees to all Hostels and Faculty complexes on orders over ₦2,500.', '🛵 Campus Perk', 'Pick Your Hall', 'open_locations', 'emerald-teal', 2, true),
+    ('Instant Wallet Cashback', 'Top up ₦5,000 or more into your Belly-Chow wallet and get instant bonus food credit.', '💳 Bonus Credit', 'Top Up Wallet', 'open_wallet', 'midnight-purple', 3, true),
+    ('Late Night Grills & Combos', 'Craving juicy chicken & chips? Open late every night with rapid campus dispatch.', '🔥 Hot Pick', 'Explore Grills', 'filter_category:shawarma', 'crimson-fire', 4, true);
+
 -- ------------------------------------------------------------------------------
 -- 12. ROW LEVEL SECURITY (RLS) POLICIES
 -- ------------------------------------------------------------------------------
@@ -928,7 +1073,9 @@ DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
 
 -- Vendors Policies
 DROP POLICY IF EXISTS "Active vendors viewable by everyone" ON public.vendors;
@@ -1002,6 +1149,11 @@ CREATE POLICY "Allow users to view own wallet" ON public.wallets FOR SELECT USIN
     auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin'::public.app_role)
 );
 
+DROP POLICY IF EXISTS "Admins can update wallets" ON public.wallets;
+CREATE POLICY "Admins can update wallets" ON public.wallets FOR UPDATE TO authenticated USING (
+    auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
 DROP POLICY IF EXISTS "Allow users to view own transactions" ON public.wallet_transactions;
 CREATE POLICY "Allow users to view own transactions" ON public.wallet_transactions FOR SELECT USING (
     auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin'::public.app_role)
@@ -1027,11 +1179,137 @@ CREATE POLICY "Riders can update own settings" ON public.rider_settings FOR UPDA
 -- Messages Policies
 DROP POLICY IF EXISTS "Order participants can view messages" ON public.messages;
 CREATE POLICY "Order participants can view messages" ON public.messages FOR SELECT TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.orders WHERE orders.id = messages.order_id AND (orders.student_id = auth.uid() OR orders.rider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())))
+  auth.uid() = sender_id
+  OR EXISTS (SELECT 1 FROM public.orders WHERE orders.id = messages.order_id AND (orders.student_id = auth.uid() OR orders.rider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())))
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
 );
 
 DROP POLICY IF EXISTS "Order participants can send messages" ON public.messages;
 CREATE POLICY "Order participants can send messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (auth.uid() = sender_id);
+
+DROP POLICY IF EXISTS "Senders can delete own messages" ON public.messages;
+CREATE POLICY "Senders can delete own messages" ON public.messages FOR DELETE TO authenticated USING (auth.uid() = sender_id);
+
+-- Notifications, Push Subscriptions, Reviews, Support Tickets & Ledger Policies
+DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
+CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Authenticated users create notifications" ON public.notifications;
+CREATE POLICY "Authenticated users create notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Users update own notifications" ON public.notifications;
+CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users manage own push subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Users manage own push subscriptions" ON public.push_subscriptions FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Reviews viewable by everyone" ON public.reviews;
+CREATE POLICY "Reviews viewable by everyone" ON public.reviews FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Authenticated users create reviews" ON public.reviews;
+CREATE POLICY "Authenticated users create reviews" ON public.reviews FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users view own support tickets" ON public.support_tickets;
+CREATE POLICY "Users view own support tickets" ON public.support_tickets FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Users create own support tickets" ON public.support_tickets;
+CREATE POLICY "Users create own support tickets" ON public.support_tickets FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins update support tickets" ON public.support_tickets;
+CREATE POLICY "Admins update support tickets" ON public.support_tickets FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants view payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants view payment transactions" ON public.payment_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = payment_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Participants insert payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants insert payment transactions" ON public.payment_transactions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Participants update payment transactions" ON public.payment_transactions;
+CREATE POLICY "Participants update payment transactions" ON public.payment_transactions FOR UPDATE TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants view escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants view escrow transactions" ON public.escrow_transactions FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = escrow_transactions.vendor_id AND vendors.user_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM public.orders WHERE orders.id = escrow_transactions.order_id AND orders.student_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Authenticated insert escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Authenticated insert escrow transactions" ON public.escrow_transactions FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Participants update escrow transactions" ON public.escrow_transactions;
+CREATE POLICY "Participants update escrow transactions" ON public.escrow_transactions FOR UPDATE TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Participants view refund transactions" ON public.refund_transactions;
+CREATE POLICY "Participants view refund transactions" ON public.refund_transactions FOR SELECT TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Admins and users manage refund transactions" ON public.refund_transactions;
+CREATE POLICY "Admins and users manage refund transactions" ON public.refund_transactions FOR ALL TO authenticated USING (
+  auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Vendors and admins view vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins view vendor payouts" ON public.vendor_payouts FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+DROP POLICY IF EXISTS "Vendors and admins manage vendor payouts" ON public.vendor_payouts;
+CREATE POLICY "Vendors and admins manage vendor payouts" ON public.vendor_payouts FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = vendor_payouts.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage withdrawal requests" ON public.withdrawal_requests;
+CREATE POLICY "Admins manage withdrawal requests" ON public.withdrawal_requests FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage drinks" ON public.drinks;
+CREATE POLICY "Admins manage drinks" ON public.drinks FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage promo codes" ON public.promo_codes;
+CREATE POLICY "Admins manage promo codes" ON public.promo_codes FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins manage platform settings" ON public.platform_settings;
+CREATE POLICY "Admins manage platform settings" ON public.platform_settings FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Admins update disputes" ON public.disputes;
+CREATE POLICY "Admins update disputes" ON public.disputes FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Enable Realtime Publication on core tables
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.wallets;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
 
 -- Platform Settings & Promo Codes Policies
 DROP POLICY IF EXISTS "Platform settings viewable by everyone" ON public.platform_settings;
@@ -1039,6 +1317,25 @@ CREATE POLICY "Platform settings viewable by everyone" ON public.platform_settin
 
 DROP POLICY IF EXISTS "Promo codes viewable by everyone" ON public.promo_codes;
 CREATE POLICY "Promo codes viewable by everyone" ON public.promo_codes FOR SELECT USING (true);
+
+-- Delivery Zones & Campus Locations Policies
+ALTER TABLE public.delivery_zones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Delivery zones viewable by everyone" ON public.delivery_zones;
+CREATE POLICY "Delivery zones viewable by everyone" ON public.delivery_zones FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage delivery zones" ON public.delivery_zones;
+CREATE POLICY "Admins manage delivery zones" ON public.delivery_zones FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+ALTER TABLE public.campus_locations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Campus locations viewable by everyone" ON public.campus_locations;
+CREATE POLICY "Campus locations viewable by everyone" ON public.campus_locations FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage campus locations" ON public.campus_locations;
+CREATE POLICY "Admins manage campus locations" ON public.campus_locations FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+ALTER TABLE public.hero_banners ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Hero banners viewable by everyone" ON public.hero_banners;
+CREATE POLICY "Hero banners viewable by everyone" ON public.hero_banners FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins manage hero banners" ON public.hero_banners;
+CREATE POLICY "Admins manage hero banners" ON public.hero_banners FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'::public.app_role));
 
 -- Disputes Policies
 ALTER TABLE public.disputes ENABLE ROW LEVEL SECURITY;
@@ -1097,6 +1394,25 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('payment-proofs', 'paymen
 INSERT INTO storage.buckets (id, name, public) VALUES ('verifications', 'verifications', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('verification-docs', 'verification-docs', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('menu-items', 'menu-items', true) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('food-images', 'food-images', true) ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.update_vendor_rating_from_reviews()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.vendor_id IS NOT NULL THEN
+    UPDATE public.vendors
+    SET rating = COALESCE((SELECT ROUND(AVG(rating)::numeric, 1) FROM public.reviews WHERE vendor_id = NEW.vendor_id), 0),
+        total_reviews = (SELECT COUNT(*) FROM public.reviews WHERE vendor_id = NEW.vendor_id)
+    WHERE id = NEW.vendor_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_update_vendor_rating ON public.reviews;
+CREATE TRIGGER trg_update_vendor_rating
+AFTER INSERT OR UPDATE OR DELETE ON public.reviews
+FOR EACH ROW EXECUTE FUNCTION public.update_vendor_rating_from_reviews();
 
 DROP POLICY IF EXISTS "Authenticated users can upload objects" ON storage.objects;
 CREATE POLICY "Authenticated users can upload objects" ON storage.objects FOR INSERT TO authenticated WITH CHECK (true);

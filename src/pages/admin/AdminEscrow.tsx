@@ -159,8 +159,34 @@ const AdminEscrow = () => {
 
         setIsReleasing(true);
         try {
+            if ((selectedTransaction as any).order_id) {
+                const { error: rpcErr } = await (supabase.rpc as any)('release_order_escrow', {
+                    p_order_id: (selectedTransaction as any).order_id,
+                });
+                if (rpcErr) throw rpcErr;
+
+                await supabase
+                    .from('escrow_transactions')
+                    .update({
+                        status: 'released',
+                        released_at: new Date().toISOString(),
+                        release_reason: releaseReason,
+                    } as any)
+                    .eq('id', selectedTransaction.id);
+
+                toast({
+                    title: 'Success',
+                    description: 'Escrow funds released to vendor and rider wallets.',
+                });
+                setSelectedTransaction(null);
+                setReleaseReason('');
+                fetchEscrowTransactions();
+                fetchStats();
+                return;
+            }
+
             const result = await paymentService.releaseEscrow({
-                paymentTransactionId: selectedTransaction.payment_transactions.korapay_reference,
+                paymentTransactionId: selectedTransaction.payment_transactions?.korapay_reference || selectedTransaction.id,
                 reason: releaseReason,
                 manualRelease: true,
             });

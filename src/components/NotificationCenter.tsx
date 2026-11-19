@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, Check, Clock, Package, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NotificationCenter = () => {
   const navigate = useNavigate();
+  const { role } = useAuth();
   const [open, setOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useInAppNotifications();
 
@@ -46,10 +48,13 @@ const NotificationCenter = () => {
       await markAsRead(notification.id);
     }
 
-    // Navigate based on notification type
+    // Navigate based on notification type & user role
     if (notification.order_id) {
       setOpen(false);
-      navigate('/orders');
+      if (role === 'vendor') navigate('/vendor-panel/orders');
+      else if (role === 'rider') navigate('/dashboard');
+      else if (role === 'admin') navigate('/admin/orders');
+      else navigate('/orders');
     }
   };
 

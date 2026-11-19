@@ -42,8 +42,9 @@ const riderIcon = makeSvgIcon('🏍️', '#f97316');   // orange
 const customerIcon = makeSvgIcon('📍', '#3b82f6'); // blue
 const vendorIcon = makeSvgIcon('🏪', '#8b5cf6');   // purple
 
-const lightTiles = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+// Free OpenStreetMap tiles (no API key required)
+const lightTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const darkTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
