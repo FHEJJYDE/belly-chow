@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -11,10 +11,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  ArrowLeft, Phone, MessageCircle, MapPin, Navigation, Clock, CheckCircle2,
-  Package, Truck, User, Store, XCircle, Locate, LocateOff, Bike, Star
-} from 'lucide-react';
 import DeliveryChat from '@/components/chat/DeliveryChat';
 import LivePulse from '@/components/LivePulse';
 import { useToast } from '@/hooks/use-toast';
@@ -45,16 +41,91 @@ interface StudentOrderTrackingProps {
   onCancelled?: () => void;
 }
 
-const STATUS_TIMELINE = [
-  { key: 'pending', label: 'Order Placed', icon: Package, emoji: '📝' },
-  { key: 'accepted', label: 'Accepted', icon: CheckCircle2, emoji: '✅' },
-  { key: 'preparing', label: 'Preparing', icon: Store, emoji: '🍳' },
-  { key: 'ready', label: 'Ready', icon: Package, emoji: '📦' },
-  { key: 'picked_up', label: 'Picked Up', icon: Bike, emoji: '🏍️' },
-  { key: 'delivering', label: 'On the Way', icon: Truck, emoji: '🚀' },
-  { key: 'arrived', label: 'Rider Arrived', icon: MapPin, emoji: '📍' },
-  { key: 'delivered', label: 'Delivered', icon: CheckCircle2, emoji: '🎉' },
+// 4-Stage High-Contrast Horizontal Delivery Stepper (Chowdeck / Uber Eats style)
+const STAGES = [
+  {
+    id: 'confirmed',
+    label: 'Confirmed',
+    icon: 'fa-solid fa-receipt',
+    statuses: ['pending', 'accepted'],
+  },
+  {
+    id: 'kitchen',
+    label: 'In Kitchen',
+    icon: 'fa-solid fa-fire-burner',
+    statuses: ['preparing', 'ready'],
+  },
+  {
+    id: 'transit',
+    label: 'In Transit',
+    icon: 'fa-solid fa-motorcycle',
+    statuses: ['picked_up', 'delivering'],
+  },
+  {
+    id: 'arrived',
+    label: 'Arrived',
+    icon: 'fa-solid fa-location-dot',
+    statuses: ['arrived', 'delivered'],
+  },
 ];
+
+const getStageIndex = (status: string): number => {
+  const idx = STAGES.findIndex((s) => s.statuses.includes(status));
+  return idx === -1 ? 0 : idx;
+};
+
+const getStatusHeadline = (status: string): { title: string; subtitle: string; icon: string } => {
+  switch (status) {
+    case 'pending':
+      return {
+        title: 'Awaiting Vendor Confirmation',
+        subtitle: 'Your order has been transmitted to the kitchen.',
+        icon: 'fa-solid fa-bell-concierge',
+      };
+    case 'accepted':
+      return {
+        title: 'Order Confirmed by Kitchen',
+        subtitle: 'The vendor has accepted your order and started preparation.',
+        icon: 'fa-solid fa-circle-check',
+      };
+    case 'preparing':
+      return {
+        title: 'Preparing Your Meal',
+        subtitle: 'Your meal is being freshly prepared and packaged.',
+        icon: 'fa-solid fa-fire-burner',
+      };
+    case 'ready':
+      return {
+        title: 'Meal Ready — Assigning Rider',
+        subtitle: 'Your package is sealed and waiting for rider pickup.',
+        icon: 'fa-solid fa-box-open',
+      };
+    case 'picked_up':
+      return {
+        title: 'Rider Picked Up Your Order',
+        subtitle: 'Your dispatch rider has collected your meal from the vendor.',
+        icon: 'fa-solid fa-motorcycle',
+      };
+    case 'delivering':
+      return {
+        title: 'Rider Heading to Your Drop-Off',
+        subtitle: 'Follow your rider live on the radar map below.',
+        icon: 'fa-solid fa-route',
+      };
+    case 'arrived':
+      return {
+        title: 'Your Rider Has Arrived!',
+        subtitle: 'Meet your rider at the drop-off point and confirm receipt below.',
+        icon: 'fa-solid fa-location-crosshairs',
+      };
+    default:
+      return {
+        title: 'Order in Progress',
+        subtitle: 'Tracking live telemetry.',
+        icon: 'fa-solid fa-clock',
+      };
+  }
+};
 
 const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTrackingProps) => {
   const { user } = useAuth();
@@ -62,11 +133,12 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const [liveOrder, setLiveOrder] = useState(order);
   const [riderProfile, setRiderProfile] = useState<{ full_name: string; phone: string; avatar_url: string | null } | null>(null);
   const [riderSettings, setRiderSettings] = useState<{ vehicle_type: string; plate_number: string } | null>(null);
-  const [vendorInfo, setVendorInfo] = useState<{ name: string; address: string; user_id: string } | null>(null);
+  const [vendorInfo, setVendorInfo] = useState<{ name: string; address: string; user_id: string; lat: number | null; lng: number | null } | null>(null);
   const [liveRiderPos, setLiveRiderPos] = useState<{ lat: number; lng: number } | null>(
     order.rider_lat && order.rider_lng ? { lat: order.rider_lat, lng: order.rider_lng } : null
   );
-  // Only auto-enable continuous student GPS overwrite if the order originally had no coordinates
+
+  // Only auto-enable continuous student GPS overwrite if the order was placed in Live GPS mode or had no coordinates
   const autoShareStatuses = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'];
   const shouldAutoShare =
     autoShareStatuses.includes(liveOrder.status) &&
@@ -75,15 +147,14 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
-  // Always watch GPS when we should be sharing (watch=true enables continuous watchPosition)
+
   const { position: studentPos, getPosition } = useGeolocation(sharingLocation);
 
-  // Keep sharingLocation in sync when order status changes
   useEffect(() => {
     if (shouldAutoShare && !sharingLocation) setSharingLocation(true);
   }, [shouldAutoShare, sharingLocation]);
 
-  // Fetch rider profile & vendor info
+  // Fetch rider profile & vendor info (including real vendor lat/lng)
   useEffect(() => {
     const fetchRider = async (riderId: string) => {
       const [{ data: profile }, { data: settings }] = await Promise.all([
@@ -95,8 +166,19 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     };
 
     const fetchVendor = async () => {
-      const { data } = await supabase.from('vendors').select('name, address, user_id').eq('id', order.vendor_id).single();
-      if (data) setVendorInfo(data);
+      const { data } = await (supabase.from('vendors') as any)
+        .select('name, address, user_id, lat, lng')
+        .eq('id', order.vendor_id)
+        .single();
+      if (data) {
+        setVendorInfo({
+          name: data.name,
+          address: data.address,
+          user_id: data.user_id,
+          lat: data.lat != null ? Number(data.lat) : null,
+          lng: data.lng != null ? Number(data.lng) : null,
+        });
+      }
     };
 
     fetchVendor();
@@ -111,7 +193,6 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
       (payload) => {
         const updated = payload.new as any;
         setLiveOrder(updated);
-        // Update rider position from the realtime payload
         if (updated.rider_lat && updated.rider_lng) {
           setLiveRiderPos({ lat: updated.rider_lat, lng: updated.rider_lng });
         }
@@ -121,8 +202,7 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     return () => { supabase.removeChannel(channel); };
   }, [order.id]);
 
-  // Push student GPS to Supabase whenever position updates.
-  // useGeolocation already throttles to ~4s so this won't spam the DB.
+  // Push student GPS to Supabase only when sharingLocation is active
   useEffect(() => {
     if (!sharingLocation || !studentPos || !user) return;
     supabase.from('orders').update({
@@ -131,16 +211,15 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     } as any).eq('id', order.id).then(() => {});
   }, [studentPos, sharingLocation, order.id, user]);
 
-  const currentStatusIndex = STATUS_TIMELINE.findIndex(s => s.key === liveOrder.status);
+  const currentStageIdx = getStageIndex(liveOrder.status);
+  const headline = getStatusHeadline(liveOrder.status);
   const isTerminal = ['delivered', 'cancelled', 'rejected'].includes(liveOrder.status);
   const canCancel = liveOrder.status === 'pending';
   const isBeingDelivered = ['picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
   const hasRider = !!liveOrder.rider_id;
-  // Show the map from 'accepted' onwards so both parties see each other as early as possible
-  const showMap = ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(liveOrder.status);
-  // Determine current student GPS for the map pin
-  const studentMapLat = studentPos?.lat ?? liveOrder.delivery_lat ?? null;
-  const studentMapLng = studentPos?.lng ?? liveOrder.delivery_lng ?? null;
+
+  const studentMapLat = sharingLocation ? (studentPos?.lat ?? liveOrder.delivery_lat ?? null) : (liveOrder.delivery_lat ?? studentPos?.lat ?? null);
+  const studentMapLng = sharingLocation ? (studentPos?.lng ?? liveOrder.delivery_lng ?? null) : (liveOrder.delivery_lng ?? studentPos?.lng ?? null);
 
   // Build chat participants
   const chatParticipants = [
@@ -148,16 +227,15 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     ...(vendorInfo ? [{ id: vendorInfo.user_id, name: vendorInfo.name, role: 'vendor' }] : []),
   ].filter(p => p.id !== user?.id);
 
-  // Estimated time calculation (fast dispatch for pre-made meals)
   const getETA = () => {
     switch (liveOrder.status) {
-      case 'pending': return '10-20 min (Fast Dispatch)';
-      case 'accepted': return '5-15 min (Food Ready)';
-      case 'preparing': return '5-15 min (Food Ready)';
-      case 'ready': return '5-12 min (Rider Dispatching)';
-      case 'picked_up': return '5-10 min';
-      case 'delivering': return '2-5 min';
-      case 'arrived': return 'Arrived';
+      case 'pending': return '15–20 mins';
+      case 'accepted': return '12–18 mins';
+      case 'preparing': return '10–15 mins';
+      case 'ready': return '8–12 mins';
+      case 'picked_up': return '5–10 mins';
+      case 'delivering': return '2–5 mins';
+      case 'arrived': return 'Arrived Now';
       default: return null;
     }
   };
@@ -165,7 +243,11 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const handleCancel = async () => {
     if (!user || !cancelReason) return;
     if (liveOrder.status !== 'pending') {
-      toast({ title: 'Cancellation Policy Restriction 🛑', description: 'Orders can only be cancelled while pending. Once accepted by vendor, cancellation is disabled.', variant: 'destructive' });
+      toast({
+        title: 'Cancellation Restricted',
+        description: 'Orders can only be cancelled before the kitchen accepts them.',
+        variant: 'destructive',
+      });
       return;
     }
     setCancelling(true);
@@ -193,7 +275,7 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
     if (error) {
       toast({ title: 'Error confirming delivery', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Delivery confirmed 🎉', description: 'Funds released to vendor & rider wallets. Enjoy your meal!' });
+      toast({ title: 'Delivery confirmed', description: 'Funds released to vendor & rider wallets. Enjoy your meal!' });
       setLiveOrder(prev => ({ ...prev, status: 'delivered' }));
     }
   };
@@ -206,200 +288,88 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background pb-16 md:pb-0">
-      {/* Top Header */}
-      <div className="sticky top-0 z-30 bg-card border-b px-4 py-3 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs font-semibold">
-          <ArrowLeft className="h-4 w-4" /> Back to Orders
-        </Button>
-        <div className="text-right">
-          <p className="text-xs font-bold text-muted-foreground uppercase">Order #{liveOrder.id.slice(0, 8)}</p>
-          <Badge variant={liveOrder.status === 'delivered' ? 'default' : 'secondary'} className="text-[10px]">
-            {liveOrder.status.replace('_', ' ')}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Status banner */}
-      <div className="bg-primary/5 border-b px-4 py-3">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">
-            {STATUS_TIMELINE[currentStatusIndex]?.emoji || '📦'}
-          </span>
-          <div>
-            <p className="font-semibold text-sm">
-              {liveOrder.status === 'pending' && 'Order sent to vendor...'}
-              {liveOrder.status === 'accepted' && 'Vendor confirmed! Food is ready for pickup/delivery 🍱'}
-              {liveOrder.status === 'preparing' && 'Food ready & packaged 🍱'}
-              {liveOrder.status === 'ready' && 'Food ready! Dispatching rider...'}
-              {liveOrder.status === 'picked_up' && 'Rider picked up your order'}
-              {liveOrder.status === 'delivering' && 'Your rider is on the way!'}
-              {liveOrder.status === 'arrived' && 'Your rider has arrived outside!'}
-            </p>
-            {eta && <p className="text-xs text-primary font-medium">Estimated arrival: {eta}</p>}
+    <div className="flex flex-col min-h-screen bg-background pb-20 md:pb-8">
+      {/* Top Sticky Navigation Bar */}
+      <div className="sticky top-0 z-30 bg-card/95 backdrop-blur-md border-b border-border/60 px-4 py-3">
+        <div className="container max-w-3xl flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 text-xs font-semibold -ml-2">
+            <i className="fa-solid fa-arrow-left text-xs" />
+            <span>Orders</span>
+          </Button>
+          <div className="flex items-center gap-2.5">
+            <LivePulse label="Live Telemetry" />
+            <Badge variant="outline" className="font-mono text-xs font-semibold">
+              #{liveOrder.id.slice(0, 8)}
+            </Badge>
           </div>
         </div>
       </div>
 
-      {/* Map — visible from 'accepted' onwards so both parties can see each other */}
-      {showMap && (
-        <div className="relative">
-          <Suspense fallback={<div className="animate-pulse bg-muted" style={{ height: '320px' }} />}>
-            <DeliveryMap
-              riderLat={liveRiderPos?.lat}
-              riderLng={liveRiderPos?.lng}
-              customerLat={studentMapLat}
-              customerLng={studentMapLng}
-              vendorLat={studentMapLat ? studentMapLat + 0.003 : null}
-              vendorLng={studentMapLng ? studentMapLng - 0.004 : null}
-              riderLabel="Rider 🏍️"
-              customerLabel="You 📍"
-              vendorLabel={vendorInfo?.name ?? 'Vendor 🏪'}
-              height="320px"
-              className="rounded-none"
-            />
-          </Suspense>
-          {/* Overlay when no rider GPS yet */}
-          {!liveRiderPos && isBeingDelivered && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm gap-2">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-sm font-medium">Waiting for rider location…</p>
-            </div>
-          )}
-          {/* Badge: sharing indicator */}
-          {sharingLocation && studentPos && (
-            <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-full bg-blue-500/90 px-3 py-1 text-xs font-medium text-white shadow">
-              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-              Sharing your location
-            </div>
-          )}
-        </div>
-      )}
+      <div className="container max-w-3xl py-4 space-y-4">
+        {/* 1. COMPACT 4-STAGE HORIZONTAL PROGRESS HEADER + ETA */}
+        <Card className="border-border/70 shadow-sm overflow-hidden">
+          <CardContent className="p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
+                  <i className={`${headline.icon} text-base`} />
+                </div>
+                <div>
+                  <h2 className="font-heading text-lg font-bold tracking-tight text-foreground">
+                    {headline.title}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {headline.subtitle}
+                  </p>
+                </div>
+              </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Delivery Confirmation Card when rider has arrived */}
-        {liveOrder.status === 'arrived' && (
-          <Card className="border-green-500 bg-green-500/10 dark:bg-green-950/30">
-            <CardContent className="p-4 space-y-3 text-center">
-              <div className="flex justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20 text-green-600 dark:text-green-400">
-                  <CheckCircle2 className="h-6 w-6 animate-bounce" />
-                </div>
-              </div>
-              <div>
-                <h4 className="font-bold text-base text-foreground">Rider Has Arrived! 📍</h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your rider is outside. Please collect your food package and confirm delivery receipt below.
-                </p>
-              </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold gap-2 shadow-md" disabled={confirmingDelivery}>
-                    <CheckCircle2 className="h-5 w-5" /> {confirmingDelivery ? 'Confirming...' : 'Confirm Delivery Received 🎉'}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Order Received?</AlertDialogTitle>
-                    <AlertDialogDescription>Have you received your food package from the rider?</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Not Yet</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDelivery} className="bg-green-600 hover:bg-green-700 text-white">Yes, I Have Received It 🎉</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        )}
-        {/* Rider Card - when assigned */}
-        {hasRider && riderProfile && (
-          <Card className="border-primary/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-xl">
-                  {riderProfile.avatar_url ? (
-                    <img src={riderProfile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
-                  ) : '🏍️'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold">{riderProfile.full_name}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {riderSettings && (
-                      <>
-                        <span className="capitalize">{riderSettings.vehicle_type}</span>
-                        {riderSettings.plate_number && (
-                          <>
-                            <span>·</span>
-                            <span>{riderSettings.plate_number}</span>
-                          </>
-                        )}
-                      </>
-                    )}
+              {eta && (
+                <div className="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3.5 py-2 self-start sm:self-center shrink-0">
+                  <i className="fa-solid fa-clock text-primary text-xs" />
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Est. Arrival</p>
+                    <p className="font-heading text-sm font-bold text-primary mt-0.5 leading-none">{eta}</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {riderProfile.phone && (
-                    <a href={`tel:${riderProfile.phone}`}>
-                      <Button size="icon" variant="outline" className="h-10 w-10 rounded-full">
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                    </a>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              )}
+            </div>
 
-        {/* Waiting for rider */}
-        {liveOrder.status === 'ready' && !hasRider && (
-          <Card className="border-dashed">
-            <CardContent className="p-6 text-center">
-              <div className="mb-3 flex justify-center">
-                <div className="relative">
-                  <Bike className="h-8 w-8 text-primary animate-pulse" />
-                </div>
-              </div>
-              <p className="font-semibold text-sm">Finding a rider near you...</p>
-              <p className="text-xs text-muted-foreground mt-1">Your order is ready. We're matching you with a nearby rider.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Status Timeline */}
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">Order Progress</p>
-            <div className="space-y-0">
-              {STATUS_TIMELINE.map((step, i) => {
-                const isActive = i <= currentStatusIndex;
-                const isCurrent = i === currentStatusIndex;
-                const Icon = step.icon;
+            {/* 4-Stage Stepper */}
+            <div className="grid grid-cols-4 gap-2 pt-1">
+              {STAGES.map((stage, i) => {
+                const isCompleted = i < currentStageIdx;
+                const isCurrent = i === currentStageIdx;
                 return (
-                  <div key={step.key} className="flex items-start gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
-                        isCurrent
-                          ? 'border-primary bg-primary text-primary-foreground scale-110'
-                          : isActive
-                            ? 'border-primary/50 bg-primary/10 text-primary'
-                            : 'border-muted bg-muted text-muted-foreground'
-                      }`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      {i < STATUS_TIMELINE.length - 1 && (
-                        <div className={`w-0.5 h-6 ${isActive ? 'bg-primary/30' : 'bg-muted'}`} />
-                      )}
+                  <div key={stage.id} className="space-y-2">
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isCompleted
+                            ? 'w-full bg-primary'
+                            : isCurrent
+                            ? 'w-2/3 bg-primary animate-pulse'
+                            : 'w-0'
+                        }`}
+                      />
                     </div>
-                    <div className="pb-6">
-                      <p className={`text-sm font-medium ${isCurrent ? 'text-primary' : isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        {step.label}
-                      </p>
-                      {isCurrent && (
-                        <p className="text-xs text-muted-foreground mt-0.5">Current step</p>
-                      )}
+                    <div className="flex items-center gap-1.5">
+                      <i
+                        className={`${stage.icon} text-[11px] ${
+                          isCompleted || isCurrent ? 'text-primary' : 'text-muted-foreground/50'
+                        }`}
+                      />
+                      <span
+                        className={`text-[11px] font-semibold truncate ${
+                          isCurrent
+                            ? 'text-primary'
+                            : isCompleted
+                            ? 'text-foreground'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        {stage.label}
+                      </span>
                     </div>
                   </div>
                 );
@@ -408,46 +378,168 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
           </CardContent>
         </Card>
 
-        {/* Location Sharing — auto-on when order is active */}
-        {shouldAutoShare && (
-          <Card className={sharingLocation ? 'border-blue-500/30 bg-blue-500/5' : 'border-dashed'}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {sharingLocation ? (
-                    <Locate className="h-5 w-5 text-blue-500 animate-pulse" />
-                  ) : (
-                    <LocateOff className="h-5 w-5 text-muted-foreground" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium">
-                      {sharingLocation ? 'Your location is being shared' : 'Location sharing is off'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {sharingLocation
-                        ? studentPos
-                          ? 'Rider can see exactly where you are'
-                          : 'Getting GPS fix…'
-                        : 'Turn on so your rider can find you'}
-                    </p>
-                  </div>
+        {/* 2. ARRIVAL ACTION BANNER (When rider marks arrived) */}
+        {liveOrder.status === 'arrived' && (
+          <Card className="border-emerald-500/40 bg-emerald-500/10 shadow-sm">
+            <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
+                  <i className="fa-solid fa-check-double text-base" />
                 </div>
-                <Button
-                  size="sm"
-                  variant={sharingLocation ? 'secondary' : 'default'}
-                  onClick={() => {
-                    if (!sharingLocation) getPosition();
-                    setSharingLocation(!sharingLocation);
-                  }}
-                >
-                  {sharingLocation ? 'Stop' : 'Share'}
-                </Button>
+                <div>
+                  <h4 className="font-heading font-bold text-base text-foreground">Your Rider is Outside</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Collect your package and confirm below to release escrow payment to the vendor and rider.
+                  </p>
+                </div>
               </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 shrink-0" disabled={confirmingDelivery}>
+                    <i className="fa-solid fa-circle-check text-xs" />
+                    <span>{confirmingDelivery ? 'Confirming...' : 'Confirm Package Received'}</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Order Received?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Confirming receipt releases the held escrow funds to the vendor and delivery rider.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Not Yet</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmDelivery} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      Yes, Package Received
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </Card>
         )}
 
-        {/* Chat */}
+        {/* 3. LIVE TELEMETRY MAP */}
+        <div className="relative">
+          <Suspense fallback={<div className="animate-pulse bg-muted rounded-2xl" style={{ height: '310px' }} />}>
+            <DeliveryMap
+              riderLat={liveRiderPos?.lat}
+              riderLng={liveRiderPos?.lng}
+              customerLat={studentMapLat}
+              customerLng={studentMapLng}
+              vendorLat={vendorInfo?.lat}
+              vendorLng={vendorInfo?.lng}
+              riderLabel={riderProfile?.full_name || 'Dispatch Rider'}
+              customerLabel={liveOrder.delivery_location?.split(' • ')[0] || 'Your Drop-off'}
+              vendorLabel={vendorInfo?.name || 'Vendor Kitchen'}
+              height="310px"
+            />
+          </Suspense>
+
+          {!liveRiderPos && isBeingDelivered && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-2xl gap-2">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-xs font-semibold">Locking onto rider GPS signal...</p>
+            </div>
+          )}
+
+          {sharingLocation && studentPos && (
+            <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-xl bg-blue-600/95 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md">
+              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+              <span>Live GPS Shared</span>
+            </div>
+          )}
+        </div>
+
+        {/* 4. RIDER & VENDOR DISPATCH BAR */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Assigned Rider Card */}
+          <Card className="border-border/70 shadow-sm">
+            <CardContent className="p-4 flex items-center justify-between gap-3">
+              {hasRider && riderProfile ? (
+                <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 overflow-hidden">
+                      {riderProfile.avatar_url ? (
+                        <img src={riderProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <i className="fa-solid fa-motorcycle text-base" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assigned Rider</p>
+                      <p className="font-heading font-bold text-sm truncate">{riderProfile.full_name}</p>
+                      {riderSettings && (
+                        <p className="text-xs text-muted-foreground capitalize truncate">
+                          {riderSettings.vehicle_type} {riderSettings.plate_number ? `· ${riderSettings.plate_number}` : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {riderProfile.phone && (
+                    <a href={`tel:${riderProfile.phone}`} className="shrink-0">
+                      <Button size="sm" variant="outline" className="gap-1.5 rounded-xl text-xs font-semibold">
+                        <i className="fa-solid fa-phone text-primary text-[11px]" />
+                        <span>Call</span>
+                      </Button>
+                    </a>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                    <i className="fa-solid fa-motorcycle text-sm animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dispatch Rider</p>
+                    <p className="text-xs font-semibold text-foreground">
+                      {liveOrder.status === 'ready' ? 'Matching closest campus rider...' : 'Assigned when meal is ready'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Vendor & Drop-off Summary Card */}
+          <Card className="border-border/70 shadow-sm">
+            <CardContent className="p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+                  <i className="fa-solid fa-store text-sm text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {vendorInfo?.name || 'Campus Vendor'}
+                  </p>
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    Drop-off: {liveOrder.delivery_location || 'Live GPS Pin'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Total: <strong className="text-primary">₦{(Number(liveOrder.total) + Number(liveOrder.delivery_fee)).toLocaleString()}</strong> (₦{Number(liveOrder.delivery_fee).toLocaleString()} delivery)
+                  </p>
+                </div>
+              </div>
+
+              {/* Optional Live GPS Toggle */}
+              <Button
+                size="sm"
+                variant={sharingLocation ? 'secondary' : 'outline'}
+                className="shrink-0 text-xs gap-1.5 rounded-xl"
+                onClick={() => {
+                  if (!sharingLocation) getPosition();
+                  setSharingLocation(!sharingLocation);
+                }}
+                title="Toggle live GPS sharing with rider"
+              >
+                <i className={`fa-solid fa-location-crosshairs text-[11px] ${sharingLocation ? 'text-blue-600 animate-pulse' : 'text-muted-foreground'}`} />
+                <span>{sharingLocation ? 'GPS On' : 'Share GPS'}</span>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 5. 3-WAY ORDER CHAT */}
         {(hasRider || vendorInfo) && (
           <DeliveryChat
             orderId={order.id}
@@ -456,45 +548,20 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
           />
         )}
 
-        {/* Order Summary */}
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Order Summary</p>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>₦{Number(liveOrder.total).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Delivery Fee</span>
-                <span>₦{Number(liveOrder.delivery_fee).toLocaleString()}</span>
-              </div>
-              <Separator className="my-1" />
-              <div className="flex justify-between font-semibold">
-                <span>Total</span>
-                <span className="text-primary">₦{(Number(liveOrder.total) + Number(liveOrder.delivery_fee)).toLocaleString()}</span>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>{liveOrder.delivery_location || 'GPS Location'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cancel Order */}
+        {/* 6. CANCEL ORDER (Only while pending) */}
         {canCancel && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/5">
-                <XCircle className="h-4 w-4" /> Cancel Order
+              <Button variant="outline" className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/5 rounded-xl">
+                <i className="fa-solid fa-ban text-xs" />
+                <span>Cancel Pending Order</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Select a reason for cancellation. This cannot be undone.
+                  Select a reason for cancellation. Once accepted by the kitchen, orders cannot be cancelled.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <Select value={cancelReason} onValueChange={setCancelReason}>

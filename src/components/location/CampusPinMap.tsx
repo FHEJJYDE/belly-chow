@@ -14,21 +14,29 @@ interface CampusPinMapProps {
 const mainPinIcon = L.divIcon({
   className: '',
   html: `
-    <div style="
-      display:flex; align-items:center; justify-content:center;
-      width:44px; height:44px; border-radius:50%;
-      background:#f97316; border:3px solid #fff;
-      box-shadow:0 4px 12px rgba(249,115,22,0.55);
-      font-size:22px; line-height:1; cursor:grab;
-    ">📍</div>
-    <div style="
-      width:0; height:0; margin:-2px auto 0;
-      border-left:8px solid transparent;
-      border-right:8px solid transparent;
-      border-top:11px solid #f97316;
-    "></div>`,
-  iconSize: [44, 55],
-  iconAnchor: [22, 55],
+    <div style="position:relative; width:44px; height:54px; display:flex; flex-direction:column; align-items:center; cursor:grab;">
+      <div style="position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+        <span class="bc-marker-pulse" style="background:rgba(249,115,22,0.45);"></span>
+        <div style="
+          position:relative; z-index:2;
+          display:flex; align-items:center; justify-content:center;
+          width:40px; height:40px; border-radius:50%;
+          background:#f97316; border:3px solid #fff;
+          box-shadow:0 6px 16px rgba(249,115,22,0.5);
+          color:#fff; font-size:16px;
+        ">
+          <i class="fa-solid fa-location-dot"></i>
+        </div>
+      </div>
+      <div style="
+        width:0; height:0; margin-top:-2px;
+        border-left:7px solid transparent;
+        border-right:7px solid transparent;
+        border-top:10px solid #f97316;
+      "></div>
+    </div>`,
+  iconSize: [44, 54],
+  iconAnchor: [22, 52],
 });
 
 const landmarkDotIcon = (label: string) =>
@@ -36,18 +44,18 @@ const landmarkDotIcon = (label: string) =>
     className: '',
     html: `
       <div style="
-        display:inline-flex; align-items:center; gap:4px;
-        background:rgba(15,23,42,0.85); color:#fff;
-        padding:2px 7px; border-radius:999px;
+        display:inline-flex; align-items:center; gap:5px;
+        background:rgba(15,23,42,0.9); color:#fff;
+        padding:3px 8px; border-radius:999px;
         font-size:10px; font-weight:600; white-space:nowrap;
-        border:1.5px solid rgba(255,255,255,0.7);
-        box-shadow:0 2px 6px rgba(0,0,0,0.25);
+        border:1.5px solid rgba(255,255,255,0.75);
+        box-shadow:0 2px 8px rgba(0,0,0,0.25);
       ">
-        <span style="width:6px;height:6px;border-radius:50%;background:#fbbf24;display:inline-block;"></span>
-        ${label}
+        <i class="fa-solid fa-building text-[9px] text-amber-400"></i>
+        <span>${label}</span>
       </div>`,
-    iconSize: [90, 22],
-    iconAnchor: [45, 11],
+    iconSize: [96, 24],
+    iconAnchor: [48, 12],
   });
 
 export const CampusPinMap: React.FC<CampusPinMapProps> = ({
@@ -74,6 +82,7 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      className: 'bc-clean-tiles',
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -81,6 +90,7 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
     const marker = L.marker([lat, lng], {
       icon: mainPinIcon,
       draggable: true,
+      zIndexOffset: 300,
     }).addTo(map);
 
     markerRef.current = marker;
@@ -140,11 +150,12 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
   }, [lat, lng]);
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-border shadow-inner" style={{ height }}>
+    <div className="relative w-full rounded-2xl overflow-hidden border border-border/80 bg-slate-100 dark:bg-slate-900 shadow-inner" style={{ height }}>
       <div ref={containerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between">
-        <span className="rounded-full bg-background/90 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-foreground shadow border">
-          🖐️ Drag pin or tap any campus building badge
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-foreground shadow border border-border/80">
+          <i className="fa-solid fa-hand-pointer text-primary text-[10px]" />
+          <span>Drag pin or tap any campus building badge</span>
         </span>
       </div>
     </div>

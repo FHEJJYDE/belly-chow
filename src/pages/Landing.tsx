@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, MapPin, Clock, ShieldCheck, Store, Bike } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Stats {
   deliveries: number | null;
@@ -11,6 +12,7 @@ interface Stats {
 }
 
 const Landing = () => {
+  const { user, role, loading } = useAuth();
   const [stats, setStats] = useState<Stats>({ deliveries: null, vendors: null });
 
   useEffect(() => {
@@ -32,6 +34,13 @@ const Landing = () => {
     };
     fetchStats();
   }, []);
+
+  // Automatically route authenticated users (especially on PWA cold start at "/") directly to their dashboard
+  if (!loading && user && role) {
+    if (role === 'admin') return <Navigate to="/admin" replace />;
+    if (role === 'vendor') return <Navigate to="/vendor-panel" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
 
   // Format large numbers nicely: 1234 → "1,234+"
   const fmt = (n: number | null) => {

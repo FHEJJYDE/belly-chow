@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import AppNavbar from '@/components/layout/AppNavbar';
+import NotificationCenter from '@/components/NotificationCenter';
+import logo from '@/assets/belly_chow_logo.png';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,9 +69,11 @@ interface WithdrawalRequest {
 }
 
 const RiderDashboard = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isOnline, setIsOnline] = useState(true);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [riderFee, setRiderFee] = useState(500);
   const [availableOrders, setAvailableOrders] = useState<EnrichedOrder[]>([]);
   const [myOrders, setMyOrders] = useState<EnrichedOrder[]>([]);
@@ -325,14 +329,20 @@ const RiderDashboard = () => {
     fetchSettings();
   }, [user]);
 
-  // Fetch withdrawals
+  // Fetch withdrawals & wallet balance
   useEffect(() => {
     if (!user) return;
-    const fetchWithdrawals = async () => {
-      const { data } = await (supabase.from('withdrawal_requests') as any).select('id, amount, status, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
-      setWithdrawals(data || []);
+    const fetchWithdrawalsAndWallet = async () => {
+      const [{ data: reqs }, { data: wallet }] = await Promise.all([
+        (supabase.from('withdrawal_requests') as any).select('id, amount, status, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+        (supabase.rpc as any)('get_or_create_wallet', { p_user_id: user.id }),
+      ]);
+      setWithdrawals(reqs || []);
+      if (wallet && typeof wallet.balance !== 'undefined') {
+        setWalletBalance(Number(wallet.balance) || 0);
+      }
     };
-    fetchWithdrawals();
+    fetchWithdrawalsAndWallet();
   }, [user]);
 
   useEffect(() => {
@@ -805,141 +815,214 @@ const RiderDashboard = () => {
   }
 
   // ──────────────────────────────────────────
-  // TABBED DEFAULT VIEW
+  // TABBED DEFAULT VIEW (Rider Dispatch App Shell)
   // ──────────────────────────────────────────
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const navItems = [
+    { id: 'home', label: 'Dispatch', icon: 'fa-solid fa-motorcycle', badge: sortedAvailableOrders.length + myOrders.length },
+    { id: 'history', label: 'Trips', icon: 'fa-solid fa-clock-rotate-left' },
+    { id: 'earnings', label: 'Earnings', icon: 'fa-solid fa-sack-dollar' },
+    { id: 'settings', label: 'Vehicle & Bank', icon: 'fa-solid fa-id-card' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      <AppNavbar />
-      <div className="container max-w-4xl py-6">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Dispatch Console</p>
-            <div className="flex items-center gap-3 mt-1">
-              <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Rider Operations</h1>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
-                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
-                {isOnline ? 'Online & Dispatchable' : 'Offline'}
-              </span>
+    <div className="min-h-screen bg-background pb-24 md:pb-10">
+      {/* Dedicated Rider Top Navbar */}
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-card/95 backdrop-blur-xl">
+        <div className="container max-w-4xl flex h-15 items-center justify-between gap-2 py-2.5">
+          {/* Brand + Rider Badge */}
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 bg-background p-0.5 shrink-0">
+              <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain" />
             </div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-              {position ? (
-                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
-                  <i className="fa-solid fa-satellite-dish text-[11px]" /> GPS Telemetry Active
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-heading text-base font-bold tracking-tight">Belly-Chow</span>
+                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  Rider
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
-                  <i className="fa-solid fa-location-crosshairs text-[11px]" /> Waiting for GPS Lock
-                </span>
-              )}
-              {geoError && <span className="text-destructive">· {geoError}</span>}
-            </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground hidden sm:block">
+                {position ? 'GPS Signal Locked' : 'Waiting for GPS Signal'}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-2.5 shadow-sm self-start sm:self-center">
-            <i className={`fa-solid fa-power-off text-xs ${isOnline ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-            <Label className="text-xs font-semibold cursor-pointer" htmlFor="rider-online-switch">
-              {isOnline ? 'Accepting Trips' : 'Go Online'}
-            </Label>
-            <Switch id="rider-online-switch" checked={isOnline} onCheckedChange={setIsOnline} />
+
+          {/* Desktop Center Navigation Pills */}
+          <nav className="hidden md:flex items-center gap-1 rounded-xl bg-muted/60 p-1 border border-border/50">
+            {navItems.map((item) => {
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={`relative flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    active
+                      ? 'bg-card text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <i className={`${item.icon} text-xs`} />
+                  <span>{item.label}</span>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="ml-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Right Action Controls: Online Toggle Pill + Today's Pay + Profile */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsOnline(!isOnline)}
+              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold border transition-all ${
+                isOnline
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-muted text-muted-foreground border-border'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+              <span>{isOnline ? 'Online' : 'Offline'}</span>
+            </button>
+
+            <NotificationCenter />
+
+            <Link to="/profile">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground" title="My Profile & ID Verification">
+                <i className="fa-solid fa-user text-sm" />
+              </Button>
+            </Link>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive" title="Sign Out">
+                  <i className="fa-solid fa-right-from-bracket text-sm" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-2xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                  <AlertDialogDescription>Are you sure you want to sign out of your Rider account?</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleSignOut} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Sign Out
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
+      </header>
 
-        {/* Rider Location Setup & Verification Card */}
-        <Card className="mb-6 border-border/70 shadow-sm">
-          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${position ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
-                <i className="fa-solid fa-location-crosshairs text-sm" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-heading font-semibold text-sm">Live Dispatch Telemetry</span>
-                  <Badge variant={position ? 'default' : geoError ? 'destructive' : 'secondary'} className="text-[10px]">
-                    {position ? 'Signal Locked' : geoError ? 'Permission Needed' : 'Acquiring...'}
-                  </Badge>
-                </div>
-                {position ? (
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {position.lat.toFixed(5)}, {position.lng.toFixed(5)} (±{Math.round(position.accuracy || 10)}m)
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Enable location access in your browser so nearby campus orders are matched to you first.
-                  </p>
-                )}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => getPosition()} className="gap-1.5 text-xs font-semibold shrink-0">
-              <i className="fa-solid fa-rotate text-primary text-[11px]" /> Refresh Signal
-            </Button>
-          </CardContent>
-        </Card>
-
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="border-border/60 shadow-sm">
-            <CardContent className="p-4 flex items-center justify-between">
+      <div className="container max-w-4xl py-5 space-y-5">
+        {/* Top Compact Summary Bar */}
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-border/60 shadow-sm cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab('earnings')}>
+            <CardContent className="p-3.5 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Today's Earnings</p>
-                <p className="font-heading text-xl font-bold text-primary mt-1">₦{earnings.today.toLocaleString()}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.todayCount} completed trips</p>
+                <p className="text-[11px] font-medium text-muted-foreground">Today's Pay</p>
+                <p className="font-heading text-lg sm:text-xl font-bold text-primary mt-0.5">₦{earnings.today.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">{earnings.todayCount} trips today</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                <i className="fa-solid fa-sack-dollar text-sm" />
+              <div className="hidden sm:flex h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 items-center justify-center text-primary">
+                <i className="fa-solid fa-sack-dollar text-xs" />
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border/60 shadow-sm">
-            <CardContent className="p-4 flex items-center justify-between">
+
+          <Card className="border-border/60 shadow-sm cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveTab('earnings')}>
+            <CardContent className="p-3.5 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">This Week</p>
-                <p className="font-heading text-xl font-bold mt-1">₦{earnings.week.toLocaleString()}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.weekCount} completed trips</p>
+                <p className="text-[11px] font-medium text-muted-foreground">Wallet Balance</p>
+                <p className="font-heading text-lg sm:text-xl font-bold mt-0.5">₦{Math.max(walletBalance, earnings.total).toLocaleString()}</p>
+                <p className="text-[10px] text-emerald-600 font-medium">Tap to cash out</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
-                <i className="fa-solid fa-calendar-week text-sm" />
+              <div className="hidden sm:flex h-9 w-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 items-center justify-center text-emerald-600">
+                <i className="fa-solid fa-wallet text-xs" />
               </div>
             </CardContent>
           </Card>
+
           <Card className="border-border/60 shadow-sm">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">This Month</p>
-                <p className="font-heading text-xl font-bold mt-1">₦{earnings.month.toLocaleString()}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.monthCount} completed trips</p>
+            <CardContent className="p-3.5 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground">GPS Radar</p>
+                <p className={`font-heading text-sm sm:text-base font-bold mt-1 truncate ${position ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {position ? 'Locked' : 'Locating...'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => getPosition()}
+                  className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-1 mt-0.5"
+                >
+                  <i className="fa-solid fa-rotate text-[9px]" /> Refresh
+                </button>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
-                <i className="fa-solid fa-chart-line text-sm" />
+              <div className={`hidden sm:flex h-9 w-9 rounded-xl border items-center justify-center ${position ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                <i className="fa-solid fa-location-crosshairs text-xs" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-5 bg-muted/40 p-1 rounded-xl border border-border/50">
-            <TabsTrigger value="home" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-motorcycle text-[11px]" /> <span>Dispatch</span></TabsTrigger>
-            <TabsTrigger value="history" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-clock-rotate-left text-[11px]" /> <span>History</span></TabsTrigger>
-            <TabsTrigger value="earnings" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-wallet text-[11px]" /> <span>Payouts</span></TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-sliders text-[11px]" /> <span>Vehicle</span></TabsTrigger>
-          </TabsList>
-
-          {/* ═══════ HOME TAB ═══════ */}
-          <TabsContent value="home" className="space-y-4">
+          {/* ═══════ HOME / DISPATCH TAB ═══════ */}
+          <TabsContent value="home" className="space-y-5 mt-0">
+            {/* 1. Active Assigned Deliveries */}
             {myOrders.length > 0 && (
-              <div>
-                <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2"><Truck className="h-5 w-5 text-primary" /> Active Deliveries ({myOrders.length})</h2>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-base font-bold flex items-center gap-2 text-foreground">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs">
+                      <i className="fa-solid fa-motorcycle" />
+                    </span>
+                    <span>Your Active Trip ({myOrders.length})</span>
+                  </h2>
+                  <span className="text-xs text-primary font-semibold">Tap card to open live map →</span>
+                </div>
+
                 <div className="space-y-3">
                   {myOrders.map(order => (
-                    <Card key={order.id} className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" onClick={() => setActiveDeliveryId(order.id)}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1"><Store className="h-3.5 w-3.5" /> {order.vendor_name}</p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {order.delivery_location || 'GPS Location'}</p>
+                    <Card
+                      key={order.id}
+                      className="cursor-pointer border-2 border-primary/40 bg-primary/5 hover:border-primary transition-all shadow-sm"
+                      onClick={() => setActiveDeliveryId(order.id)}
+                    >
+                      <CardContent className="p-4 flex items-center justify-between gap-4">
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-heading font-bold text-sm">Order #{order.id.slice(0, 8)}</span>
+                            <Badge className="uppercase text-[10px]">{order.status.replace('_', ' ')}</Badge>
                           </div>
-                          <div className="text-right space-y-1">
-                            <Badge variant={order.status === 'delivering' ? 'default' : 'secondary'}>{order.status.replace('_', ' ')}</Badge>
-                            <p className="text-sm font-medium text-primary">₦{riderFee.toLocaleString()}</p>
-                          </div>
+                          <p className="text-xs font-medium text-foreground flex items-center gap-1.5 truncate">
+                            <i className="fa-solid fa-store text-primary text-[11px] w-3.5" />
+                            <span>Pickup: <strong>{order.vendor_name}</strong></span>
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                            <i className="fa-solid fa-location-dot text-blue-600 text-[11px] w-3.5" />
+                            <span>Drop-off: <strong>{order.delivery_location || 'Live GPS Pin'}</strong></span>
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0 space-y-2">
+                          <p className="font-heading font-extrabold text-base text-primary">+₦{riderFee.toLocaleString()}</p>
+                          <Button size="sm" className="h-8 text-xs font-bold gap-1.5 rounded-xl">
+                            <span>Open Map</span>
+                            <i className="fa-solid fa-arrow-right text-[10px]" />
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -948,67 +1031,124 @@ const RiderDashboard = () => {
               </div>
             )}
 
-            <div>
-              <h2 className="mb-3 font-heading text-lg font-semibold flex items-center gap-2"><Package className="h-5 w-5 text-muted-foreground" /> Available Orders ({sortedAvailableOrders.length}){position && <span className="ml-auto text-xs font-normal text-muted-foreground flex items-center gap-1"><Navigation className="h-3 w-3" /> Sorted by distance</span>}</h2>
+            {/* 2. Available Orders Pool */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-heading text-base font-bold flex items-center gap-2">
+                  <i className="fa-solid fa-boxes-packing text-primary text-sm" />
+                  <span>Ready for Pickup ({sortedAvailableOrders.length})</span>
+                </h2>
+                {position && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <i className="fa-solid fa-location-arrow text-primary text-[10px]" /> Closest first
+                  </span>
+                )}
+              </div>
+
               {!isOnline ? (
-                <Card><CardContent className="py-10 text-center text-muted-foreground">Go online to see available orders</CardContent></Card>
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center space-y-3">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                      <i className="fa-solid fa-power-off text-lg" />
+                    </div>
+                    <div>
+                      <p className="font-heading font-bold text-base">You are currently Offline</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Switch to Online in the top bar to receive campus delivery requests.</p>
+                    </div>
+                    <Button size="sm" onClick={() => setIsOnline(true)} className="gap-1.5 rounded-xl">
+                      <i className="fa-solid fa-bolt text-xs" /> Go Online Now
+                    </Button>
+                  </CardContent>
+                </Card>
               ) : sortedAvailableOrders.length === 0 ? (
-                <Card><CardContent className="py-10 text-center text-muted-foreground">No orders awaiting pickup right now. New dispatches will appear here automatically.</CardContent></Card>
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center space-y-2">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <i className="fa-solid fa-radar text-lg animate-spin" />
+                    </div>
+                    <p className="font-heading font-semibold text-sm">Scanning for Ready Orders...</p>
+                    <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                      As soon as a campus vendor marks an order ready for pickup, it will pop up here automatically.
+                    </p>
+                  </CardContent>
+                </Card>
               ) : (
-                <div className="space-y-3">
+                <div className="grid gap-3.5 sm:grid-cols-2">
                   {sortedAvailableOrders.map(order => {
                     const distKm = position && order.vendor_lat && order.vendor_lng
                       ? haversineKm(position.lat, position.lng, order.vendor_lat, order.vendor_lng)
                       : null;
                     return (
-                    <Card key={order.id} className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="bg-primary/10 px-4 py-2 flex items-center justify-between">
-                          <span className="text-xs font-medium text-primary flex items-center gap-1"><DollarSign className="h-3 w-3" /> Earn</span>
-                          <div className="flex items-center gap-2">
-                            {distKm !== null && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Navigation className="h-3 w-3" />
-                                {distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`} away
-                              </span>
-                            )}
-                            <span className="font-bold text-primary">₦{riderFee.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <div className="space-y-2 flex-1">
+                      <Card key={order.id} className="overflow-hidden border-border/80 shadow-sm hover:border-primary/40 transition-all flex flex-col justify-between">
+                        <div>
+                          {/* Top Payout Header */}
+                          <div className="bg-primary/10 border-b border-primary/15 px-4 py-2.5 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="font-semibold text-sm">{order.id.slice(0, 8)}</span>
-                              <span className="text-xs text-muted-foreground">· {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="font-heading font-bold text-xs text-foreground">
+                                #{order.id.slice(0, 8)}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                · {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <div className="mt-1 h-2 w-2 rounded-full bg-accent shrink-0" />
-                              <div><p className="text-xs uppercase tracking-wider text-muted-foreground">Pickup</p><p className="text-sm font-medium">{order.vendor_name}</p></div>
+                            <div className="flex items-center gap-2">
+                              {distKm !== null && (
+                                <Badge variant="outline" className="bg-background/80 text-[10px] font-semibold gap-1">
+                                  <i className="fa-solid fa-route text-primary text-[9px]" />
+                                  {distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`}
+                                </Badge>
+                              )}
+                              <span className="font-heading font-extrabold text-sm text-primary">
+                                +₦{riderFee.toLocaleString()}
+                              </span>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
-                              <div><p className="text-xs uppercase tracking-wider text-muted-foreground">Drop-off</p><p className="text-sm font-medium">{order.customer_name}</p><p className="text-xs text-muted-foreground">{order.delivery_location || 'GPS Location'}</p></div>
+                          </div>
+
+                          {/* Route Timeline: Pickup -> Dropoff */}
+                          <div className="p-4 space-y-3">
+                            <div className="relative pl-5 space-y-3 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
+                              <div className="relative">
+                                <span className="absolute -left-5 top-1 h-3 w-3 rounded-full border-2 border-slate-900 bg-background" />
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pickup Kitchen</p>
+                                <p className="text-sm font-bold text-foreground">{order.vendor_name}</p>
+                                {order.vendor_address && (
+                                  <p className="text-xs text-muted-foreground truncate">{order.vendor_address}</p>
+                                )}
+                              </div>
+
+                              <div className="relative">
+                                <span className="absolute -left-5 top-1 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Student Drop-off</p>
+                                <p className="text-sm font-bold text-foreground">{order.delivery_location || 'Live GPS Location'}</p>
+                                <p className="text-xs text-muted-foreground">{order.customer_name}</p>
+                              </div>
                             </div>
+
                             {order.items.length > 0 && (
-                              <div className="rounded-md bg-muted/50 px-3 py-2">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">📦 {order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
-                                {order.items.map((item, i) => (<p key={i} className="text-xs">{item.quantity}x {item.name}</p>))}
+                              <div className="rounded-xl bg-muted/50 px-3 py-2 text-xs flex items-center justify-between">
+                                <span className="font-medium text-muted-foreground flex items-center gap-1.5 truncate">
+                                  <i className="fa-solid fa-bag-shopping text-primary text-[11px]" />
+                                  <span className="truncate">
+                                    {order.items.map((item) => `${item.quantity}x ${item.name}`).join(', ')}
+                                  </span>
+                                </span>
+                                <span className="text-[11px] font-semibold shrink-0 ml-2">
+                                  {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                                </span>
                               </div>
                             )}
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> {order.payment_method.replace('_', ' ')}</span>
-                              <span>₦{Number(order.total).toLocaleString()} order</span>
-                            </div>
                           </div>
-                          <Button className="w-full gap-2" onClick={() => acceptOrder(order.id)}><Bike className="h-4 w-4" /> Accept Delivery</Button>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        <div className="px-4 pb-4 pt-1">
+                          <Button className="w-full font-bold gap-2 rounded-xl h-10 shadow-sm" onClick={() => acceptOrder(order.id)}>
+                            <i className="fa-solid fa-motorcycle text-xs" />
+                            <span>Accept & Start Pickup</span>
+                          </Button>
+                        </div>
+                      </Card>
                     );
                   })}
-
-
                 </div>
               )}
             </div>
@@ -1123,6 +1263,41 @@ const RiderDashboard = () => {
             <Button onClick={saveSettings} disabled={savingSettings} className="w-full">{savingSettings ? 'Saving...' : 'Save Settings'}</Button>
           </TabsContent>
         </Tabs>
+      </div>
+
+      {/* Dedicated Rider Mobile Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none md:hidden pb-safe">
+        <div className="px-3 pb-3 pt-1">
+          <nav className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl shadow-lg p-1.5">
+            <div className="flex items-center justify-around gap-1">
+              {navItems.map((item) => {
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    className={`relative flex flex-1 flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-medium transition-all select-none ${
+                      active
+                        ? 'bg-primary/10 text-primary font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <div className="relative mb-1 flex items-center justify-center">
+                      <i className={`${item.icon} text-sm ${active ? 'text-primary' : ''}`} />
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span className="absolute -right-3 -top-1.5 flex h-4 min-w-[1rem] px-1 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                          {item.badge > 99 ? '99+' : item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="tracking-tight leading-none">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        </div>
       </div>
     </div>
   );

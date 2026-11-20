@@ -49,9 +49,12 @@ const PaymentVerification = () => {
                 setVerificationStatus('success');
                 setPaymentData({ reference });
                 toast({
-                    title: 'Payment confirmed! 🎉',
-                    description: 'Your order has been sent to the vendor.',
+                    title: 'Order confirmed',
+                    description: 'Redirecting to your live order radar...',
                 });
+                setTimeout(() => {
+                    navigate('/orders', { replace: true });
+                }, 1200);
                 return;
             }
 

@@ -25,16 +25,16 @@ type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
 };
 
 const statusColors: Record<string, string> = {
-  pending: 'border bg-muted/50 text-foreground',
-  accepted: 'border bg-muted/50 text-foreground',
-  preparing: 'border bg-muted/50 text-foreground',
-  ready: 'border bg-muted/50 text-foreground',
-  picked_up: 'border bg-muted/50 text-foreground',
-  delivering: 'border bg-muted/50 text-foreground',
-  arrived: 'border bg-green-500/20 text-green-700 dark:text-green-400 font-semibold',
-  delivered: 'border bg-muted/50 text-foreground',
-  cancelled: 'border bg-destructive/5 text-destructive',
-  rejected: 'border bg-destructive/5 text-destructive',
+  pending: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  accepted: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  preparing: 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400',
+  ready: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+  picked_up: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+  delivering: 'border-primary/40 bg-primary/10 text-primary font-semibold',
+  arrived: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-semibold',
+  delivered: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  cancelled: 'border-destructive/30 bg-destructive/10 text-destructive',
+  rejected: 'border-destructive/30 bg-destructive/10 text-destructive',
 };
 
 const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'];
@@ -284,9 +284,13 @@ const Orders = () => {
                         </div>
                         {order.status === 'arrived' && (
                           <div className="mt-3 pt-3 border-t flex flex-col gap-2">
-                            <p className="text-xs font-semibold text-green-700 dark:text-green-400">📍 Rider has arrived! Please verify food package and confirm below.</p>
-                            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold gap-1" onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }}>
-                              <CheckCircle2 className="h-4 w-4" /> Confirm Delivery Received 🎉
+                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                              <i className="fa-solid fa-location-dot" />
+                              <span>Rider has arrived! Verify your food package and confirm below.</span>
+                            </p>
+                            <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5" onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }}>
+                              <i className="fa-solid fa-circle-check text-xs" />
+                              <span>Confirm Delivery Received</span>
                             </Button>
                           </div>
                         )}
@@ -306,58 +310,77 @@ const Orders = () => {
                     const items = orderItems[order.id] || [];
                     const isExpanded = expandedOrders.has(order.id);
                     return (
-                      <Card key={order.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-medium">Order #{order.id.slice(0, 8)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()}
+                      <Card key={order.id} className="border-border/70 shadow-sm">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-heading font-bold text-sm">Order #{order.id.slice(0, 8)}</p>
+                                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize ${statusColors[order.status] || ''}`}>
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(order.created_at).toLocaleString()}
                               </p>
-                              <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString()}</p>
                               {order.delivery_location && (
-                                <p className="mt-1 text-xs text-muted-foreground">📍 {order.delivery_location}</p>
+                                <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1.5">
+                                  <i className="fa-solid fa-location-dot text-primary text-[11px]" />
+                                  <span className="truncate">{order.delivery_location}</span>
+                                </p>
                               )}
                             </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || ''}`}>
-                                {order.status.replace('_', ' ')}
-                              </span>
-                              {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
-                                <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="gap-1">
-                                  <Star className="h-3.5 w-3.5" /> Rate
-                                </Button>
-                              )}
-                              {order.status === 'delivered' && (
-                                <Button size="sm" variant="outline" onClick={() => setReceiptOrder(order)} className="gap-1">
-                                  <Receipt className="h-3.5 w-3.5" /> Receipt
-                                </Button>
-                              )}
-                              {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
-                                <Button size="sm" variant="outline" onClick={() => handleReorder(order.id, order.vendor_id)} className="gap-1">
-                                  <RotateCcw className="h-3.5 w-3.5" /> Reorder
-                                </Button>
-                              )}
-                              {!['pending'].includes(order.status) && !disputedOrders.has(order.id) && (
-                                <Button size="sm" variant="ghost" onClick={() => setDisputeOrder(order)} className="gap-1 text-destructive hover:text-destructive">
-                                  <AlertTriangle className="h-3.5 w-3.5" /> Report Issue
-                                </Button>
-                              )}
-                              {disputedOrders.has(order.id) && (
-                                <span className="text-xs text-muted-foreground">⚠️ Dispute filed</span>
-                              )}
+                            <div className="text-right shrink-0">
+                              <p className="font-heading font-bold text-base text-foreground">
+                                ₦{(Number(order.total) + Number(order.delivery_fee)).toLocaleString()}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {items.length} item{items.length !== 1 ? 's' : ''}
+                              </p>
                             </div>
                           </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2 w-full justify-between text-xs text-muted-foreground"
-                            onClick={() => toggleExpand(order.id)}
-                          >
-                            {items.length} item{items.length !== 1 ? 's' : ''}
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
+                          {/* Horizontal Action Toolbar */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {['delivered', 'cancelled', 'rejected'].includes(order.status) && (
+                                <Button size="sm" variant="default" onClick={() => handleReorder(order.id, order.vendor_id)} className="h-8 text-xs gap-1.5 rounded-lg">
+                                  <i className="fa-solid fa-rotate-right text-[11px]" /> Reorder
+                                </Button>
+                              )}
+                              {order.status === 'delivered' && (
+                                <Button size="sm" variant="outline" onClick={() => setReceiptOrder(order)} className="h-8 text-xs gap-1.5 rounded-lg">
+                                  <i className="fa-solid fa-receipt text-[11px]" /> Receipt
+                                </Button>
+                              )}
+                              {order.status === 'delivered' && !reviewedOrders.has(order.id) && (
+                                <Button size="sm" variant="outline" onClick={() => setReviewOrder(order)} className="h-8 text-xs gap-1.5 rounded-lg border-amber-500/30 text-amber-600 hover:bg-amber-500/10">
+                                  <i className="fa-solid fa-star text-amber-500 text-[11px]" /> Rate Order
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {!['pending'].includes(order.status) && !disputedOrders.has(order.id) && (
+                                <Button size="sm" variant="ghost" onClick={() => setDisputeOrder(order)} className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-destructive">
+                                  <i className="fa-solid fa-flag text-[11px]" /> Report
+                                </Button>
+                              )}
+                              {disputedOrders.has(order.id) && (
+                                <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                                  <i className="fa-solid fa-scale-balanced text-[10px]" /> Dispute filed
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-muted-foreground"
+                                onClick={() => toggleExpand(order.id)}
+                              >
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
 
                           {isExpanded && items.length > 0 && (
                             <div className="mt-2 space-y-2 border-t pt-2">

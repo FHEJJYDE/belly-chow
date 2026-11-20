@@ -52,7 +52,7 @@ const setCachedRole = (userId: string, userRole: AppRole) => {
 const clearSupabaseStorage = () => {
   try {
     Object.keys(localStorage)
-      .filter((k) => k.startsWith('sb-') || k.startsWith(ROLE_CACHE_PREFIX))
+      .filter((k) => k === 'belly_chow_auth_token' || k.startsWith('sb-') || k.startsWith(ROLE_CACHE_PREFIX))
       .forEach((k) => localStorage.removeItem(k));
   } catch (_) {
     /* ignore SSR / private-browsing edge cases */
