@@ -44,9 +44,6 @@ export function useInAppNotifications() {
             // Update badge immediately when new notifications are fetched
             setBadge(newUnreadCount);
 
-            // Log for debugging
-            console.log('Fetched notifications:', newNotifications.length, 'unread:', newUnreadCount);
-
             setNotifications(newNotifications);
         } catch (error) {
             console.error('Error fetching notifications:', error);
@@ -103,19 +100,27 @@ export function useInAppNotifications() {
 
         fetchNotifications();
 
-        const channel = supabase
-            .channel(`in-app-notifs-${user.id}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-                () => fetchNotifications()
-            )
-            .subscribe();
+        const channelId = `in-app-notifs-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
+        let channel: any = null;
+        try {
+            channel = supabase
+                .channel(channelId)
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+                    () => fetchNotifications()
+                )
+                .subscribe();
+        } catch (err) {
+            console.warn('Realtime notification channel warning:', err);
+        }
 
         const interval = setInterval(fetchNotifications, 8000);
 
         return () => {
-            supabase.removeChannel(channel);
+            if (channel) {
+                supabase.removeChannel(channel).catch(() => {});
+            }
             clearInterval(interval);
         };
     }, [user, fetchNotifications]);

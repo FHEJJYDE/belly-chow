@@ -58,12 +58,52 @@ function playNotificationSound(type: 'new_order' | 'status_update' = 'status_upd
   }
 }
 
+function triggerDevicePopupNotification(title: string, body: string, targetUrl = '/dashboard', tag?: string) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const options: any = {
+    body,
+    icon: '/belly_chow_logo.png',
+    badge: '/belly_chow_logo.png',
+    vibrate: [200, 100, 200],
+    tag: tag || `bc-alert-${Date.now()}`,
+    renotify: true,
+    requireInteraction: false,
+    silent: false,
+    data: { url: targetUrl },
+  };
+
+  // Prefer ServiceWorkerRegistration.showNotification so popups appear on Android/iOS/Desktop OS banner even when minimized
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg && 'showNotification' in reg) {
+        reg.showNotification(title, options).catch(() => {
+          try { new Notification(title, options); } catch {}
+        });
+      } else {
+        try { new Notification(title, options); } catch {}
+      }
+    }).catch(() => {
+      try { new Notification(title, options); } catch {}
+    });
+  } else {
+    try { new Notification(title, options); } catch {}
+  }
+}
+
 export function useOrderNotifications() {
   const { user, role, loading } = useAuth();
   const vendorIdRef = useRef<string | null>(null);
   const recentNotifications = useRef<Set<string>>(new Set());
   // Track last known status per order to avoid duplicate notifications
   const orderStatuses = useRef<Map<string, string>>(new Map());
+
+  const getRoleTargetUrl = useCallback(() => {
+    if (role === 'vendor') return '/vendor-panel/orders';
+    if (role === 'rider') return '/dashboard';
+    if (role === 'admin') return '/admin/orders';
+    return '/orders';
+  }, [role]);
 
   const notify = useCallback((title: string, description: string, sound: 'new_order' | 'status_update' = 'status_update', dedupeKey?: string) => {
     const key = dedupeKey || `${title}-${description}`;
@@ -73,16 +113,26 @@ export function useOrderNotifications() {
 
     toast({ title, description });
     playNotificationSound(sound);
-
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body: description, icon: '/belly_chow_logo.png' });
-    }
-  }, []);
+    triggerDevicePopupNotification(title, description, getRoleTargetUrl(), key);
+  }, [getRoleTargetUrl]);
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    // Try requesting permission on mount, and also attach a one-time click/tap listener so mobile browsers that require a user gesture grant it immediately on first tap
+    Notification.requestPermission().catch(() => {});
+    const requestOnFirstGesture = () => {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+      window.removeEventListener('click', requestOnFirstGesture);
+      window.removeEventListener('touchstart', requestOnFirstGesture);
+    };
+    window.addEventListener('click', requestOnFirstGesture, { once: true });
+    window.addEventListener('touchstart', requestOnFirstGesture, { once: true });
+    return () => {
+      window.removeEventListener('click', requestOnFirstGesture);
+      window.removeEventListener('touchstart', requestOnFirstGesture);
+    };
   }, [role]);
 
   useEffect(() => {
@@ -172,23 +222,29 @@ export function useOrderNotifications() {
     pollOrders(true);
 
     // 1. Realtime listener for instant <100ms alerts
-    const channel = supabase.channel(`order-notifications-${user.id}`).on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'orders' },
-      (payload) => {
-        checkAndNotify(payload.new as any, false);
-      }
-    ).on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'orders' },
-      (payload) => {
-        const order = payload.new as any;
-        if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
-          orderStatuses.current.set(order.id, order.status);
-          notify('New Order Received!', `New order #${order.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${order.id}`);
+    const channelId = `order-notifications-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
+    let channel: any = null;
+    try {
+      channel = supabase.channel(channelId).on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          checkAndNotify(payload.new as any, false);
         }
-      }
-    ).subscribe();
+      ).on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          const order = payload.new as any;
+          if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
+            orderStatuses.current.set(order.id, order.status);
+            notify('New Order Received!', `New order #${order.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${order.id}`);
+          }
+        }
+      ).subscribe();
+    } catch (err) {
+      console.warn('Order notifications channel warning:', err);
+    }
 
     // 2. Guaranteed 5-second polling fallback so students/vendors/riders NEVER miss a status change toast & sound
     const pollInterval = setInterval(() => {
@@ -196,7 +252,9 @@ export function useOrderNotifications() {
     }, 5000);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel).catch(() => {});
+      }
       clearInterval(pollInterval);
       orderStatuses.current.clear();
     };

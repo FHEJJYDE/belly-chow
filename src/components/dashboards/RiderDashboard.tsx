@@ -100,151 +100,15 @@ const RiderDashboard = () => {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Simulation state
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simStep, setSimStep] = useState(0);
-  const [totalSimSteps, setTotalSimSteps] = useState(0);
-  const [simulatedPos, setSimulatedPos] = useState<{ lat: number; lng: number } | null>(null);
-  const simIntervalRef = useRef<any>(null);
-
-  const stopRouteSimulation = useCallback(() => {
-    if (simIntervalRef.current) {
-      clearInterval(simIntervalRef.current);
-      simIntervalRef.current = null;
-    }
-    setIsSimulating(false);
-    setSimulatedPos(null);
-    setSimStep(0);
-    setTotalSimSteps(0);
-    if (activeDeliveryId) {
-      localStorage.removeItem(`rider_sim_${activeDeliveryId}`);
-      localStorage.removeItem(`rider_sim_step_${activeDeliveryId}`);
-    }
-  }, [activeDeliveryId]);
-
+  // Broadcast real live rider GPS to the currently active delivery only.
+  // useGeolocation already throttles position updates to every ~4 seconds.
   useEffect(() => {
-    return () => {
-      if (simIntervalRef.current) {
-        clearInterval(simIntervalRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (activeDeliveryId) {
-      const savedSim = localStorage.getItem(`rider_sim_${activeDeliveryId}`);
-      if (savedSim !== 'true') {
-        stopRouteSimulation();
-      }
-    } else {
-      stopRouteSimulation();
-    }
-  }, [activeDeliveryId, stopRouteSimulation]);
-
-  const startRouteSimulation = async (startStepIndex = 0) => {
-    const activeOrder = myOrders.find(o => o.id === activeDeliveryId);
-    if (!activeOrder || !activeOrder.delivery_lat || !activeOrder.delivery_lng) {
-      toast({ title: 'Cannot simulate', description: 'Customer delivery coordinates are missing.', variant: 'destructive' });
-      return;
-    }
-
-    const customerLat = activeOrder.delivery_lat;
-    const customerLng = activeOrder.delivery_lng;
-    const vendorLat = customerLat + 0.003;
-    const vendorLng = customerLng - 0.004;
-
-    setIsSimulating(true);
-    localStorage.setItem(`rider_sim_${activeDeliveryId}`, 'true');
-    if (startStepIndex === 0) {
-      toast({ title: 'Starting GPS simulation...', description: 'Fetching OSRM street route...' });
-    } else {
-      toast({ title: 'Resuming GPS simulation...', description: 'Continuing from last active step...' });
-    }
-
-    try {
-      const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${vendorLng},${vendorLat};${customerLng},${customerLat}?overview=full&geometries=geojson`
-      );
-      if (!res.ok) throw new Error('OSRM route error');
-      const data = await res.json();
-      let coords: [number, number][] = [];
-      if (data.routes && data.routes[0]) {
-        coords = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
-      } else {
-        coords = [];
-        const steps = 15;
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          coords.push([
-            vendorLat + (customerLat - vendorLat) * t,
-            vendorLng + (customerLng - vendorLng) * t
-          ]);
-        }
-      }
-
-      if (coords.length === 0) {
-        stopRouteSimulation();
-        return;
-      }
-
-      const initialIndex = Math.min(startStepIndex, coords.length - 1);
-      setTotalSimSteps(coords.length);
-      setSimStep(initialIndex);
-      setSimulatedPos({ lat: coords[initialIndex][0], lng: coords[initialIndex][1] });
-
-      let currentIndex = initialIndex;
-      await supabase.from('orders').update({
-        rider_lat: coords[initialIndex][0],
-        rider_lng: coords[initialIndex][1]
-      } as any).eq('id', activeOrder.id);
-
-      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-
-      simIntervalRef.current = setInterval(async () => {
-        currentIndex += 1;
-        if (currentIndex >= coords.length) {
-          stopRouteSimulation();
-          toast({ title: 'Simulation complete 🎉', description: 'Rider has reached the destination!' });
-          return;
-        }
-
-        setSimStep(currentIndex);
-        localStorage.setItem(`rider_sim_step_${activeDeliveryId}`, currentIndex.toString());
-        const nextPt = coords[currentIndex];
-        setSimulatedPos({ lat: nextPt[0], lng: nextPt[1] });
-        await supabase.from('orders').update({
-          rider_lat: nextPt[0],
-          rider_lng: nextPt[1]
-        } as any).eq('id', activeOrder.id);
-      }, 3000);
-
-    } catch (err) {
-      console.error('Failed to initialize route simulation:', err);
-      toast({ title: 'Simulation error', description: 'Failed to fetch OSRM route. Check connection.', variant: 'destructive' });
-      stopRouteSimulation();
-    }
-  };
-
-  useEffect(() => {
-    if (!activeDeliveryId || myOrders.length === 0 || isSimulating) return;
-    const savedSim = localStorage.getItem(`rider_sim_${activeDeliveryId}`);
-    if (savedSim === 'true') {
-      const savedStep = parseInt(localStorage.getItem(`rider_sim_step_${activeDeliveryId}`) || '0', 10);
-      startRouteSimulation(savedStep);
-    }
-  }, [activeDeliveryId, myOrders, isSimulating]);
-
-  // Broadcast rider GPS to the currently active delivery only.
-  // useGeolocation already throttles position updates to every ~4 seconds,
-  // so this effect fires at most once per throttle window.
-  useEffect(() => {
-    if (isSimulating) return; // Prevent real GPS overwriting simulation coords
     if (!position || !user || !activeDeliveryId) return;
     supabase.from('orders').update({
       rider_lat: position.lat,
       rider_lng: position.lng,
     } as any).eq('id', activeDeliveryId).then(() => {});
-  }, [position, activeDeliveryId, user, isSimulating]);
+  }, [position, activeDeliveryId, user]);
 
   /** Haversine distance in km between two GPS points */
   const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -771,8 +635,8 @@ const RiderDashboard = () => {
 
         <div className="relative">
           <DeliveryMap
-            riderLat={isSimulating ? simulatedPos?.lat : position?.lat}
-            riderLng={isSimulating ? simulatedPos?.lng : position?.lng}
+            riderLat={position?.lat}
+            riderLng={position?.lng}
             customerLat={activeOrder.delivery_lat}
             customerLng={activeOrder.delivery_lng}
             vendorLat={activeOrder.vendor_lat}
@@ -799,20 +663,6 @@ const RiderDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1">
-              <span className="text-[11px] font-medium flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${isSimulating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                {isSimulating ? `Simulating (${simStep + 1}/${totalSimSteps})` : 'GPS Demo'}
-              </span>
-              <Switch
-                checked={isSimulating}
-                onCheckedChange={(checked) => {
-                  if (checked) startRouteSimulation();
-                  else stopRouteSimulation();
-                }}
-              />
-            </div>
-
             {activeOrder.delivery_lat && activeOrder.delivery_lng && (
               <Button
                 size="sm"
@@ -820,7 +670,7 @@ const RiderDashboard = () => {
                 onClick={() => openInGoogleMaps(activeOrder.delivery_lat!, activeOrder.delivery_lng!)}
               >
                 <i className="fa-solid fa-diamond-turn-right text-[11px]" />
-                <span>Turn-by-Turn</span>
+                <span>Open Turn-by-Turn GPS</span>
               </Button>
             )}
           </div>

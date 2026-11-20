@@ -3,57 +3,108 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAppBadge } from '@/hooks/useAppBadge';
 
+function showNativeOsPopup(title: string, body: string, url: string, tag: string) {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
+
+    const options: any = {
+        body,
+        icon: '/belly_chow_logo.png',
+        badge: '/belly_chow_logo.png',
+        vibrate: [200, 100, 200],
+        tag,
+        renotify: true,
+        requireInteraction: false,
+        silent: false,
+        data: { url },
+    };
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+            if (reg && 'showNotification' in reg) {
+                reg.showNotification(title, options).catch(() => {
+                    try { new Notification(title, options); } catch {}
+                });
+            } else {
+                try { new Notification(title, options); } catch {}
+            }
+        }).catch(() => {
+            try { new Notification(title, options); } catch {}
+        });
+    } else {
+        try { new Notification(title, options); } catch {}
+    }
+}
+
 export function useBackgroundNotifications() {
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const { setBadge } = useAppBadge();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
-    const lastCheckRef = useRef<Date>(new Date());
+    const seenNotifIds = useRef<Set<string>>(new Set());
+    const initialized = useRef<boolean>(false);
 
     useEffect(() => {
         if (!user) return;
+        seenNotifIds.current.clear();
+        initialized.current = false;
+
+        const getTargetUrl = () => {
+            if (role === 'vendor') return '/vendor-panel/orders';
+            if (role === 'rider') return '/dashboard';
+            if (role === 'admin') return '/admin/orders';
+            return '/orders';
+        };
 
         const checkNotifications = async () => {
             try {
                 const { data, error } = await supabase
                     .from('notifications')
-                    .select('id, is_read, created_at')
+                    .select('id, title, message, order_id, is_read, created_at')
                     .eq('user_id', user.id)
-                    .eq('is_read', false);
+                    .eq('is_read', false)
+                    .order('created_at', { ascending: false })
+                    .limit(25);
 
                 if (error) throw error;
 
-                const unreadCount = data?.length || 0;
-                console.log('Background check: unread notifications:', unreadCount);
+                const unreadList = data || [];
+                setBadge(unreadList.length);
 
-                // Always update badge, even if app is in background
-                setBadge(unreadCount);
-
-                // Check for new notifications since last check
-                const newNotifications = data?.filter(n =>
-                    new Date(n.created_at) > lastCheckRef.current
-                ) || [];
-
-                if (newNotifications.length > 0) {
-                    console.log('New notifications detected:', newNotifications.length);
-                    // Could trigger additional actions here
+                if (!initialized.current) {
+                    // Seed existing unread notifications on initial boot so we don't spam old popups
+                    unreadList.forEach((n) => seenNotifIds.current.add(n.id));
+                    initialized.current = true;
+                    return;
                 }
 
-                lastCheckRef.current = new Date();
+                // Trigger native OS banner pop-up for any brand-new unread notifications (especially when tab is minimized/hidden!)
+                unreadList.forEach((n) => {
+                    if (!seenNotifIds.current.has(n.id)) {
+                        seenNotifIds.current.add(n.id);
+                        // If the tab is in the background/hidden, always pop up a native OS notification
+                        if (document.hidden) {
+                            showNativeOsPopup(
+                                n.title || 'Belly-Chow Update',
+                                n.message || 'You have a new order notification.',
+                                n.order_id ? getTargetUrl() : '/notifications',
+                                `notif-${n.id}`
+                            );
+                        }
+                    }
+                });
             } catch (error) {
                 console.error('Background notification check failed:', error);
             }
         };
 
-        // Initial check
         checkNotifications();
 
-        // Set up more frequent checking (every 15 seconds)
-        intervalRef.current = setInterval(checkNotifications, 15000);
+        // Check every 8 seconds so background tabs / minimized PWAs receive OS pop-up banners promptly
+        intervalRef.current = setInterval(checkNotifications, 8000);
 
-        // Also check when page becomes visible
         const handleVisibilityChange = () => {
             if (!document.hidden) {
-                console.log('Page visible, checking notifications');
                 checkNotifications();
             }
         };
@@ -66,5 +117,5 @@ export function useBackgroundNotifications() {
             }
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [user, setBadge]);
+    }, [user, role, setBadge]);
 }

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { X, Bell, Package, AlertTriangle } from 'lucide-react';
@@ -7,8 +8,33 @@ import { useNavigate } from 'react-router-dom';
 
 const NotificationBanner = () => {
     const navigate = useNavigate();
+    const { user, role } = useAuth();
     const { notifications } = useInAppNotifications();
     const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+    const [permState, setPermState] = useState<NotificationPermission>(
+        typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'granted'
+    );
+    const [permDismissed, setPermDismissed] = useState(false);
+
+    const handleEnableDevicePopups = async () => {
+        if (!('Notification' in window)) return;
+        try {
+            const res = await Notification.requestPermission();
+            setPermState(res);
+            if (res === 'granted' && 'serviceWorker' in navigator) {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg && 'showNotification' in reg) {
+                    reg.showNotification('Device Alerts Enabled', {
+                        body: 'You will now receive instant pop-up alerts even when Belly-Chow is minimized.',
+                        icon: '/belly_chow_logo.png',
+                        badge: '/belly_chow_logo.png',
+                    });
+                }
+            }
+        } catch {
+            // Ignore
+        }
+    };
 
     // Get the most recent unread critical notification
     const criticalNotification = notifications.find(
@@ -23,7 +49,10 @@ const NotificationBanner = () => {
 
     const handleClick = () => {
         if (criticalNotification?.order_id) {
-            navigate('/orders');
+            if (role === 'vendor') navigate('/vendor-panel/orders');
+            else if (role === 'rider') navigate('/dashboard');
+            else if (role === 'admin') navigate('/admin/orders');
+            else navigate('/orders');
         } else {
             navigate('/notifications');
         }
@@ -51,7 +80,34 @@ const NotificationBanner = () => {
         }
     };
 
-    if (!criticalNotification) return null;
+    if (!criticalNotification) {
+        if (user && permState === 'default' && !permDismissed) {
+            return (
+                <div className="fixed bottom-20 md:bottom-5 right-4 left-4 md:left-auto md:max-w-sm z-[100] animate-in fade-in slide-in-from-bottom-3">
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-card/95 backdrop-blur-xl p-3.5 shadow-xl">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <i className="fa-solid fa-bell text-sm animate-bounce" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-heading text-xs font-bold text-foreground">Enable Device Pop-Up Alerts</p>
+                                <p className="text-[11px] text-muted-foreground truncate">Get order updates even when off the app</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                            <Button size="sm" onClick={handleEnableDevicePopups} className="h-8 rounded-xl text-xs font-bold px-3">
+                                Enable
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setPermDismissed(true)}>
+                                <X className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    }
 
     return (
         <div className="fixed top-16 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-[100] animate-in slide-in-from-top-2">

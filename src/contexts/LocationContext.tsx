@@ -184,10 +184,6 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       lastUpdated.current = now;
       lastBroadcastCoords.current = { lat: coords.lat, lng: coords.lng };
 
-      // Skip database update if simulating in Rider Dashboard
-      const isSimulating = localStorage.getItem(`rider_sim_${activeOrderRef.current}`) === 'true';
-      if (isSimulating && role === 'rider') return;
-
       if (user && activeOrderRef.current) {
         try {
           if (role === 'rider') {
