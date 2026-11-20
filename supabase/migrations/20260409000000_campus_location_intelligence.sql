@@ -322,6 +322,126 @@ CREATE POLICY "Admins can update wallets" ON public.wallets FOR UPDATE TO authen
   auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'::public.app_role)
 );
 
+-- Rider Order Pool & Atomic Claim Policies
+DROP POLICY IF EXISTS "Users view relevant orders" ON public.orders;
+CREATE POLICY "Users view relevant orders" ON public.orders FOR SELECT USING (
+  auth.uid() = student_id
+  OR auth.uid() = rider_id
+  OR (status = 'ready'::public.order_status AND rider_id IS NULL)
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants can update orders" ON public.orders;
+CREATE POLICY "Participants can update orders" ON public.orders FOR UPDATE USING (
+  auth.uid() = student_id
+  OR auth.uid() = rider_id
+  OR (status = 'ready'::public.order_status AND rider_id IS NULL)
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Atomic First-Accept-Wins Rider Claim RPC (Prevents 2 riders from claiming the same order)
+CREATE OR REPLACE FUNCTION public.claim_ready_order(
+  p_order_id UUID,
+  p_rider_lat DOUBLE PRECISION DEFAULT NULL,
+  p_rider_lng DOUBLE PRECISION DEFAULT NULL
+)
+RETURNS public.orders AS $$
+DECLARE
+  v_order public.orders;
+BEGIN
+  UPDATE public.orders
+  SET rider_id = auth.uid(),
+      status = 'picked_up'::public.order_status,
+      rider_lat = COALESCE(p_rider_lat, rider_lat),
+      rider_lng = COALESCE(p_rider_lng, rider_lng)
+  WHERE id = p_order_id
+    AND rider_id IS NULL
+    AND status = 'ready'::public.order_status
+  RETURNING * INTO v_order;
+
+  IF v_order.id IS NULL THEN
+    RAISE EXCEPTION 'ORDER_ALREADY_CLAIMED';
+  END IF;
+
+  RETURN v_order;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Automatic In-App Notifications Trigger for All Order Status Changes
+CREATE OR REPLACE FUNCTION public.notify_order_lifecycle()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_vendor_user_id UUID;
+  v_vendor_name TEXT;
+  v_short_id TEXT;
+BEGIN
+  v_short_id := SUBSTRING(NEW.id::text FROM 1 FOR 8);
+  SELECT user_id, name INTO v_vendor_user_id, v_vendor_name FROM public.vendors WHERE id = NEW.vendor_id;
+
+  IF TG_OP = 'INSERT' THEN
+    IF v_vendor_user_id IS NOT NULL THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (v_vendor_user_id, 'New Order Received', 'New order #' || v_short_id || ' is waiting in your kitchen pipeline.', 'new_order', NEW.id);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    -- Notify Student on every lifecycle stage
+    IF NEW.status = 'accepted' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Accepted', COALESCE(v_vendor_name, 'The vendor') || ' has accepted your order #' || v_short_id || '.', 'order_update', NEW.id);
+    ELSIF NEW.status = 'preparing' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Meal Preparation Started', COALESCE(v_vendor_name, 'The kitchen') || ' has accepted and started preparing your meal (#' || v_short_id || ').', 'order_update', NEW.id);
+    ELSIF NEW.status = 'ready' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Meal Ready for Rider Pickup', 'Your meal from ' || COALESCE(v_vendor_name, 'the kitchen') || ' is packaged and ready for rider pickup!', 'order_update', NEW.id);
+    ELSIF NEW.status = 'picked_up' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Picked Up by Rider', 'A dispatch rider has picked up your order #' || v_short_id || ' from ' || COALESCE(v_vendor_name, 'the vendor') || '.', 'order_update', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Order Picked Up by Rider', 'A rider has claimed and picked up order #' || v_short_id || '.', 'order_update', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'delivering' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Rider On The Way', 'Your rider is heading to your drop-off location now! Track live on the map.', 'order_update', NEW.id);
+    ELSIF NEW.status = 'arrived' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Your Rider Has Arrived!', 'Your rider is outside at your drop-off spot for order #' || v_short_id || '. Please meet them and confirm receipt.', 'success', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Rider Arrived at Drop-off', 'Rider has arrived at the customer location for order #' || v_short_id || '.', 'order_update', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'delivered' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Delivered', 'Order #' || v_short_id || ' is complete. Enjoy your meal!', 'success', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Order Completed & Paid', 'Customer confirmed delivery for order #' || v_short_id || '. Earnings credited to your wallet.', 'success', NEW.id);
+      END IF;
+      IF NEW.rider_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (NEW.rider_id, 'Delivery Confirmed & Paid', 'Customer confirmed order #' || v_short_id || '. Delivery fee credited to your wallet.', 'success', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'rejected' OR NEW.status = 'cancelled' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order ' || INITCAP(NEW.status::text), 'Order #' || v_short_id || ' was ' || NEW.status::text || '.', 'error', NEW.id);
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_order_lifecycle ON public.orders;
+CREATE TRIGGER trg_notify_order_lifecycle
+AFTER INSERT OR UPDATE ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.notify_order_lifecycle();
+
 -- Storage Bucket & Automatic Vendor Rating Trigger
 INSERT INTO storage.buckets (id, name, public) VALUES ('food-images', 'food-images', true) ON CONFLICT (id) DO NOTHING;
 
@@ -503,6 +623,126 @@ DROP POLICY IF EXISTS "Admins update disputes" ON public.disputes;
 CREATE POLICY "Admins update disputes" ON public.disputes FOR UPDATE TO authenticated USING (
   public.has_role(auth.uid(), 'admin'::public.app_role)
 );
+
+-- Rider Order Pool & Atomic Claim Policies
+DROP POLICY IF EXISTS "Users view relevant orders" ON public.orders;
+CREATE POLICY "Users view relevant orders" ON public.orders FOR SELECT USING (
+  auth.uid() = student_id
+  OR auth.uid() = rider_id
+  OR (status = 'ready'::public.order_status AND rider_id IS NULL)
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+DROP POLICY IF EXISTS "Participants can update orders" ON public.orders;
+CREATE POLICY "Participants can update orders" ON public.orders FOR UPDATE USING (
+  auth.uid() = student_id
+  OR auth.uid() = rider_id
+  OR (status = 'ready'::public.order_status AND rider_id IS NULL)
+  OR EXISTS (SELECT 1 FROM public.vendors WHERE vendors.id = orders.vendor_id AND vendors.user_id = auth.uid())
+  OR public.has_role(auth.uid(), 'admin'::public.app_role)
+);
+
+-- Atomic First-Accept-Wins Rider Claim RPC (Prevents 2 riders from claiming the same order)
+CREATE OR REPLACE FUNCTION public.claim_ready_order(
+  p_order_id UUID,
+  p_rider_lat DOUBLE PRECISION DEFAULT NULL,
+  p_rider_lng DOUBLE PRECISION DEFAULT NULL
+)
+RETURNS public.orders AS $$
+DECLARE
+  v_order public.orders;
+BEGIN
+  UPDATE public.orders
+  SET rider_id = auth.uid(),
+      status = 'picked_up'::public.order_status,
+      rider_lat = COALESCE(p_rider_lat, rider_lat),
+      rider_lng = COALESCE(p_rider_lng, rider_lng)
+  WHERE id = p_order_id
+    AND rider_id IS NULL
+    AND status = 'ready'::public.order_status
+  RETURNING * INTO v_order;
+
+  IF v_order.id IS NULL THEN
+    RAISE EXCEPTION 'ORDER_ALREADY_CLAIMED';
+  END IF;
+
+  RETURN v_order;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Automatic In-App Notifications Trigger for All Order Status Changes
+CREATE OR REPLACE FUNCTION public.notify_order_lifecycle()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_vendor_user_id UUID;
+  v_vendor_name TEXT;
+  v_short_id TEXT;
+BEGIN
+  v_short_id := SUBSTRING(NEW.id::text FROM 1 FOR 8);
+  SELECT user_id, name INTO v_vendor_user_id, v_vendor_name FROM public.vendors WHERE id = NEW.vendor_id;
+
+  IF TG_OP = 'INSERT' THEN
+    IF v_vendor_user_id IS NOT NULL THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (v_vendor_user_id, 'New Order Received', 'New order #' || v_short_id || ' is waiting in your kitchen pipeline.', 'new_order', NEW.id);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    -- Notify Student on every lifecycle stage
+    IF NEW.status = 'accepted' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Accepted', COALESCE(v_vendor_name, 'The vendor') || ' has accepted your order #' || v_short_id || '.', 'order_update', NEW.id);
+    ELSIF NEW.status = 'preparing' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Meal Preparation Started', COALESCE(v_vendor_name, 'The kitchen') || ' has accepted and started preparing your meal (#' || v_short_id || ').', 'order_update', NEW.id);
+    ELSIF NEW.status = 'ready' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Meal Ready for Rider Pickup', 'Your meal from ' || COALESCE(v_vendor_name, 'the kitchen') || ' is packaged and ready for rider pickup!', 'order_update', NEW.id);
+    ELSIF NEW.status = 'picked_up' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Picked Up by Rider', 'A dispatch rider has picked up your order #' || v_short_id || ' from ' || COALESCE(v_vendor_name, 'the vendor') || '.', 'order_update', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Order Picked Up by Rider', 'A rider has claimed and picked up order #' || v_short_id || '.', 'order_update', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'delivering' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Rider On The Way', 'Your rider is heading to your drop-off location now! Track live on the map.', 'order_update', NEW.id);
+    ELSIF NEW.status = 'arrived' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Your Rider Has Arrived!', 'Your rider is outside at your drop-off spot for order #' || v_short_id || '. Please meet them and confirm receipt.', 'success', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Rider Arrived at Drop-off', 'Rider has arrived at the customer location for order #' || v_short_id || '.', 'order_update', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'delivered' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order Delivered', 'Order #' || v_short_id || ' is complete. Enjoy your meal!', 'success', NEW.id);
+      IF v_vendor_user_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (v_vendor_user_id, 'Order Completed & Paid', 'Customer confirmed delivery for order #' || v_short_id || '. Earnings credited to your wallet.', 'success', NEW.id);
+      END IF;
+      IF NEW.rider_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, title, message, type, order_id)
+        VALUES (NEW.rider_id, 'Delivery Confirmed & Paid', 'Customer confirmed order #' || v_short_id || '. Delivery fee credited to your wallet.', 'success', NEW.id);
+      END IF;
+    ELSIF NEW.status = 'rejected' OR NEW.status = 'cancelled' THEN
+      INSERT INTO public.notifications (user_id, title, message, type, order_id)
+      VALUES (NEW.student_id, 'Order ' || INITCAP(NEW.status::text), 'Order #' || v_short_id || ' was ' || NEW.status::text || '.', 'error', NEW.id);
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_order_lifecycle ON public.orders;
+CREATE TRIGGER trg_notify_order_lifecycle
+AFTER INSERT OR UPDATE ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.notify_order_lifecycle();
 
 -- Storage Bucket & Automatic Vendor Rating Trigger
 INSERT INTO storage.buckets (id, name, public) VALUES ('food-images', 'food-images', true) ON CONFLICT (id) DO NOTHING;

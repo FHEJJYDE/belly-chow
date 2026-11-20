@@ -28,12 +28,11 @@ export function VendorSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border/60">
       <SidebarContent className="bg-card">
         <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50">
-          <img src={logo} alt="Belly-Chow" className="h-9 w-9 shrink-0 rounded-xl object-contain border border-border/60 p-0.5 bg-background shadow-sm" />
+          <img src={logo} alt="Belly-Chow" className="h-10 w-10 shrink-0 rounded-xl object-contain border border-border/60 p-0.5 bg-background shadow-sm" />
           {!collapsed && (
-            <div className="min-w-0">
-              <span className="font-heading text-base font-bold tracking-tight block leading-none">Belly-Chow</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mt-1 block">Merchant Portal</span>
-            </div>
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary uppercase tracking-wider">
+              Merchant Portal
+            </span>
           )}
         </div>
         <SidebarGroup className="py-3">

@@ -85,8 +85,40 @@ const VendorOrders = () => {
   }, [user, authLoading, fetchData]);
 
   const updateStatus = async (orderId: string, status: string) => {
+    const targetOrder = orders.find(o => o.id === orderId);
     const { error } = await supabase.from('orders').update({ status: status as any }).eq('id', orderId);
-    if (!error) { setOrders(orders.map(o => o.id === orderId ? { ...o, status: status as any } : o)); toast({ title: `Order ${status}` }); }
+    if (!error) {
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: status as any } : o));
+      toast({ title: `Order marked as ${status}` });
+
+      // Send explicit in-app notification to the student for every vendor lifecycle change
+      if (targetOrder?.student_id) {
+        const shortId = orderId.slice(0, 8);
+        let title = 'Order Status Updated';
+        let message = `Your order #${shortId} is now ${status}.`;
+        let type = 'order_update';
+
+        if (status === 'accepted' || status === 'preparing') {
+          title = 'Kitchen Started Preparing Your Meal';
+          message = `The vendor has accepted your order #${shortId} and started cooking your meal!`;
+        } else if (status === 'ready') {
+          title = 'Meal Ready — Dispatching Rider';
+          message = `Your meal (#${shortId}) is packaged and ready! Nearby riders have been notified for pickup.`;
+        } else if (status === 'rejected') {
+          title = 'Order Rejected by Vendor';
+          message = `Unfortunately the vendor could not fulfill order #${shortId}.`;
+          type = 'error';
+        }
+
+        await supabase.from('notifications').insert({
+          user_id: targetOrder.student_id,
+          title,
+          message,
+          type,
+          order_id: orderId,
+        });
+      }
+    }
   };
 
   const updatePaymentStatus = async (orderId: string, status: 'confirmed' | 'failed') => {

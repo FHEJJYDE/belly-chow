@@ -69,9 +69,8 @@ const Signup = () => {
     <div className="flex min-h-screen">
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between border-r bg-muted/30 p-12">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+        <Link to="/" className="flex items-center">
+          <img src={logo} alt="Belly-Chow" className="h-11 w-11 rounded-xl object-contain" />
         </Link>
         <div>
           <h1 className="font-heading text-4xl font-bold leading-tight tracking-tight">
@@ -89,9 +88,8 @@ const Signup = () => {
       {/* Right panel — form */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <Link to="/" className="mb-10 flex items-center gap-2 lg:hidden">
-            <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+          <Link to="/" className="mb-10 flex items-center lg:hidden">
+            <img src={logo} alt="Belly-Chow" className="h-11 w-11 rounded-xl object-contain" />
           </Link>
 
           <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Get started</p>

@@ -4,26 +4,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const statusMessages: Record<string, { title: string; description: string }> = {
-  accepted: { title: 'Order Accepted! ✅', description: 'The vendor has accepted your order.' },
-  preparing: { title: 'Being Prepared 🍳', description: 'Your food is being prepared.' },
-  ready: { title: 'Order Ready! 📦', description: 'Your order is ready for pickup.' },
-  picked_up: { title: 'Picked Up 🏍️', description: 'A rider has picked up your order.' },
-  delivering: { title: 'On the Way! 🚀', description: 'Your order is on its way to you.' },
-  arrived: { title: 'Rider Arrived! 📍', description: 'Your rider is outside! Please meet them and confirm delivery receipt.' },
-  delivered: { title: 'Order Complete! 🎉', description: 'Delivery confirmed. Enjoy your food!' },
-  cancelled: { title: 'Order Cancelled ❌', description: 'Your order has been cancelled.' },
-  rejected: { title: 'Order Rejected 😞', description: 'The vendor rejected your order.' },
+  accepted: { title: 'Order Accepted by Vendor', description: 'The vendor has accepted your order.' },
+  preparing: { title: 'Kitchen Preparing Your Meal', description: 'The vendor has accepted and started cooking your meal!' },
+  ready: { title: 'Meal Ready — Dispatching Rider', description: 'Your food is packaged and ready for rider pickup.' },
+  picked_up: { title: 'Order Picked Up by Rider', description: 'A dispatch rider has picked up your order from the vendor.' },
+  delivering: { title: 'Rider Is On The Way!', description: 'Your rider is heading to your drop-off location now.' },
+  arrived: { title: 'Your Rider Has Arrived!', description: 'Your rider is outside! Please meet them and confirm delivery receipt.' },
+  delivered: { title: 'Order Delivered', description: 'Delivery confirmed. Enjoy your meal!' },
+  cancelled: { title: 'Order Cancelled', description: 'Your order has been cancelled.' },
+  rejected: { title: 'Order Rejected', description: 'The vendor was unable to fulfill your order.' },
 };
 
 const vendorStatusMessages: Record<string, { title: string; description: string }> = {
-  pending: { title: 'New Order! 🔔', description: 'You have a new order waiting.' },
-  picked_up: { title: 'Order Picked Up 🏍️', description: 'A rider picked up the order.' },
-  arrived: { title: 'Rider Arrived 📍', description: 'Rider has reached the customer location.' },
-  delivered: { title: 'Order Received & Delivered ✅', description: 'Customer confirmed order receipt! Order completed.' },
+  pending: { title: 'New Order Received', description: 'You have a new order waiting in your kitchen pipeline.' },
+  picked_up: { title: 'Order Claimed & Picked Up', description: 'A dispatch rider has picked up the order.' },
+  arrived: { title: 'Rider Arrived at Customer', description: 'The rider has reached the customer drop-off point.' },
+  delivered: { title: 'Order Delivered & Paid', description: 'Customer confirmed delivery! Earnings credited to your wallet.' },
 };
 
 const riderStatusMessages: Record<string, { title: string; description: string }> = {
-  ready: { title: 'Order Ready! 📦', description: 'An order is ready for pickup.' },
+  ready: { title: 'New Order Ready for Pickup!', description: 'A vendor just marked an order ready for pickup.' },
+  delivered: { title: 'Delivery Confirmed by Customer!', description: 'Your delivery payout has been released to your wallet.' },
 };
 
 function playNotificationSound(type: 'new_order' | 'status_update' = 'status_update') {
@@ -79,7 +80,7 @@ export function useOrderNotifications() {
   }, []);
 
   useEffect(() => {
-    if ((role === 'vendor' || role === 'rider') && 'Notification' in window && Notification.permission === 'default') {
+    if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, [role]);
@@ -87,70 +88,95 @@ export function useOrderNotifications() {
   useEffect(() => {
     if (!user || loading || !role) return;
 
-    const init = async () => {
-      if (role === 'student') {
-        const { data } = await supabase
-          .from('orders')
-          .select('id, status')
-          .eq('student_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-        data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
-      } else if (role === 'vendor') {
-        const { data: v } = await supabase
-          .from('vendors')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (v) {
-          vendorIdRef.current = v.id;
-          const { data } = await supabase
-            .from('orders')
-            .select('id, status')
-            .eq('vendor_id', v.id)
-            .order('created_at', { ascending: false })
-            .limit(30);
-          data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
-        }
-      } else if (role === 'rider') {
-        const { data } = await supabase
-          .from('orders')
-          .select('id, status')
-          .or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`)
-          .order('created_at', { ascending: false })
-          .limit(30);
-        data?.forEach((o) => orderStatuses.current.set(o.id, o.status));
+    const checkAndNotify = (order: any, isInitialLoad = false) => {
+      const previousStatus = orderStatuses.current.get(order.id);
+      if (isInitialLoad) {
+        orderStatuses.current.set(order.id, order.status);
+        return;
+      }
+      if (order.status === previousStatus) return;
+      orderStatuses.current.set(order.id, order.status);
+
+      if (role === 'student' && order.student_id === user.id) {
+        const msg = statusMessages[order.status];
+        if (msg) notify(msg.title, msg.description, 'status_update', `student-${order.id}-${order.status}`);
+      }
+
+      if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current) {
+        const msg = vendorStatusMessages[order.status];
+        if (msg) notify(msg.title, msg.description, order.status === 'pending' ? 'new_order' : 'status_update', `vendor-${order.id}-${order.status}`);
+      }
+
+      if (role === 'rider' && (order.rider_id === user.id || (order.status === 'ready' && !order.rider_id))) {
+        const msg = riderStatusMessages[order.status];
+        if (msg) notify(msg.title, msg.description, 'new_order', `rider-${order.id}-${order.status}`);
       }
     };
-    init();
 
-    const channel = supabase.channel('order-notifications').on(
+    const pollOrders = async (isInitialLoad = false) => {
+      try {
+        if (role === 'student') {
+          const { data } = await supabase
+            .from('orders')
+            .select('id, status, student_id, vendor_id, rider_id')
+            .eq('student_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+          data?.forEach((o) => checkAndNotify(o, isInitialLoad));
+        } else if (role === 'vendor') {
+          if (!vendorIdRef.current) {
+            const { data: v } = await supabase
+              .from('vendors')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            if (v) vendorIdRef.current = v.id;
+          }
+          if (vendorIdRef.current) {
+            const { data } = await supabase
+              .from('orders')
+              .select('id, status, student_id, vendor_id, rider_id')
+              .eq('vendor_id', vendorIdRef.current)
+              .order('created_at', { ascending: false })
+              .limit(30);
+            data?.forEach((o) => {
+              if (!isInitialLoad && !orderStatuses.current.has(o.id) && o.status === 'pending') {
+                orderStatuses.current.set(o.id, o.status);
+                notify('New Order Received!', `New order #${o.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${o.id}`);
+              } else {
+                checkAndNotify(o, isInitialLoad);
+              }
+            });
+          }
+        } else if (role === 'rider') {
+          const { data } = await supabase
+            .from('orders')
+            .select('id, status, student_id, vendor_id, rider_id')
+            .or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`)
+            .order('created_at', { ascending: false })
+            .limit(30);
+          data?.forEach((o) => {
+            if (!isInitialLoad && !orderStatuses.current.has(o.id) && o.status === 'ready' && !o.rider_id) {
+              orderStatuses.current.set(o.id, o.status);
+              notify('New Order Ready for Pickup!', `Order #${o.id.slice(0, 8)} is ready for dispatch pickup.`, 'new_order', `rider-${o.id}-ready`);
+            } else {
+              checkAndNotify(o, isInitialLoad);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Order notification poll error:', err);
+      }
+    };
+
+    pollOrders(true);
+
+    // 1. Realtime listener for instant <100ms alerts
+    const channel = supabase.channel(`order-notifications-${user.id}`).on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'orders' },
       (payload) => {
-        const order = payload.new as any;
-        const previousStatus = orderStatuses.current.get(order.id);
-
-        // Only notify if status actually changed (compare against our local tracking)
-        if (order.status === previousStatus) return;
-
-        // Update our local tracking
-        orderStatuses.current.set(order.id, order.status);
-
-        if (role === 'student' && order.student_id === user.id) {
-          const msg = statusMessages[order.status];
-          if (msg) notify(msg.title, msg.description, 'status_update', `student-${order.id}-${order.status}`);
-        }
-
-        if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current) {
-          const msg = vendorStatusMessages[order.status];
-          if (msg) notify(msg.title, msg.description, order.status === 'pending' ? 'new_order' : 'status_update', `vendor-${order.id}-${order.status}`);
-        }
-
-        if (role === 'rider' && (order.rider_id === user.id || order.status === 'ready')) {
-          const msg = riderStatusMessages[order.status];
-          if (msg) notify(msg.title, msg.description, 'new_order', `rider-${order.id}-${order.status}`);
-        }
+        checkAndNotify(payload.new as any, false);
       }
     ).on(
       'postgres_changes',
@@ -159,13 +185,19 @@ export function useOrderNotifications() {
         const order = payload.new as any;
         if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
           orderStatuses.current.set(order.id, order.status);
-          notify('🔔 New Order!', `New order #${order.id.slice(0, 8)} — check your orders tab!`, 'new_order', `new-order-${order.id}`);
+          notify('New Order Received!', `New order #${order.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${order.id}`);
         }
       }
     ).subscribe();
 
+    // 2. Guaranteed 5-second polling fallback so students/vendors/riders NEVER miss a status change toast & sound
+    const pollInterval = setInterval(() => {
+      pollOrders(false);
+    }, 5000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
       orderStatuses.current.clear();
     };
   }, [user, role, loading, notify]);

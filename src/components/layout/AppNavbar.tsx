@@ -26,13 +26,10 @@ const AppNavbar = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl transition-all">
       <div className="container flex h-14 items-center justify-between">
-        <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5 group select-none">
-          <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 shadow-md shadow-orange-500/10 group-hover:scale-105 transition-transform duration-300">
+        <Link to={user ? '/dashboard' : '/'} className="flex items-center group select-none">
+          <div className="h-10 w-10 rounded-xl overflow-hidden border border-primary/25 shadow-sm group-hover:scale-105 transition-transform duration-300">
             <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain bg-background" />
           </div>
-          <span className="font-heading text-xl font-bold tracking-tight text-foreground">
-            Belly<span className="text-primary">-Chow</span>
-          </span>
         </Link>
 
         <div className="flex items-center gap-1.5">

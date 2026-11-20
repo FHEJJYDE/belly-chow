@@ -345,35 +345,36 @@ const RiderDashboard = () => {
     fetchWithdrawalsAndWallet();
   }, [user]);
 
+  const fetchOrders = useCallback(async () => {
+    if (!user) return;
+    const [avail, mine, history] = await Promise.all([
+      supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }).limit(30),
+      supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering', 'arrived']).order('created_at', { ascending: false }).limit(10),
+      supabase.from('orders').select('*').eq('rider_id', user.id).eq('status', 'delivered').order('created_at', { ascending: false }).limit(50),
+    ]);
+    const availList = avail.data || [];
+    const mineList = mine.data || [];
+    const historyList = history.data || [];
+
+    const combinedMap = new Map<string, any>();
+    [...availList, ...mineList, ...historyList].forEach((o) => combinedMap.set(o.id, o));
+    const allEnriched = await enrichOrders(Array.from(combinedMap.values()));
+    const enrichedById = new Map(allEnriched.map((o) => [o.id, o]));
+
+    const enrichedAvail = availList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
+    const enrichedMine = mineList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
+    const enrichedHistory = historyList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
+    setAvailableOrders(enrichedAvail);
+    setMyOrders(enrichedMine);
+    setDeliveryHistory(enrichedHistory);
+    setLoading(false);
+    if (enrichedMine.length > 0 && !activeDeliveryId) {
+      setActiveDeliveryId(enrichedMine[0].id);
+    }
+  }, [user, activeDeliveryId]);
+
   useEffect(() => {
     if (!user) return;
-    const fetchOrders = async () => {
-      const [avail, mine, history] = await Promise.all([
-        supabase.from('orders').select('*').eq('status', 'ready').is('rider_id', null).order('created_at', { ascending: false }).limit(30),
-        supabase.from('orders').select('*').eq('rider_id', user.id).in('status', ['picked_up', 'delivering', 'arrived']).order('created_at', { ascending: false }).limit(10),
-        supabase.from('orders').select('*').eq('rider_id', user.id).eq('status', 'delivered').order('created_at', { ascending: false }).limit(50),
-      ]);
-      const availList = avail.data || [];
-      const mineList = mine.data || [];
-      const historyList = history.data || [];
-
-      // Deduplicate & enrich all orders in a single batch instead of 3 separate enrichOrders calls
-      const combinedMap = new Map<string, any>();
-      [...availList, ...mineList, ...historyList].forEach((o) => combinedMap.set(o.id, o));
-      const allEnriched = await enrichOrders(Array.from(combinedMap.values()));
-      const enrichedById = new Map(allEnriched.map((o) => [o.id, o]));
-
-      const enrichedAvail = availList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
-      const enrichedMine = mineList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
-      const enrichedHistory = historyList.map((o) => enrichedById.get(o.id)!).filter(Boolean);
-      setAvailableOrders(enrichedAvail);
-      setMyOrders(enrichedMine);
-      setDeliveryHistory(enrichedHistory);
-      setLoading(false);
-      if (enrichedMine.length > 0 && !activeDeliveryId) {
-        setActiveDeliveryId(enrichedMine[0].id);
-      }
-    };
     fetchOrders();
     const channel = supabase.channel('rider-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
       if (payload.eventType === 'UPDATE') {
@@ -392,8 +393,17 @@ const RiderDashboard = () => {
       }
       fetchOrders();
     }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
+
+    // Active polling fallback every 6 seconds so available orders & claims stay synced even if realtime reconnects
+    const poll = setInterval(() => {
+      fetchOrders();
+    }, 6000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
+  }, [user, fetchOrders]);
 
   // Sort available orders by proximity to the rider (closest vendor first)
   const sortedAvailableOrders = useMemo(() => {
@@ -411,26 +421,151 @@ const RiderDashboard = () => {
 
   const acceptOrder = async (orderId: string) => {
     if (!user) return;
-    const updateData: any = { rider_id: user.id, status: 'picked_up' };
-    if (position) { updateData.rider_lat = position.lat; updateData.rider_lng = position.lng; }
-    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Order accepted! 🏍️' });
+    const targetOrder = availableOrders.find(o => o.id === orderId);
+
+    // 1. Try Atomic RPC first (First-Accept-Wins, prevents 2 riders from claiming the same order)
+    let claimedRow: any = null;
+    const { data: rpcClaimed, error: rpcErr } = await (supabase.rpc as any)('claim_ready_order', {
+      p_order_id: orderId,
+      p_rider_lat: position?.lat ?? null,
+      p_rider_lng: position?.lng ?? null,
+    });
+
+    if (!rpcErr && rpcClaimed && rpcClaimed.id) {
+      claimedRow = rpcClaimed;
+    } else if (rpcErr?.message?.includes('ORDER_ALREADY_CLAIMED')) {
+      setAvailableOrders(prev => prev.filter(o => o.id !== orderId));
+      toast({
+        title: 'Order already claimed',
+        description: 'Another nearby rider accepted this delivery a split-second before you.',
+        variant: 'destructive',
+      });
+      fetchOrders();
+      return;
+    } else {
+      // Fallback conditional atomic update (.is('rider_id', null).eq('status', 'ready')) if RPC migration hasn't been run yet
+      const updateData: any = { rider_id: user.id, status: 'picked_up' };
+      if (position) {
+        updateData.rider_lat = position.lat;
+        updateData.rider_lng = position.lng;
+      }
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId)
+        .is('rider_id', null)
+        .eq('status', 'ready')
+        .select();
+
+      if (updateErr) {
+        toast({ title: 'Could not claim order', description: updateErr.message, variant: 'destructive' });
+        return;
+      }
+      if (!updatedRows || updatedRows.length === 0) {
+        setAvailableOrders(prev => prev.filter(o => o.id !== orderId));
+        toast({
+          title: 'Order already claimed or restricted',
+          description: 'This order was either claimed by another rider or requires running the latest SQL policy.',
+          variant: 'destructive',
+        });
+        fetchOrders();
+        return;
+      }
+      claimedRow = updatedRows[0];
+    }
+
+    // 2. Immediately move order into myOrders state and open the Active Delivery Map screen without waiting for Realtime!
+    if (targetOrder) {
+      const updatedOrder: EnrichedOrder = {
+        ...targetOrder,
+        status: 'picked_up',
+        rider_id: user.id,
+        rider_lat: position?.lat ?? targetOrder.rider_lat,
+        rider_lng: position?.lng ?? targetOrder.rider_lng,
+      };
+      setAvailableOrders(prev => prev.filter(o => o.id !== orderId));
+      setMyOrders(prev => [updatedOrder, ...prev.filter(o => o.id !== orderId)]);
+    }
     setActiveDeliveryId(orderId);
+
+    // 3. Send in-app notification to Student & Vendor
+    const shortId = orderId.slice(0, 8);
+    if (targetOrder?.student_id) {
+      await supabase.from('notifications').insert({
+        user_id: targetOrder.student_id,
+        title: 'Order Picked Up by Rider',
+        message: `Your rider has picked up order #${shortId} from ${targetOrder.vendor_name} and is preparing to head your way.`,
+        type: 'order_update',
+        order_id: orderId,
+      });
+    }
+    if (targetOrder?.vendor_user_id) {
+      await supabase.from('notifications').insert({
+        user_id: targetOrder.vendor_user_id,
+        title: 'Order Claimed by Rider',
+        message: `A dispatch rider has claimed and picked up order #${shortId}.`,
+        type: 'order_update',
+        order_id: orderId,
+      });
+    }
+
+    toast({ title: 'Delivery claimed! Opening live route map...' });
+    fetchOrders();
   };
 
   const updateStatus = async (orderId: string, status: string) => {
-    const { error } = await supabase.from('orders').update({ status: status as any }).eq('id', orderId);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    const targetOrder = myOrders.find(o => o.id === orderId);
+    const { data: updated, error } = await supabase
+      .from('orders')
+      .update({ status: status as any })
+      .eq('id', orderId)
+      .select();
+
+    if (error || !updated || updated.length === 0) {
+      toast({
+        title: 'Error updating status',
+        description: error?.message || 'Could not update order status.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Optimistically update local myOrders immediately
+    setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+
+    // Send notification to Student
+    if (targetOrder?.student_id && status === 'delivering') {
+      await supabase.from('notifications').insert({
+        user_id: targetOrder.student_id,
+        title: 'Rider On The Way!',
+        message: `Your rider is now in transit with your order #${orderId.slice(0, 8)} from ${targetOrder.vendor_name}. Track live on your map!`,
+        type: 'order_update',
+        order_id: orderId,
+      });
+    }
+
     toast({ title: `Order marked as ${status.replace('_', ' ')}` });
-    if (status === 'delivered') { setActiveDeliveryId(null); setDeliveryProof(null); setDeliveryProofPreview(null); }
+    if (status === 'delivered') {
+      setActiveDeliveryId(null);
+      setDeliveryProof(null);
+      setDeliveryProofPreview(null);
+    }
+    fetchOrders();
   };
 
   const cancelDelivery = async (orderId: string) => {
-    const { error } = await supabase.from('orders').update({ rider_id: null, rider_lat: null, rider_lng: null, status: 'ready' as any } as any).eq('id', orderId);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    const { error } = await supabase
+      .from('orders')
+      .update({ rider_id: null, rider_lat: null, rider_lng: null, status: 'ready' as any } as any)
+      .eq('id', orderId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setMyOrders(prev => prev.filter(o => o.id !== orderId));
     toast({ title: 'Delivery cancelled. Order returned to pool.' });
     setActiveDeliveryId(null);
+    fetchOrders();
   };
 
   const openInGoogleMaps = (lat: number, lng: number) => {
@@ -508,6 +643,7 @@ const RiderDashboard = () => {
   };
 
   const handleDeliverWithProof = async (orderId: string) => {
+    const targetOrder = myOrders.find(o => o.id === orderId);
     let proofUrl: string | null = null;
     if (deliveryProof) {
       proofUrl = await uploadDeliveryProof(orderId);
@@ -515,8 +651,24 @@ const RiderDashboard = () => {
     const updateData: any = { status: 'arrived' };
     if (proofUrl) updateData.delivery_proof_url = proofUrl;
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Ride ended! 🏁 Waiting for customer confirmation.' });
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'arrived' } : o));
+
+    if (targetOrder?.student_id) {
+      await supabase.from('notifications').insert({
+        user_id: targetOrder.student_id,
+        title: 'Your Rider Has Arrived!',
+        message: `Your rider has arrived at your drop-off location for order #${orderId.slice(0, 8)}. Please meet them and confirm delivery receipt.`,
+        type: 'success',
+        order_id: orderId,
+      });
+    }
+
+    toast({ title: 'Ride ended! Waiting for customer confirmation.' });
     setDeliveryProof(null);
     setDeliveryProofPreview(null);
   };
@@ -845,18 +997,15 @@ const RiderDashboard = () => {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-card/95 backdrop-blur-xl">
         <div className="container max-w-4xl flex h-15 items-center justify-between gap-2 py-2.5">
           {/* Brand + Rider Badge */}
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 bg-background p-0.5 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="h-10 w-10 rounded-xl overflow-hidden border border-primary/30 bg-background p-0.5 shrink-0">
               <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-heading text-base font-bold tracking-tight">Belly-Chow</span>
-                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Rider
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground hidden sm:block">
+              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary block w-fit">
+                Rider Console
+              </span>
+              <p className="text-[11px] text-muted-foreground hidden sm:block mt-0.5">
                 {position ? 'GPS Signal Locked' : 'Waiting for GPS Signal'}
               </p>
             </div>

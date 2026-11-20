@@ -53,9 +53,8 @@ const Landing = () => {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-lg">
         <div className="container flex h-14 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="font-heading text-lg font-bold tracking-tight">Belly-Chow</span>
+          <Link to="/" className="flex items-center">
+            <img src={logo} alt="Belly-Chow" className="h-10 w-10 rounded-xl object-contain" />
           </Link>
           <div className="flex items-center gap-2">
             <Link to="/login">
@@ -233,9 +232,8 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Belly-Chow" className="h-6 w-6 rounded-md object-contain" />
-            <span className="font-heading text-sm font-semibold">Belly-Chow</span>
+          <div className="flex items-center">
+            <img src={logo} alt="Belly-Chow" className="h-8 w-8 rounded-lg object-contain" />
           </div>
           <div className="flex items-center gap-5 text-sm text-muted-foreground">
             <Link to="/support" className="transition-colors hover:text-foreground">Support</Link>

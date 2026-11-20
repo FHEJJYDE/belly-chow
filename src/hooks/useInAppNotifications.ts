@@ -97,16 +97,25 @@ export function useInAppNotifications() {
         }
     }, [user, setBadge]);
 
-    // Initial fetch and periodic refresh (fallback for realtime)
+    // Initial fetch, Realtime subscription, and 8s periodic refresh
     useEffect(() => {
         if (!user) return;
 
         fetchNotifications();
 
-        // Refresh notifications every 30 seconds as fallback
-        const interval = setInterval(fetchNotifications, 30000);
+        const channel = supabase
+            .channel(`in-app-notifs-${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+                () => fetchNotifications()
+            )
+            .subscribe();
+
+        const interval = setInterval(fetchNotifications, 8000);
 
         return () => {
+            supabase.removeChannel(channel);
             clearInterval(interval);
         };
     }, [user, fetchNotifications]);
