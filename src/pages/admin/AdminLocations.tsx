@@ -12,6 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Plus, Search, Edit, Trash2, Star, Sparkles, Building, Landmark, School, BookOpen, Compass, Layers, Tag } from 'lucide-react';
 import { useCampusLocations, DeliveryZoneItem } from '@/hooks/useCampusLocations';
+import CampusPinMap from '@/components/location/CampusPinMap';
+import { useGeolocation } from '@/hooks/useGeolocation';
 
 export interface CampusLocation {
   id: string;
@@ -45,6 +47,23 @@ const CATEGORIES = [
 const AdminLocations = () => {
   const { toast } = useToast();
   const { invalidateLocations } = useCampusLocations();
+  const { position: adminGpsPos, getPosition: getAdminGps } = useGeolocation();
+  const [capturingAdminGps, setCapturingAdminGps] = useState(false);
+
+  useEffect(() => {
+    if (capturingAdminGps && adminGpsPos) {
+      setFormData((prev) => ({
+        ...prev,
+        lat: adminGpsPos.lat.toFixed(6),
+        lng: adminGpsPos.lng.toFixed(6),
+      }));
+      setCapturingAdminGps(false);
+      toast({
+        title: 'GPS coordinates locked',
+        description: `${adminGpsPos.lat.toFixed(6)}, ${adminGpsPos.lng.toFixed(6)}`,
+      });
+    }
+  }, [adminGpsPos, capturingAdminGps, toast]);
 
   const [activeTab, setActiveTab] = useState<'locations' | 'zones'>('locations');
   const [locations, setLocations] = useState<CampusLocation[]>([]);
@@ -892,28 +911,85 @@ const AdminLocations = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="loc-lat">Latitude (Optional)</Label>
-                <Input
-                  id="loc-lat"
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 7.4412"
-                  value={formData.lat}
-                  onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
-                />
+            <div className="space-y-2.5 rounded-xl border border-border/80 bg-muted/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-xs font-bold flex items-center gap-1.5">
+                    <i className="fa-solid fa-map-pin text-primary" />
+                    <span>Pin Exact Building Location on Google Map</span>
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Switch to Satellite to spot brand-new campus buildings and tap or drag the pin onto the roof.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px] gap-1 shrink-0"
+                  onClick={() => {
+                    setCapturingAdminGps(true);
+                    getAdminGps();
+                  }}
+                >
+                  <i className="fa-solid fa-location-crosshairs text-primary text-[10px]" />
+                  <span>{capturingAdminGps ? 'Locating...' : 'Use My GPS'}</span>
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="loc-lng">Longitude (Optional)</Label>
-                <Input
-                  id="loc-lng"
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 3.8967"
-                  value={formData.lng}
-                  onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
-                />
+
+              <CampusPinMap
+                lat={
+                  formData.lat
+                    ? parseFloat(formData.lat)
+                    : adminGpsPos?.lat ??
+                      (locations.find((l) => l.lat != null)?.lat
+                        ? Number(locations.find((l) => l.lat != null)!.lat)
+                        : 7.4443)
+                }
+                lng={
+                  formData.lng
+                    ? parseFloat(formData.lng)
+                    : adminGpsPos?.lng ??
+                      (locations.find((l) => l.lng != null)?.lng
+                        ? Number(locations.find((l) => l.lng != null)!.lng)
+                        : 3.8995)
+                }
+                locations={locations as any}
+                height="210px"
+                onPinMove={(newLat, newLng) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    lat: newLat.toFixed(6),
+                    lng: newLng.toFixed(6),
+                  }));
+                }}
+              />
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label htmlFor="loc-lat" className="text-xs">Latitude</Label>
+                  <Input
+                    id="loc-lat"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 7.441200"
+                    value={formData.lat}
+                    onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loc-lng" className="text-xs">Longitude</Label>
+                  <Input
+                    id="loc-lng"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 3.896700"
+                    value={formData.lng}
+                    onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
               </div>
             </div>
 

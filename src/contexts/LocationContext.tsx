@@ -88,7 +88,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [user, role]);
 
-  // One-shot manual GPS fix helper
+  // One-shot manual GPS fix helper (with automatic fallback for indoor/desktop devices)
   const requestCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
@@ -106,10 +106,29 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setLoading(false);
       },
       (err) => {
+        if (err.code === 3 || err.code === 2) {
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => {
+              setLocation({
+                lat: fallbackPos.coords.latitude,
+                lng: fallbackPos.coords.longitude,
+                accuracy: fallbackPos.coords.accuracy,
+              });
+              setError(null);
+              setLoading(false);
+            },
+            (fallbackErr) => {
+              setLoading(false);
+              setError(fallbackErr.message || 'Unable to retrieve GPS position');
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+          );
+          return;
+        }
         setLoading(false);
         setError(err.message || 'Unable to retrieve GPS position');
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
     );
   }, []);
 
@@ -208,12 +227,17 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               setError('Location permission denied. Please allow access in browser settings.');
               break;
             case 2:
-              setError('GPS signal lost. Retrying…');
-              retryTimer = setTimeout(() => startWatch(), 8000);
-              break;
             case 3:
-              setError('GPS timed out. Retrying…');
-              retryTimer = setTimeout(() => startWatch(), 8000);
+              // Fallback watch with standard accuracy for indoor/desktop devices
+              if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+              watchId = navigator.geolocation.watchPosition(
+                handleSuccess,
+                () => {
+                  setError('GPS signal weak. Retrying…');
+                  retryTimer = setTimeout(() => startWatch(), 8000);
+                },
+                { enableHighAccuracy: false, timeout: 20000, maximumAge: 15000 }
+              );
               break;
             default:
               setError(err.message);

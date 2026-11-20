@@ -437,16 +437,16 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
           </Suspense>
 
           {!liveRiderPos && isBeingDelivered && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-2xl gap-2">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-xs font-semibold">Locking onto rider GPS signal...</p>
+            <div className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2 rounded-full bg-slate-900/90 text-white backdrop-blur-md px-3.5 py-1.5 text-xs font-semibold shadow-lg border border-white/15">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
+              <span>Waiting for rider's live GPS signal...</span>
             </div>
           )}
 
           {sharingLocation && studentPos && (
-            <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-xl bg-blue-600/95 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md">
+            <div className="pointer-events-none absolute bottom-3 right-12 z-[1000] flex items-center gap-1.5 rounded-xl bg-blue-600/95 px-2.5 py-1 text-[10px] font-semibold text-white shadow-md">
               <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-              <span>Live GPS Shared</span>
+              <span>Sharing Live GPS</span>
             </div>
           )}
         </div>
@@ -526,9 +526,30 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
                 size="sm"
                 variant={sharingLocation ? 'secondary' : 'outline'}
                 className="shrink-0 text-xs gap-1.5 rounded-xl"
-                onClick={() => {
-                  if (!sharingLocation) getPosition();
-                  setSharingLocation(!sharingLocation);
+                onClick={async () => {
+                  const nextState = !sharingLocation;
+                  setSharingLocation(nextState);
+                  if (nextState) {
+                    getPosition();
+                    if (studentPos && user) {
+                      await supabase
+                        .from('orders')
+                        .update({
+                          delivery_lat: studentPos.lat,
+                          delivery_lng: studentPos.lng,
+                        } as any)
+                        .eq('id', order.id);
+                    }
+                    toast({
+                      title: 'Live GPS sharing enabled',
+                      description: 'Your rider can now see your exact live position on the map.',
+                    });
+                  } else {
+                    toast({
+                      title: 'Live GPS sharing paused',
+                      description: 'Your pinned drop-off spot remains visible to the rider.',
+                    });
+                  }
                 }}
                 title="Toggle live GPS sharing with rider"
               >

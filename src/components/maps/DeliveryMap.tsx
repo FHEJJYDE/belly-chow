@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useCampusLocations } from '@/hooks/useCampusLocations';
 
 // Fix default marker icons for bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -14,19 +15,43 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+// ── Google Maps & OSM Tile Layers (Up to Zoom 21, Most Recent Imagery & Roads) ─
+type MapStyleMode = 'google_streets' | 'google_hybrid' | 'osm';
+
+const TILE_LAYERS = {
+  // Google Maps Standard Streets & Campus Buildings (Latest Google Roads & POIs up to Zoom 21)
+  google_streets: {
+    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    maxZoom: 21,
+    className: '',
+  },
+  // Google Maps Hybrid Satellite (Latest Google Aerial Satellite + Google Road & Building Labels up to Zoom 21)
+  google_hybrid: {
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    maxZoom: 21,
+    className: '',
+  },
+  // OpenStreetMap Community Layer
+  osm: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 19,
+    className: 'bc-clean-tiles',
+  },
+};
+
 // ── Custom Font Awesome 3D Vector Marker Factory ─────────────────────────────
 function makeVectorMarker(faIconClass: string, bgColor: string, pulseColor: string, badgeLabel?: string): L.DivIcon {
   return L.divIcon({
     className: '',
     html: `
-      <div style="position:relative; width:42px; height:52px; display:flex; flex-direction:column; align-items:center;">
+      <div style="position:relative; width:44px; height:54px; display:flex; flex-direction:column; align-items:center;">
         ${
           badgeLabel
             ? `<div style="
-                position:absolute; top:-22px; left:50%; transform:translateX(-50%);
-                background:rgba(15,23,42,0.92); color:#fff; font-size:10px; font-weight:700;
-                padding:2px 7px; border-radius:999px; white-space:nowrap;
-                box-shadow:0 2px 6px rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2);
+                position:absolute; top:-23px; left:50%; transform:translateX(-50%);
+                background:rgba(15,23,42,0.94); color:#fff; font-size:10px; font-weight:700;
+                padding:2px 8px; border-radius:999px; white-space:nowrap;
+                box-shadow:0 3px 8px rgba(0,0,0,0.35); border:1.5px solid rgba(255,255,255,0.35);
                 letter-spacing:0.01em; pointer-events:none;
               ">${badgeLabel}</div>`
             : ''
@@ -38,7 +63,7 @@ function makeVectorMarker(faIconClass: string, bgColor: string, pulseColor: stri
             display:flex; align-items:center; justify-content:center;
             width:38px; height:38px; border-radius:50%;
             background:${bgColor}; border:2.5px solid #ffffff;
-            box-shadow:0 6px 16px -2px rgba(15,23,42,0.35);
+            box-shadow:0 6px 16px -2px rgba(15,23,42,0.45);
             color:#ffffff; font-size:15px;
           ">
             <i class="${faIconClass}"></i>
@@ -50,20 +75,50 @@ function makeVectorMarker(faIconClass: string, bgColor: string, pulseColor: stri
           border-left:7px solid transparent;
           border-right:7px solid transparent;
           border-top:9px solid ${bgColor};
-          filter:drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+          filter:drop-shadow(0 2px 2px rgba(0,0,0,0.25));
         "></div>
       </div>`,
-    iconSize: [42, 52],
-    iconAnchor: [21, 50],
+    iconSize: [44, 54],
+    iconAnchor: [22, 52],
     popupAnchor: [0, -52],
+  });
+}
+
+// Campus Landmark Pill Overlay Marker (shows admin-configured hostels, faculties, gates on the map)
+function makeCampusLandmarkChip(name: string, category: string): L.DivIcon {
+  const catLower = (category || '').toLowerCase();
+  const icon =
+    catLower.includes('hostel')
+      ? 'fa-building'
+      : catLower.includes('faculty') || catLower.includes('lecture')
+      ? 'fa-graduation-cap'
+      : catLower.includes('gate')
+      ? 'fa-archway'
+      : 'fa-landmark';
+
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        display:inline-flex; align-items:center; gap:4px;
+        background:rgba(255,255,255,0.94); color:#0f172a;
+        padding:2px 7px; border-radius:999px;
+        font-size:10px; font-weight:700; white-space:nowrap;
+        border:1.5px solid rgba(249,115,22,0.55);
+        box-shadow:0 2px 6px rgba(15,23,42,0.18);
+        pointer-events:auto;
+      ">
+        <i class="fa-solid ${icon}" style="color:#f97316; font-size:9px;"></i>
+        <span>${name}</span>
+      </div>`,
+    iconSize: [100, 22],
+    iconAnchor: [50, 11],
   });
 }
 
 const riderIcon = makeVectorMarker('fa-solid fa-motorcycle', '#f97316', 'rgba(249,115,22,0.45)', 'Rider');
 const customerIcon = makeVectorMarker('fa-solid fa-location-dot', '#2563eb', 'rgba(37,99,235,0.38)', 'Drop-off');
 const vendorIcon = makeVectorMarker('fa-solid fa-store', '#0f172a', 'rgba(15,23,42,0.22)', 'Kitchen');
-
-const osmTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 export interface DeliveryMapProps {
   riderLat?: number | null;
@@ -92,14 +147,22 @@ const DeliveryMap = ({
   className = '',
   height = '320px',
 }: DeliveryMapProps) => {
+  const { locations: campusLocations } = useCampusLocations();
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const baseTileGroupRef = useRef<L.LayerGroup | null>(null);
+  const campusLayerGroupRef = useRef<L.LayerGroup | null>(null);
+
   const riderMarkerRef = useRef<L.Marker | null>(null);
   const customerMarkerRef = useRef<L.Marker | null>(null);
   const vendorMarkerRef = useRef<L.Marker | null>(null);
+  const customerAccuracyCircleRef = useRef<L.Circle | null>(null);
   const routeCasingRef = useRef<L.Polyline | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
 
+  const [mapStyle, setMapStyle] = useState<MapStyleMode>('google_streets');
+  const [showCampusPOIs, setShowCampusPOIs] = useState(true);
   const [routeCoords, setRouteCoords] = useState<L.LatLngExpression[] | null>(null);
   const [routeStats, setRouteStats] = useState<{ distanceKm: number; durationMins: number } | null>(null);
 
@@ -122,9 +185,9 @@ const DeliveryMap = ({
     if (vendorLat && vendorLng) pts.push([vendorLat, vendorLng]);
     if (pts.length === 0) return;
     if (pts.length === 1) {
-      map.setView(pts[0] as L.LatLngExpression, 16);
+      map.setView(pts[0] as L.LatLngExpression, 17);
     } else {
-      map.fitBounds(L.latLngBounds(pts as L.LatLngTuple[]), { padding: [56, 56], maxZoom: 17 });
+      map.fitBounds(L.latLngBounds(pts as L.LatLngTuple[]), { padding: [56, 56], maxZoom: 18 });
     }
   }, [riderLat, riderLng, customerLat, customerLng, vendorLat, vendorLng]);
 
@@ -181,13 +244,14 @@ const DeliveryMap = ({
     const map = L.map(mapRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView(defaultCenter, 15);
+    }).setView(defaultCenter, 16);
     mapInstanceRef.current = map;
 
-    L.tileLayer(osmTiles, {
-      maxZoom: 19,
-      className: 'bc-clean-tiles',
-    }).addTo(map);
+    const baseGroup = L.layerGroup().addTo(map);
+    baseTileGroupRef.current = baseGroup;
+
+    const campusGroup = L.layerGroup().addTo(map);
+    campusLayerGroupRef.current = campusGroup;
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -196,6 +260,41 @@ const DeliveryMap = ({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // ── Switch Map Basemap Layer (Google Streets / Google Hybrid Satellite / OSM) ──
+  useEffect(() => {
+    const group = baseTileGroupRef.current;
+    if (!group) return;
+    group.clearLayers();
+
+    const selected = TILE_LAYERS[mapStyle] || TILE_LAYERS.google_streets;
+    L.tileLayer(selected.url, {
+      maxZoom: selected.maxZoom,
+      className: selected.className,
+    }).addTo(group);
+  }, [mapStyle]);
+
+  // ── Render Campus Buildings & Hostels Overlay Chips ────────────────────────
+  useEffect(() => {
+    const group = campusLayerGroupRef.current;
+    if (!group) return;
+    group.clearLayers();
+
+    if (!showCampusPOIs || !campusLocations || campusLocations.length === 0) return;
+
+    campusLocations.forEach((loc) => {
+      if (loc.lat != null && loc.lng != null) {
+        const shortLabel = loc.short_code || loc.name.split('(')[0].trim();
+        const marker = L.marker([Number(loc.lat), Number(loc.lng)], {
+          icon: makeCampusLandmarkChip(shortLabel, loc.category),
+          zIndexOffset: 50,
+        });
+        const slangs = Array.isArray(loc.aliases) && loc.aliases.length > 0 ? `<br/><span style="color:#64748b;font-size:11px;">Also called: ${loc.aliases.join(', ')}</span>` : '';
+        marker.bindPopup(`<strong>${loc.name}</strong> (${loc.category})${slangs}`);
+        marker.addTo(group);
+      }
+    });
+  }, [campusLocations, showCampusPOIs]);
 
   // ── Update markers + dual-casing route line whenever coords change ─────────
   useEffect(() => {
@@ -216,7 +315,7 @@ const DeliveryMap = ({
       riderMarkerRef.current = null;
     }
 
-    // Customer marker
+    // Customer marker + subtle 35m drop-off zone accuracy halo
     if (customerLat && customerLng) {
       if (customerMarkerRef.current) {
         customerMarkerRef.current.setLatLng([customerLat, customerLng]);
@@ -225,9 +324,28 @@ const DeliveryMap = ({
           .addTo(map)
           .bindPopup(customerLabel);
       }
-    } else if (customerMarkerRef.current) {
-      customerMarkerRef.current.remove();
-      customerMarkerRef.current = null;
+
+      if (customerAccuracyCircleRef.current) {
+        customerAccuracyCircleRef.current.setLatLng([customerLat, customerLng]);
+      } else {
+        customerAccuracyCircleRef.current = L.circle([customerLat, customerLng], {
+          radius: 35,
+          color: '#2563eb',
+          weight: 1.5,
+          opacity: 0.45,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.12,
+        }).addTo(map);
+      }
+    } else {
+      if (customerMarkerRef.current) {
+        customerMarkerRef.current.remove();
+        customerMarkerRef.current = null;
+      }
+      if (customerAccuracyCircleRef.current) {
+        customerAccuracyCircleRef.current.remove();
+        customerAccuracyCircleRef.current = null;
+      }
     }
 
     // Vendor marker
@@ -251,8 +369,8 @@ const DeliveryMap = ({
       } else {
         routeCasingRef.current = L.polyline(routeCoords, {
           color: '#0f172a',
-          weight: 7,
-          opacity: 0.25,
+          weight: 8,
+          opacity: 0.35,
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(map);
@@ -263,8 +381,8 @@ const DeliveryMap = ({
       } else {
         routeLineRef.current = L.polyline(routeCoords, {
           color: '#f97316',
-          weight: 4.5,
-          opacity: 0.95,
+          weight: 5,
+          opacity: 0.98,
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(map);
@@ -297,12 +415,49 @@ const DeliveryMap = ({
               : `${routeStats.distanceKm} km`}
           </span>
           <span className="text-white/40">•</span>
-          <span className="text-orange-300">~{routeStats.durationMins} min drive</span>
+          <span className="text-orange-300">~{routeStats.durationMins} min</span>
         </div>
       )}
 
-      {/* Bottom-Left Sleek Glassmorphic Legend Pill */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] flex flex-wrap items-center gap-2.5 rounded-xl bg-card/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-medium shadow-md border border-border/80">
+      {/* Top-Right Map Layer Switcher (Google Map / Google Satellite / OSM) */}
+      <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1 rounded-xl bg-slate-900/90 p-1 text-white backdrop-blur-md shadow-lg border border-white/15">
+        <button
+          type="button"
+          onClick={() => setMapStyle('google_streets')}
+          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+            mapStyle === 'google_streets' ? 'bg-primary text-white shadow-sm' : 'text-white/75 hover:text-white'
+          }`}
+          title="Google Maps Streets & Latest Roads"
+        >
+          <i className="fa-solid fa-map text-[10px]" />
+          <span>Google Map</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapStyle('google_hybrid')}
+          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+            mapStyle === 'google_hybrid' ? 'bg-primary text-white shadow-sm' : 'text-white/75 hover:text-white'
+          }`}
+          title="Google Maps Hybrid Satellite & Labels"
+        >
+          <i className="fa-solid fa-satellite text-[10px]" />
+          <span>Satellite</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapStyle('osm')}
+          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+            mapStyle === 'osm' ? 'bg-primary text-white shadow-sm' : 'text-white/75 hover:text-white'
+          }`}
+          title="OpenStreetMap Campus Footpaths"
+        >
+          <i className="fa-solid fa-compass text-[10px]" />
+          <span className="hidden sm:inline">OSM</span>
+        </button>
+      </div>
+
+      {/* Bottom-Left Legend + Campus Landmarks Toggle */}
+      <div className="absolute bottom-3 left-3 z-[1000] flex flex-wrap items-center gap-2 rounded-xl bg-card/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-medium shadow-md border border-border/80">
         {vendorLat && vendorLng && (
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-slate-900 dark:bg-slate-200 inline-block" />
@@ -321,9 +476,24 @@ const DeliveryMap = ({
             <span>{customerLabel.replace(/[^\w\s&'-]/g, '').trim() || 'Drop-off'}</span>
           </span>
         )}
+        {campusLocations.some((l) => l.lat != null && l.lng != null) && (
+          <button
+            type="button"
+            onClick={() => setShowCampusPOIs(!showCampusPOIs)}
+            className={`ml-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border transition-colors ${
+              showCampusPOIs
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'bg-muted text-muted-foreground border-border'
+            }`}
+            title="Show or hide campus hostels & faculty landmarks on map"
+          >
+            <i className="fa-solid fa-landmark text-[9px]" />
+            <span>Hostels</span>
+          </button>
+        )}
       </div>
 
-      {/* Top-Right Recenter Button */}
+      {/* Bottom-Right Recenter Button */}
       <button
         type="button"
         onClick={() => mapInstanceRef.current && fitBounds(mapInstanceRef.current)}

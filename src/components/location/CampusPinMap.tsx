@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CampusLocationItem, findNearestCampusLocation } from '@/hooks/useCampusLocations';
@@ -45,11 +45,11 @@ const landmarkDotIcon = (label: string) =>
     html: `
       <div style="
         display:inline-flex; align-items:center; gap:5px;
-        background:rgba(15,23,42,0.9); color:#fff;
+        background:rgba(15,23,42,0.92); color:#fff;
         padding:3px 8px; border-radius:999px;
         font-size:10px; font-weight:600; white-space:nowrap;
-        border:1.5px solid rgba(255,255,255,0.75);
-        box-shadow:0 2px 8px rgba(0,0,0,0.25);
+        border:1.5px solid rgba(255,255,255,0.8);
+        box-shadow:0 2px 8px rgba(0,0,0,0.3);
       ">
         <i class="fa-solid fa-building text-[9px] text-amber-400"></i>
         <span>${label}</span>
@@ -67,8 +67,10 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const baseTileGroupRef = useRef<L.LayerGroup | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const landmarkGroupRef = useRef<L.LayerGroup | null>(null);
+  const [mapMode, setMapMode] = useState<'streets' | 'satellite'>('streets');
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -76,14 +78,12 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
     const map = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView([lat, lng], 16);
+    }).setView([lat, lng], 17);
 
     mapRef.current = map;
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      className: 'bc-clean-tiles',
-    }).addTo(map);
+    const tileGroup = L.layerGroup().addTo(map);
+    baseTileGroupRef.current = tileGroup;
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -138,13 +138,30 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Switch between Google Maps Streets and Google Maps Hybrid Satellite (up to Zoom 21)
+  useEffect(() => {
+    const tileGroup = baseTileGroupRef.current;
+    if (!tileGroup) return;
+    tileGroup.clearLayers();
+
+    if (mapMode === 'streets') {
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+      }).addTo(tileGroup);
+    } else {
+      L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+      }).addTo(tileGroup);
+    }
+  }, [mapMode]);
+
   // Update marker position if parent changes lat/lng externally
   useEffect(() => {
     if (mapRef.current && markerRef.current && lat && lng) {
       const curr = markerRef.current.getLatLng();
       if (Math.abs(curr.lat - lat) > 0.00005 || Math.abs(curr.lng - lng) > 0.00005) {
         markerRef.current.setLatLng([lat, lng]);
-        mapRef.current.setView([lat, lng], 16);
+        mapRef.current.setView([lat, lng], 17);
       }
     }
   }, [lat, lng]);
@@ -152,11 +169,33 @@ export const CampusPinMap: React.FC<CampusPinMapProps> = ({
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-border/80 bg-slate-100 dark:bg-slate-900 shadow-inner" style={{ height }}>
       <div ref={containerRef} className="h-full w-full" />
-      <div className="pointer-events-none absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between">
+      <div className=" absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between gap-2 pointer-events-none">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-foreground shadow border border-border/80">
           <i className="fa-solid fa-hand-pointer text-primary text-[10px]" />
-          <span>Drag pin or tap any campus building badge</span>
+          <span>Drag pin to your exact building or tap a badge</span>
         </span>
+
+        {/* Google Map vs Google Satellite Switcher */}
+        <div className="pointer-events-auto flex items-center gap-1 rounded-xl bg-slate-900/90 p-1 text-white shadow-md">
+          <button
+            type="button"
+            onClick={() => setMapMode('streets')}
+            className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold transition-all ${
+              mapMode === 'streets' ? 'bg-primary text-white' : 'text-white/75 hover:text-white'
+            }`}
+          >
+            Google Map
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapMode('satellite')}
+            className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold transition-all ${
+              mapMode === 'satellite' ? 'bg-primary text-white' : 'text-white/75 hover:text-white'
+            }`}
+          >
+            Satellite
+          </button>
+        </div>
       </div>
     </div>
   );

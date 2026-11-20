@@ -10,6 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import VendorLogoUpload from '@/components/VendorLogoUpload';
 import VendorStatusToggle from '@/components/VendorStatusToggle';
+import CampusPinMap from '@/components/location/CampusPinMap';
+import { useGeolocation } from '@/hooks/useGeolocation';
+import { useCampusLocations } from '@/hooks/useCampusLocations';
 import type { Database } from '@/integrations/supabase/types';
 
 type Vendor = Database['public']['Tables']['vendors']['Row'];
@@ -17,11 +20,29 @@ type Vendor = Database['public']['Tables']['vendors']['Row'];
 const VendorSettings = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { locations: campusLocations } = useCampusLocations();
+  const { position: vendorGpsPos, loading: gpsLoading, getPosition: getVendorGps } = useGeolocation();
+  const [capturingGps, setCapturingGps] = useState(false);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', address: '' });
+  const [form, setForm] = useState({ name: '', description: '', address: '', lat: '', lng: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (capturingGps && vendorGpsPos) {
+      setForm((prev) => ({
+        ...prev,
+        lat: vendorGpsPos.lat.toFixed(6),
+        lng: vendorGpsPos.lng.toFixed(6),
+      }));
+      setCapturingGps(false);
+      toast({
+        title: 'Kitchen GPS Locked',
+        description: `Coordinates: ${vendorGpsPos.lat.toFixed(5)}, ${vendorGpsPos.lng.toFixed(5)}`,
+      });
+    }
+  }, [vendorGpsPos, capturingGps, toast]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -35,7 +56,13 @@ const VendorSettings = () => {
         if (data) {
           setVendor(data);
           setLogoUrl(data.logo_url || null);
-          setForm({ name: data.name, description: data.description || '', address: data.address || '' });
+          setForm({
+            name: data.name,
+            description: data.description || '',
+            address: data.address || '',
+            lat: (data as any).lat != null ? String((data as any).lat) : '',
+            lng: (data as any).lng != null ? String((data as any).lng) : '',
+          });
         }
       } catch (err) {
         console.error('Error fetching vendor settings:', err);
@@ -50,10 +77,14 @@ const VendorSettings = () => {
     if (!vendor) return;
     setSaving(true);
     const { error } = await supabase.from('vendors').update({
-      name: form.name, description: form.description, address: form.address,
-    }).eq('id', vendor.id);
+      name: form.name,
+      description: form.description,
+      address: form.address,
+      lat: form.lat ? parseFloat(form.lat) : null,
+      lng: form.lng ? parseFloat(form.lng) : null,
+    } as any).eq('id', vendor.id);
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else toast({ title: 'Settings saved' });
+    else toast({ title: 'Store settings & GPS location saved' });
     setSaving(false);
   };
 
@@ -101,6 +132,74 @@ const VendorSettings = () => {
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Physical Store Location (Address)</Label>
                 <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="e.g. Beside SUB, Main Campus" className="bg-background/50" />
+              </div>
+
+              {/* Kitchen GPS Pin-Dropper & 1-Tap GPS Share */}
+              <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-xs font-bold flex items-center gap-1.5">
+                      <i className="fa-solid fa-location-dot text-primary" />
+                      <span>Kitchen GPS Pin (For Rider Pickup & Student Map)</span>
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Pin your exact kitchen spot so nearby riders are matched to your orders by distance.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={gpsLoading || capturingGps}
+                    onClick={() => {
+                      setCapturingGps(true);
+                      getVendorGps();
+                    }}
+                    className="h-8 text-xs gap-1.5 shrink-0 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <i className={`fa-solid fa-location-crosshairs text-xs ${gpsLoading || capturingGps ? 'animate-spin' : ''}`} />
+                    <span>{gpsLoading || capturingGps ? 'Locating...' : 'Capture Kitchen GPS'}</span>
+                  </Button>
+                </div>
+
+                <CampusPinMap
+                  lat={form.lat ? parseFloat(form.lat) : vendorGpsPos?.lat ?? 7.4443}
+                  lng={form.lng ? parseFloat(form.lng) : vendorGpsPos?.lng ?? 3.8995}
+                  locations={campusLocations}
+                  height="210px"
+                  onPinMove={(newLat, newLng) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      lat: newLat.toFixed(6),
+                      lng: newLng.toFixed(6),
+                    }));
+                  }}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">Latitude</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 7.444300"
+                      value={form.lat}
+                      onChange={(e) => setForm({ ...form, lat: e.target.value })}
+                      className="h-8 text-xs font-mono bg-background"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">Longitude</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 3.899500"
+                      value={form.lng}
+                      onChange={(e) => setForm({ ...form, lng: e.target.value })}
+                      className="h-8 text-xs font-mono bg-background"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

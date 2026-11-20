@@ -625,46 +625,53 @@ const RiderDashboard = () => {
             customerLng={activeOrder.delivery_lng}
             vendorLat={activeOrder.vendor_lat}
             vendorLng={activeOrder.vendor_lng}
-            riderLabel="You 🏍️"
-            customerLabel="Customer 📍"
+            riderLabel="You"
+            customerLabel="Customer"
             vendorLabel={activeOrder.vendor_name}
-            height="300px"
-            className="rounded-none"
+            height="320px"
+            className="rounded-none border-x-0"
           />
-          {/* Simulation Panel */}
-          <div className="absolute top-3 right-3 z-[1000] bg-card/95 backdrop-blur border border-border rounded-lg shadow-lg px-3 py-2 flex flex-col gap-1.5 max-w-[200px]">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-xs font-semibold flex items-center gap-1">
-                <span className={`h-2 w-2 rounded-full ${isSimulating ? 'bg-emerald-500 animate-pulse' : 'bg-muted'}`} />
-                GPS Simulator
+        </div>
+
+        {/* Rider Active Trip Telemetry & Quick Navigation Bar */}
+        <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-3">
+            {studentSharingLocation ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 px-2.5 py-0.5 font-semibold">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                Customer GPS Active
+              </span>
+            ) : (
+              <span className="text-slate-400">Drop-off: {activeOrder.delivery_location}</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
+            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1">
+              <span className="text-[11px] font-medium flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${isSimulating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                {isSimulating ? `Simulating (${simStep + 1}/${totalSimSteps})` : 'GPS Demo'}
               </span>
               <Switch
                 checked={isSimulating}
                 onCheckedChange={(checked) => {
-                  if (checked) {
-                    startRouteSimulation();
-                  } else {
-                    stopRouteSimulation();
-                  }
+                  if (checked) startRouteSimulation();
+                  else stopRouteSimulation();
                 }}
               />
             </div>
-            {isSimulating && (
-              <p className="text-[10px] text-muted-foreground animate-pulse">
-                Rider moving: {simStep + 1}/{totalSimSteps} steps
-              </p>
+
+            {activeOrder.delivery_lat && activeOrder.delivery_lng && (
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold"
+                onClick={() => openInGoogleMaps(activeOrder.delivery_lat!, activeOrder.delivery_lng!)}
+              >
+                <i className="fa-solid fa-diamond-turn-right text-[11px]" />
+                <span>Turn-by-Turn</span>
+              </Button>
             )}
           </div>
-          {studentSharingLocation && (
-            <div className="absolute top-3 left-3 bg-blue-500/90 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-              <Locate className="h-3 w-3 animate-pulse" /> Student sharing live location
-            </div>
-          )}
-          {activeOrder.delivery_lat && activeOrder.delivery_lng && (
-            <Button size="sm" className="absolute bottom-3 right-3 gap-1.5 shadow-lg" onClick={() => openInGoogleMaps(activeOrder.delivery_lat!, activeOrder.delivery_lng!)}>
-              <Navigation className="h-4 w-4" /> Navigate
-            </Button>
-          )}
         </div>
 
         <div className="px-4 py-4 bg-card border-b">

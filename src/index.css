@@ -256,14 +256,16 @@
   font-size: 10px;
 }
 
-/* ── Custom Uber/Chowdeck Delivery Map Styling ─────────────────────────────── */
+/* ── Custom High-Definition Delivery Map Styling ──────────────────────────── */
 .bc-clean-tiles {
-  filter: saturate(0.28) contrast(1.06) brightness(1.03);
+  filter: contrast(1.04) saturate(1.08);
   transition: filter 0.3s ease;
 }
 
-.dark .bc-clean-tiles {
-  filter: invert(0.92) hue-rotate(185deg) saturate(0.35) contrast(1.12) brightness(0.88);
+.bc-hybrid-labels {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)) contrast(1.15);
+  mix-blend-mode: screen;
+  opacity: 0.92;
 }
 
 .leaflet-marker-icon {
