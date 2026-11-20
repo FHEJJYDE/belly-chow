@@ -395,7 +395,7 @@ const VendorDetail = () => {
 
       {/* Floating Sticky Checkout Bar (Chowdeck / Glovo style) */}
       {itemCount > 0 && (
-        <div className="fixed bottom-16 md:bottom-6 left-0 right-0 z-40 px-4 pointer-events-none">
+        <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:bottom-6 left-0 right-0 z-40 px-4 pointer-events-none">
           <div className="max-w-lg mx-auto pointer-events-auto">
             <button
               type="button"

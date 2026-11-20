@@ -12,6 +12,15 @@ export interface GeoPosition {
  * @param watch       When true, subscribes to watchPosition for live updates.
  * @param throttleMs  Minimum ms between position state updates (default 4000ms).
  */
+const getPermissionDeniedMessage = () => {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+  if (isIOS) {
+    return 'iPhone blocked location for this app. Open iPhone Settings → Privacy & Security → Location Services → Safari Websites → select "While Using the App" (turn Precise Location ON), then reopen Belly-Chow.';
+  }
+  return 'Location permission denied. Open your browser/phone Settings → Site Settings → Location and allow Belly-Chow, then tap Retry.';
+};
+
 export const useGeolocation = (watch = false, throttleMs = 4000) => {
   const [position, setPosition] = useState<GeoPosition | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +71,7 @@ export const useGeolocation = (watch = false, throttleMs = 4000) => {
             (fallbackErr) => {
               setLoading(false);
               switch (fallbackErr.code) {
-                case 1: setError('Location permission denied. Please allow location access in your browser settings.'); break;
+                case 1: setError(getPermissionDeniedMessage()); break;
                 case 2: setError('Location unavailable. Check your device GPS or network connection.'); break;
                 case 3: setError('Location request timed out. Please type your delivery address manually.'); break;
                 default: setError(fallbackErr.message);
@@ -75,7 +84,7 @@ export const useGeolocation = (watch = false, throttleMs = 4000) => {
 
         setLoading(false);
         switch (err.code) {
-          case 1: setError('Location permission denied. Please allow location access in your browser settings.'); break;
+          case 1: setError(getPermissionDeniedMessage()); break;
           case 2: setError('Location unavailable. Check your device GPS or network connection.'); break;
           case 3: setError('Location request timed out. Please type your delivery address manually.'); break;
           default: setError(err.message);
@@ -103,13 +112,13 @@ export const useGeolocation = (watch = false, throttleMs = 4000) => {
           watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => applyPosition(pos),
             (fallbackErr) => {
-              if (fallbackErr.code === 1) setError('Location permission denied.');
+              if (fallbackErr.code === 1) setError(getPermissionDeniedMessage());
             },
             { enableHighAccuracy: false, maximumAge: 10000 }
           );
           return;
         }
-        if (err.code === 1) setError('Location permission denied. Allow access to enable live tracking.');
+        if (err.code === 1) setError(getPermissionDeniedMessage());
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
@@ -124,8 +133,9 @@ export const useGeolocation = (watch = false, throttleMs = 4000) => {
       return;
     }
 
-    // Kick off an immediate one-shot so UI has a fix right away
-    getPosition();
+    // Use a single watchPosition subscription (watchPosition emits an immediate initial fix
+    // and avoids firing two competing permission prompts on iOS PWAs).
+    setLoading(true);
     startWatch();
 
     return () => {
