@@ -163,6 +163,56 @@ export function useOrderNotifications() {
       }
     };
 
+    const ACTIVE_STATUSES = new Set(['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived']);
+    let hasActiveStudentOrder = false;
+    let pollTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    let channel: any = null;
+
+    const setupRealtimeChannel = (vendorId?: string | null) => {
+      if (cancelled || channel) return;
+      const channelId = `order-notifications-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        // Apply row-level Realtime filters so Postgres doesn't fan out every campus order to every user
+        const filter =
+          role === 'student'
+            ? `student_id=eq.${user.id}`
+            : role === 'vendor' && vendorId
+            ? `vendor_id=eq.${vendorId}`
+            : undefined;
+
+        const updateConfig: any = { event: 'UPDATE', schema: 'public', table: 'orders' };
+        const insertConfig: any = { event: 'INSERT', schema: 'public', table: 'orders' };
+        if (filter) {
+          updateConfig.filter = filter;
+          insertConfig.filter = filter;
+        }
+
+        channel = supabase
+          .channel(channelId)
+          .on('postgres_changes', updateConfig, (payload) => {
+            const updated = payload.new as any;
+            if (role === 'student') {
+              hasActiveStudentOrder = ACTIVE_STATUSES.has(updated?.status);
+            }
+            checkAndNotify(updated, false);
+          })
+          .on('postgres_changes', insertConfig, (payload) => {
+            const order = payload.new as any;
+            if (role === 'student' && order.student_id === user.id) {
+              hasActiveStudentOrder = true;
+            }
+            if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
+              orderStatuses.current.set(order.id, order.status);
+              notify('New Order Received!', `New order #${order.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${order.id}`);
+            }
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('Order notifications channel warning:', err);
+      }
+    };
+
     const pollOrders = async (isInitialLoad = false) => {
       try {
         if (role === 'student') {
@@ -171,8 +221,10 @@ export function useOrderNotifications() {
             .select('id, status, student_id, vendor_id, rider_id')
             .eq('student_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(20);
+            .limit(10);
+          hasActiveStudentOrder = Boolean(data?.some((o) => ACTIVE_STATUSES.has(o.status)));
           data?.forEach((o) => checkAndNotify(o, isInitialLoad));
+          if (isInitialLoad) setupRealtimeChannel(null);
         } else if (role === 'vendor') {
           if (!vendorIdRef.current) {
             const { data: v } = await supabase
@@ -182,13 +234,14 @@ export function useOrderNotifications() {
               .maybeSingle();
             if (v) vendorIdRef.current = v.id;
           }
+          if (isInitialLoad) setupRealtimeChannel(vendorIdRef.current);
           if (vendorIdRef.current) {
             const { data } = await supabase
               .from('orders')
               .select('id, status, student_id, vendor_id, rider_id')
               .eq('vendor_id', vendorIdRef.current)
               .order('created_at', { ascending: false })
-              .limit(30);
+              .limit(20);
             data?.forEach((o) => {
               if (!isInitialLoad && !orderStatuses.current.has(o.id) && o.status === 'pending') {
                 orderStatuses.current.set(o.id, o.status);
@@ -199,12 +252,13 @@ export function useOrderNotifications() {
             });
           }
         } else if (role === 'rider') {
+          if (isInitialLoad) setupRealtimeChannel(null);
           const { data } = await supabase
             .from('orders')
             .select('id, status, student_id, vendor_id, rider_id')
             .or(`rider_id.eq.${user.id},and(status.eq.ready,rider_id.is.null)`)
             .order('created_at', { ascending: false })
-            .limit(30);
+            .limit(20);
           data?.forEach((o) => {
             if (!isInitialLoad && !orderStatuses.current.has(o.id) && o.status === 'ready' && !o.rider_id) {
               orderStatuses.current.set(o.id, o.status);
@@ -219,43 +273,42 @@ export function useOrderNotifications() {
       }
     };
 
-    pollOrders(true);
-
-    // 1. Realtime listener for instant <100ms alerts
-    const channelId = `order-notifications-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
-    let channel: any = null;
-    try {
-      channel = supabase.channel(channelId).on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          checkAndNotify(payload.new as any, false);
+    // Adaptive fallback polling: Realtime handles instant <100ms alerts;
+    // polling backs off dramatically when idle or tab is hidden to save >90% DB load.
+    const scheduleNextPoll = () => {
+      if (cancelled) return;
+      const delayMs = document.hidden
+        ? 60_000
+        : role === 'student'
+        ? hasActiveStudentOrder
+          ? 12_000
+          : 45_000
+        : 15_000;
+      pollTimeout = setTimeout(async () => {
+        if (!cancelled) {
+          await pollOrders(false);
+          scheduleNextPoll();
         }
-      ).on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const order = payload.new as any;
-          if (role === 'vendor' && vendorIdRef.current && order.vendor_id === vendorIdRef.current && !orderStatuses.current.has(order.id)) {
-            orderStatuses.current.set(order.id, order.status);
-            notify('New Order Received!', `New order #${order.id.slice(0, 8)} — check your kitchen orders tab!`, 'new_order', `new-order-${order.id}`);
-          }
-        }
-      ).subscribe();
-    } catch (err) {
-      console.warn('Order notifications channel warning:', err);
-    }
+      }, delayMs);
+    };
 
-    // 2. Guaranteed 5-second polling fallback so students/vendors/riders NEVER miss a status change toast & sound
-    const pollInterval = setInterval(() => {
-      pollOrders(false);
-    }, 5000);
+    pollOrders(true).then(() => scheduleNextPoll());
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !cancelled) {
+        if (pollTimeout) clearTimeout(pollTimeout);
+        pollOrders(false).then(() => scheduleNextPoll());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (channel) {
         supabase.removeChannel(channel).catch(() => {});
       }
-      clearInterval(pollInterval);
+      if (pollTimeout) clearTimeout(pollTimeout);
       orderStatuses.current.clear();
     };
   }, [user, role, loading, notify]);

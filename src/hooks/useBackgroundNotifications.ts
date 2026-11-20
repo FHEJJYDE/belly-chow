@@ -100,8 +100,38 @@ export function useBackgroundNotifications() {
 
         checkNotifications();
 
-        // Check every 8 seconds so background tabs / minimized PWAs receive OS pop-up banners promptly
-        intervalRef.current = setInterval(checkNotifications, 8000);
+        // Realtime subscription delivers new notifications instantly with zero polling load
+        const channelId = `bg-notifs-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
+        let channel: any = null;
+        try {
+            channel = supabase
+                .channel(channelId)
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+                    (payload) => {
+                        const n = payload.new as any;
+                        if (n && !seenNotifIds.current.has(n.id)) {
+                            seenNotifIds.current.add(n.id);
+                            if (document.hidden) {
+                                showNativeOsPopup(
+                                    n.title || 'Belly-Chow Update',
+                                    n.message || 'You have a new order notification.',
+                                    n.order_id ? getTargetUrl() : '/notifications',
+                                    `notif-${n.id}`
+                                );
+                            }
+                        }
+                        checkNotifications();
+                    }
+                )
+                .subscribe();
+        } catch (err) {
+            console.warn('Background notifications channel warning:', err);
+        }
+
+        // Lightweight 45s safety fallback (down from 8s to cut DB traffic by >80% at scale)
+        intervalRef.current = setInterval(checkNotifications, 45_000);
 
         const handleVisibilityChange = () => {
             if (!document.hidden) {
@@ -112,6 +142,9 @@ export function useBackgroundNotifications() {
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
+            if (channel) {
+                supabase.removeChannel(channel).catch(() => {});
+            }
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }

@@ -1542,3 +1542,27 @@ CREATE POLICY "Authenticated users can upload objects" ON storage.objects FOR IN
 
 DROP POLICY IF EXISTS "Public objects viewable by everyone" ON storage.objects;
 CREATE POLICY "Public objects viewable by everyone" ON storage.objects FOR SELECT USING (true);
+
+-- ------------------------------------------------------------------------------
+-- 14. HIGH-CONCURRENCY COMPOSITE INDEXES
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_orders_student_created
+  ON public.orders (student_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_vendor_status_created
+  ON public.orders (vendor_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_status_rider_created
+  ON public.orders (status, rider_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_rider_status_created
+  ON public.orders (rider_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created
+  ON public.notifications (user_id, is_read, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+  ON public.order_items (order_id);
+
+CREATE INDEX IF NOT EXISTS idx_menu_items_vendor_available
+  ON public.menu_items (vendor_id, is_available);

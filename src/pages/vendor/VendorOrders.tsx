@@ -80,9 +80,52 @@ const VendorOrders = () => {
   useEffect(() => {
     if (authLoading) return;
     fetchData();
-    const channel = supabase.channel('vendor-orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData()).subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [user, authLoading, fetchData]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    const channelId = `vendor-orders-${vendorId}-${Math.random().toString(36).slice(2, 7)}`;
+    const channel = supabase
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `vendor_id=eq.${vendorId}` },
+        (payload) => {
+          // Skip full 200-order refetch when only rider GPS coordinates changed
+          if (payload.eventType === 'UPDATE') {
+            const next = payload.new as any;
+            const prev = payload.old as any;
+            if (
+              next &&
+              prev &&
+              next.status === prev.status &&
+              next.rider_id === prev.rider_id &&
+              next.payment_status === prev.payment_status
+            ) {
+              setOrders((curr) =>
+                curr.map((o) =>
+                  o.id === next.id
+                    ? {
+                        ...o,
+                        rider_lat: next.rider_lat,
+                        rider_lng: next.rider_lng,
+                        delivery_lat: next.delivery_lat,
+                        delivery_lng: next.delivery_lng,
+                      }
+                    : o
+                )
+              );
+              return;
+            }
+          }
+          fetchData();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [vendorId, fetchData]);
 
   const updateStatus = async (orderId: string, status: string) => {
     const targetOrder = orders.find(o => o.id === orderId);

@@ -260,16 +260,18 @@ const RiderDashboard = () => {
       fetchOrders();
     }).subscribe();
 
-    // Active polling fallback every 6 seconds so available orders & claims stay synced even if realtime reconnects
+    // Active polling fallback every 15 seconds while visible & online (Realtime handles instant updates)
     const poll = setInterval(() => {
-      fetchOrders();
-    }, 6000);
+      if (!document.hidden && (isOnline || myOrders.length > 0)) {
+        fetchOrders();
+      }
+    }, 15_000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
     };
-  }, [user, fetchOrders]);
+  }, [user, fetchOrders, isOnline, myOrders.length]);
 
   // Sort available orders by proximity to the rider (closest vendor first)
   const sortedAvailableOrders = useMemo(() => {

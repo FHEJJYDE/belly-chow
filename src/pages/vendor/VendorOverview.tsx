@@ -60,9 +60,20 @@ const VendorOverview = () => {
 
   useEffect(() => {
     if (!vendor) return;
-    const channel = supabase.channel('vendor-overview-rt').on(
-      'postgres_changes', { event: '*', schema: 'public', table: 'orders' },
-      (payload) => { const order = payload.new as Order; if (order && order.vendor_id === vendor.id) fetchData(); }
+    const channelId = `vendor-overview-rt-${vendor.id}-${Math.random().toString(36).slice(2, 7)}`;
+    const channel = supabase.channel(channelId).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders', filter: `vendor_id=eq.${vendor.id}` },
+      (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          const next = payload.new as any;
+          const prev = payload.old as any;
+          if (next && prev && next.status === prev.status && next.payment_status === prev.payment_status) {
+            return;
+          }
+        }
+        fetchData();
+      }
     ).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [vendor?.id]);

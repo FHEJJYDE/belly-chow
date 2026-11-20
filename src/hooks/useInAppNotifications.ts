@@ -115,9 +115,18 @@ export function useInAppNotifications() {
             console.warn('Realtime notification channel warning:', err);
         }
 
-        const interval = setInterval(fetchNotifications, 8000);
+        // Realtime pushes updates instantly; keep a lightweight 45s safety fallback only while tab is visible
+        const interval = setInterval(() => {
+            if (!document.hidden) fetchNotifications();
+        }, 45_000);
+
+        const handleVisibilityChange = () => {
+            if (!document.hidden) fetchNotifications();
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (channel) {
                 supabase.removeChannel(channel).catch(() => {});
             }
