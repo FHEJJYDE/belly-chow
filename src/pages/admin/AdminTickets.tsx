@@ -57,7 +57,10 @@ const AdminTickets = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Support Tickets</h1>
+      <h1 className="font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+        <i className="fa-solid fa-headset text-primary text-lg" />
+        <span>Support Tickets</span>
+      </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{tickets.length}</p></CardContent></Card>

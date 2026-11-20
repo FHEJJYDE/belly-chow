@@ -330,20 +330,19 @@ const AdminOverview = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/60 pb-5">
         <div>
-          <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Admin</p>
-          <h1 className="mt-1 font-heading text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-          <p className="text-muted-foreground">Comprehensive analytics and management</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Operations & Analytics</p>
+          <h1 className="mt-1 font-heading text-2xl sm:text-3xl font-bold tracking-tight">Executive Overview</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchData} disabled={refreshing} variant="outline" size="sm">
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          <Button onClick={fetchData} disabled={refreshing} variant="outline" size="sm" className="gap-2">
+            <i className={`fa-solid fa-rotate text-xs ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={exportData} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button onClick={exportData} variant="outline" size="sm" className="gap-2">
+            <i className="fa-solid fa-file-arrow-down text-xs" />
+            Export CSV
           </Button>
         </div>
       </div>
@@ -402,73 +401,81 @@ const AdminOverview = () => {
       {/* Key Metrics */}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <DollarSign className="h-8 w-8 text-green-500" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="font-heading text-2xl font-bold">₦{stats.totalRevenue.toLocaleString()}</p>
-                <div className="flex items-center gap-1 text-xs">
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="flex items-start justify-between p-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Completed Revenue</p>
+                <p className="font-heading text-2xl font-bold mt-1.5">₦{stats.totalRevenue.toLocaleString()}</p>
+                <div className="flex items-center gap-1 text-xs mt-1">
                   {stats.revenueGrowth >= 0 ? (
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3 text-emerald-600" />
                   ) : (
                     <TrendingDown className="h-3 w-3 text-red-500" />
                   )}
-                  <span className={stats.revenueGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>
-                    {Math.abs(stats.revenueGrowth).toFixed(1)}%
+                  <span className={stats.revenueGrowth >= 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                    {Math.abs(stats.revenueGrowth).toFixed(1)}% vs prior
                   </span>
                 </div>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0">
+                <i className="fa-solid fa-sack-dollar text-sm" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Package className="h-8 w-8 text-blue-500" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="font-heading text-2xl font-bold">{stats.totalOrders}</p>
-                <div className="flex items-center gap-1 text-xs">
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="flex items-start justify-between p-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Order Volume</p>
+                <p className="font-heading text-2xl font-bold mt-1.5">{stats.totalOrders}</p>
+                <div className="flex items-center gap-1 text-xs mt-1">
                   {stats.orderGrowth >= 0 ? (
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3 text-emerald-600" />
                   ) : (
                     <TrendingDown className="h-3 w-3 text-red-500" />
                   )}
-                  <span className={stats.orderGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>
-                    {Math.abs(stats.orderGrowth).toFixed(1)}%
+                  <span className={stats.orderGrowth >= 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                    {Math.abs(stats.orderGrowth).toFixed(1)}% vs prior
                   </span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Store className="h-8 w-8 text-purple-500" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Active Vendors</p>
-                <p className="font-heading text-2xl font-bold">{stats.totalVendors}</p>
-                <p className="text-xs text-muted-foreground">{pendingVendors.length} pending approval</p>
+              <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 shrink-0">
+                <i className="fa-solid fa-boxes-packing text-sm" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Users className="h-8 w-8 text-orange-500" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">New Users</p>
-                <p className="font-heading text-2xl font-bold">{stats.totalUsers}</p>
-                <div className="flex items-center gap-1 text-xs">
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="flex items-start justify-between p-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Approved Vendors</p>
+                <p className="font-heading text-2xl font-bold mt-1.5">{stats.totalVendors}</p>
+                <p className="text-xs text-muted-foreground mt-1">{pendingVendors.length} awaiting review</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 shrink-0">
+                <i className="fa-solid fa-store text-sm" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="flex items-start justify-between p-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Registered Accounts</p>
+                <p className="font-heading text-2xl font-bold mt-1.5">{stats.totalUsers}</p>
+                <div className="flex items-center gap-1 text-xs mt-1">
                   {stats.userGrowth >= 0 ? (
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3 text-emerald-600" />
                   ) : (
                     <TrendingDown className="h-3 w-3 text-red-500" />
                   )}
-                  <span className={stats.userGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>
-                    {Math.abs(stats.userGrowth).toFixed(1)}%
+                  <span className={stats.userGrowth >= 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                    {Math.abs(stats.userGrowth).toFixed(1)}% growth
                   </span>
                 </div>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                <i className="fa-solid fa-users text-sm" />
               </div>
             </CardContent>
           </Card>

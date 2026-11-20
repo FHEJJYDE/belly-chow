@@ -414,34 +414,34 @@ const StudentDashboard = () => {
 
   const getCategoryVisual = (cat: string) => {
     const lower = cat.toLowerCase();
-    if (lower.includes('rice') || lower.includes('pasta') || lower.includes('spag')) return { icon: '🍚', color: 'from-amber-500/15 to-orange-500/15 text-orange-600 border-orange-500/20' };
-    if (lower.includes('chicken') || lower.includes('meat') || lower.includes('grill') || lower.includes('suya')) return { icon: '🍗', color: 'from-red-500/15 to-orange-500/15 text-red-600 border-red-500/20' };
-    if (lower.includes('burger') || lower.includes('sandwich') || lower.includes('fast')) return { icon: '🍔', color: 'from-yellow-500/15 to-amber-500/15 text-amber-600 border-amber-500/20' };
-    if (lower.includes('drink') || lower.includes('smoothie') || lower.includes('juice') || lower.includes('boba')) return { icon: '🥤', color: 'from-blue-500/15 to-cyan-500/15 text-blue-600 border-blue-500/20' };
-    if (lower.includes('soup') || lower.includes('swallow') || lower.includes('local') || lower.includes('amala')) return { icon: '🍲', color: 'from-emerald-500/15 to-teal-500/15 text-emerald-600 border-emerald-500/20' };
-    if (lower.includes('pastry') || lower.includes('snack') || lower.includes('bake') || lower.includes('cake')) return { icon: '🥐', color: 'from-pink-500/15 to-rose-500/15 text-pink-600 border-pink-500/20' };
-    if (lower.includes('shawarma') || lower.includes('wrap')) return { icon: '🌯', color: 'from-orange-500/15 to-amber-500/15 text-orange-600 border-orange-500/20' };
-    if (lower.includes('salad') || lower.includes('veg') || lower.includes('fruit')) return { icon: '🥗', color: 'from-green-500/15 to-emerald-500/15 text-green-600 border-green-500/20' };
-    return { icon: '🍽️', color: 'from-primary/15 to-amber-500/15 text-primary border-primary/20' };
+    if (lower.includes('rice') || lower.includes('pasta') || lower.includes('spag')) return { icon: 'fa-solid fa-bowl-rice', color: 'text-orange-600 bg-orange-500/10 border-orange-500/20' };
+    if (lower.includes('chicken') || lower.includes('meat') || lower.includes('grill') || lower.includes('suya')) return { icon: 'fa-solid fa-drumstick-bite', color: 'text-red-600 bg-red-500/10 border-red-500/20' };
+    if (lower.includes('burger') || lower.includes('sandwich') || lower.includes('fast')) return { icon: 'fa-solid fa-burger', color: 'text-amber-600 bg-amber-500/10 border-amber-500/20' };
+    if (lower.includes('drink') || lower.includes('smoothie') || lower.includes('juice') || lower.includes('boba')) return { icon: 'fa-solid fa-martini-glass-citrus', color: 'text-blue-600 bg-blue-500/10 border-blue-500/20' };
+    if (lower.includes('soup') || lower.includes('swallow') || lower.includes('local') || lower.includes('amala')) return { icon: 'fa-solid fa-bowl-food', color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' };
+    if (lower.includes('pastry') || lower.includes('snack') || lower.includes('bake') || lower.includes('cake')) return { icon: 'fa-solid fa-bread-slice', color: 'text-pink-600 bg-pink-500/10 border-pink-500/20' };
+    if (lower.includes('shawarma') || lower.includes('wrap')) return { icon: 'fa-solid fa-hotdog', color: 'text-orange-600 bg-orange-500/10 border-orange-500/20' };
+    if (lower.includes('salad') || lower.includes('veg') || lower.includes('fruit')) return { icon: 'fa-solid fa-leaf', color: 'text-green-600 bg-green-500/10 border-green-500/20' };
+    return { icon: 'fa-solid fa-utensils', color: 'text-primary bg-primary/10 border-primary/20' };
   };
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return { text: 'Good morning', icon: '☀️', mood: 'Ready for breakfast & hot coffee?' };
-    if (hour >= 12 && hour < 17) return { text: 'Good afternoon', icon: '🍔', mood: 'Hungry? Grab lunch from campus favorites.' };
-    if (hour >= 17 && hour < 22) return { text: 'Good evening', icon: '🍲', mood: 'Treat yourself to a delicious dinner.' };
-    return { text: 'Late-night cravings?', icon: '🌙', mood: 'Midnight snacks & hot meals delivered to your hostel.' };
+    if (hour >= 5 && hour < 12) return { text: 'Good morning', icon: 'fa-solid fa-sun', mood: 'Ready for breakfast & hot coffee?' };
+    if (hour >= 12 && hour < 17) return { text: 'Good afternoon', icon: 'fa-solid fa-utensils', mood: 'Hungry? Grab lunch from campus favorites.' };
+    if (hour >= 17 && hour < 22) return { text: 'Good evening', icon: 'fa-solid fa-bowl-food', mood: 'Treat yourself to a delicious dinner.' };
+    return { text: 'Late-night cravings?', icon: 'fa-solid fa-moon', mood: 'Midnight snacks & hot meals delivered to your hostel.' };
   }, []);
 
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
       case 'pending': return { text: 'Order Placed', color: 'bg-amber-500 text-white' };
       case 'accepted': return { text: 'Confirmed', color: 'bg-blue-500 text-white' };
-      case 'preparing': return { text: 'Preparing Chow 🍳', color: 'bg-orange-500 text-white animate-pulse' };
-      case 'ready': return { text: 'Ready for Pickup 📦', color: 'bg-emerald-500 text-white' };
+      case 'preparing': return { text: 'Preparing in Kitchen', color: 'bg-orange-500 text-white animate-pulse' };
+      case 'ready': return { text: 'Ready for Pickup', color: 'bg-emerald-500 text-white' };
       case 'picked_up':
-      case 'delivering': return { text: 'Rider In Transit 🛵', color: 'bg-primary text-white animate-bounce' };
-      case 'arrived': return { text: 'Rider Arrived! 📍', color: 'bg-green-600 text-white animate-pulse' };
+      case 'delivering': return { text: 'Rider In Transit', color: 'bg-primary text-white' };
+      case 'arrived': return { text: 'Rider Arrived', color: 'bg-green-600 text-white animate-pulse' };
       default: return { text: status, color: 'bg-muted text-foreground' };
     }
   };
@@ -455,15 +455,16 @@ const StudentDashboard = () => {
           <Card className={`overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${!open ? 'opacity-55 hover:translate-y-0 hover:border-border' : ''}`}>
             <div className="relative h-40 bg-muted flex items-center justify-center overflow-hidden">
               {(vendor as any).featured_tier && (
-                <span className={`absolute top-2.5 left-2.5 z-10 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm ${(vendor as any).featured_tier === 'gold' ? 'bg-amber-500' : (vendor as any).featured_tier === 'silver' ? 'bg-slate-500' : 'bg-amber-700'
+                <span className={`absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm ${(vendor as any).featured_tier === 'gold' ? 'bg-amber-500' : (vendor as any).featured_tier === 'silver' ? 'bg-slate-600' : 'bg-amber-700'
                   }`}>
-                  {(vendor as any).featured_tier === 'gold' ? '🥇 Gold Featured' : (vendor as any).featured_tier === 'silver' ? '🥈 Silver Featured' : '🥉 Featured'}
+                  <i className="fa-solid fa-crown text-[9px]" />
+                  {(vendor as any).featured_tier === 'gold' ? 'Gold Featured' : (vendor as any).featured_tier === 'silver' ? 'Silver Featured' : 'Featured'}
                 </span>
               )}
               {vendor.logo_url ? (
                 <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               ) : (
-                <span className="text-4xl text-muted-foreground/40">🍽️</span>
+                <i className="fa-solid fa-utensils text-3xl text-muted-foreground/30" />
               )}
               {!open && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/75 backdrop-blur-[2px]">
@@ -532,8 +533,8 @@ const StudentDashboard = () => {
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-primary p-4 text-white shadow-lg border border-orange-400/30 animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-xl shadow">
-                  🛵
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-lg shadow">
+                  <i className="fa-solid fa-motorcycle" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -579,7 +580,7 @@ const StudentDashboard = () => {
 
             <div>
               <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-amber-100/90 mb-1 flex items-center gap-1.5">
-                <span>{greeting.icon}</span>
+                <i className={greeting.icon} />
                 <span>{greeting.text}{userName ? `, ${userName}` : ''}!</span>
               </p>
               <h1 className="font-heading text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.15]">
@@ -611,15 +612,15 @@ const StudentDashboard = () => {
               {trendingMeals.length > 0 && (
                 <div className="mt-3 flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-1">
                   <span className="text-[11px] font-semibold text-white/90 shrink-0 mr-1 flex items-center gap-1">
-                    <Flame className="h-3.5 w-3.5 text-amber-300 fill-amber-300 animate-pulse" /> Most Ordered:
+                    <i className="fa-solid fa-fire text-amber-300" /> Most Ordered:
                   </span>
                   {trendingMeals.map(meal => (
                     <button
                       key={meal.name}
                       onClick={() => setSearch(meal.name)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md text-white border border-white/20 text-[11px] font-medium transition-colors shrink-0 shadow-sm"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md text-white border border-white/20 text-[11px] font-medium transition-colors shrink-0 shadow-sm"
                     >
-                      <span>🔥 {meal.name}</span>
+                      <span>{meal.name}</span>
                       {meal.count > 0 && (
                         <span className="text-[9px] bg-amber-400/30 text-amber-100 px-1.5 py-0.2 rounded-full font-bold">
                           {meal.count} orders
@@ -632,8 +633,8 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          <div className="hidden lg:flex absolute right-10 top-1/2 -translate-y-1/2 items-center justify-center text-8xl select-none pointer-events-none drop-shadow-2xl opacity-95 transition-transform hover:scale-105 duration-500">
-            🍱
+          <div className="hidden lg:flex absolute right-10 top-1/2 -translate-y-1/2 h-36 w-36 rounded-3xl bg-white/10 border border-white/20 backdrop-blur-md items-center justify-center text-6xl text-white/90 select-none pointer-events-none shadow-2xl">
+            <i className="fa-solid fa-utensils" />
           </div>
         </div>
 
@@ -786,7 +787,9 @@ const StudentDashboard = () => {
                     to={`/vendors?category=${catParam}`}
                     className="flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all duration-200 shrink-0 w-28 text-center snap-start select-none bg-card hover:bg-muted/60 text-foreground shadow-sm hover:border-primary/40 group hover:scale-[1.03]"
                   >
-                    <span className="text-3xl mb-1.5 filter drop-shadow-sm group-hover:scale-110 transition-transform">{visual.icon}</span>
+                    <div className={`h-10 w-10 rounded-xl border flex items-center justify-center mb-2 transition-transform group-hover:scale-110 ${visual.color}`}>
+                      <i className={`${visual.icon} text-base`} />
+                    </div>
                     <span className="font-semibold text-xs truncate max-w-full leading-tight group-hover:text-primary transition-colors">
                       {name}
                     </span>
@@ -806,7 +809,10 @@ const StudentDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fast Reorder</p>
-                <h2 className="font-heading text-lg sm:text-xl font-bold tracking-tight">Order Again ⚡</h2>
+                <h2 className="font-heading text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2">
+                  <span>Order Again</span>
+                  <i className="fa-solid fa-bolt text-amber-500 text-sm" />
+                </h2>
               </div>
             </div>
 
@@ -820,8 +826,8 @@ const StudentDashboard = () => {
                     {dish.image_url ? (
                       <img src={dish.image_url} alt={dish.name} className="h-16 w-16 rounded-xl object-cover shrink-0" />
                     ) : (
-                      <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center text-2xl shrink-0">
-                        🍲
+                      <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <i className="fa-solid fa-bowl-food text-lg" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -949,8 +955,8 @@ const StudentDashboard = () => {
                   return (
                     <div key={vendor.id} className="space-y-3">
                       <Link to={`/vendor/${vendor.id}`} className="group inline-flex items-center gap-2.5 hover:underline">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-lg shadow-sm">
-                          {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-xl object-cover" /> : '🍽️'}
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground shadow-sm">
+                          {vendor.logo_url ? <img src={vendor.logo_url} alt={vendor.name} className="h-full w-full rounded-xl object-cover" /> : <i className="fa-solid fa-store" />}
                         </div>
                         <span className="font-heading font-bold text-base text-foreground group-hover:text-primary transition-colors">
                           {vendor.name}
@@ -966,8 +972,8 @@ const StudentDashboard = () => {
                                 {item.image_url ? (
                                   <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-xl object-cover shrink-0" />
                                 ) : (
-                                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground/40 text-2xl shrink-0">
-                                    🍛
+                                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground/40 text-lg shrink-0">
+                                    <i className="fa-solid fa-utensils" />
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">

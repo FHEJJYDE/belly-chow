@@ -30,18 +30,25 @@ const VendorLayout = () => {
       <div className="min-h-screen flex w-full">
         {!isMobile && <VendorSidebar />}
         <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-50 h-14 flex items-center justify-between glass-nav px-4">
-            {!isMobile && <SidebarTrigger />}
-            {isMobile && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
-            <div className="flex items-center gap-1">
+          <header className="sticky top-0 z-40 h-14 flex items-center justify-between border-b border-border/60 bg-card/95 backdrop-blur-md px-5">
+            {!isMobile && (
+              <div className="flex items-center gap-3">
+                <SidebarTrigger />
+                <span className="text-xs font-medium text-muted-foreground hidden sm:inline">Merchant Portal</span>
+              </div>
+            )}
+            {isMobile && <span className="font-heading text-base font-bold">Merchant Portal</span>}
+            <div className="flex items-center gap-1.5">
               <NotificationCenter />
               <Link to="/profile">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><User className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground">
+                  <i className="fa-solid fa-user text-sm" />
+                </Button>
               </Link>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <LogOut className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive">
+                    <i className="fa-solid fa-right-from-bracket text-sm" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>

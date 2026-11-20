@@ -85,25 +85,17 @@ const DeliveryChat = ({
     [user?.id, participantMap, senderProfiles]
   );
 
-  const getSenderLabel = (senderId: string) => {
+  const getSenderInfo = (senderId: string): { name: string; role: string } | null => {
     if (senderId === user?.id) return null;
     const p = participantMap.get(senderId);
     if (p) {
-      return p.role === 'vendor'
-        ? `🍳 ${p.name}`
-        : p.role === 'rider'
-        ? `🏍️ ${p.name}`
-        : `👤 ${p.name}`;
+      return { name: p.name, role: p.role };
     }
     const resolved = senderProfiles[senderId];
     if (resolved) {
-      return resolved.role === 'vendor'
-        ? `🍳 ${resolved.full_name}`
-        : resolved.role === 'rider'
-        ? `🏍️ ${resolved.full_name}`
-        : `👤 ${resolved.full_name}`;
+      return { name: resolved.full_name, role: resolved.role };
     }
-    return '👤 Order Participant';
+    return { name: 'Order Participant', role: 'student' };
   };
 
   const fetchMessages = useCallback(async () => {
@@ -307,8 +299,9 @@ const DeliveryChat = ({
             You
           </Badge>
           {participants.map((p) => (
-            <Badge key={p.id} variant="outline" className="text-[10px]">
-              {p.role === 'vendor' ? '🍳' : p.role === 'rider' ? '🏍️' : '👤'} {p.name}
+            <Badge key={p.id} variant="outline" className="text-[10px] gap-1">
+              <i className={`fa-solid ${p.role === 'vendor' ? 'fa-utensils text-orange-500' : p.role === 'rider' ? 'fa-motorcycle text-blue-500' : 'fa-user text-emerald-500'} text-[9px]`} />
+              {p.name}
             </Badge>
           ))}
         </div>
@@ -321,12 +314,12 @@ const DeliveryChat = ({
         >
           {messages.length === 0 && (
             <p className="py-10 text-center text-xs text-muted-foreground">
-              No messages yet. Send a message to coordinate delivery! 👋
+              No messages yet. Send a message to coordinate delivery.
             </p>
           )}
           {messages.map((msg) => {
             const isMe = msg.sender_id === user?.id;
-            const senderLabel = getSenderLabel(msg.sender_id);
+            const senderInfo = getSenderInfo(msg.sender_id);
             return (
               <div
                 key={msg.id}
@@ -339,9 +332,10 @@ const DeliveryChat = ({
                       : 'bg-card border text-foreground rounded-bl-sm'
                   }`}
                 >
-                  {!isMe && senderLabel && (
-                    <p className="text-[10px] font-bold mb-0.5 text-primary">
-                      {senderLabel}
+                  {!isMe && senderInfo && (
+                    <p className="text-[10px] font-bold mb-0.5 text-primary flex items-center gap-1">
+                      <i className={`fa-solid ${senderInfo.role === 'vendor' ? 'fa-utensils' : senderInfo.role === 'rider' ? 'fa-motorcycle' : 'fa-user'} text-[9px]`} />
+                      <span>{senderInfo.name}</span>
                     </p>
                   )}
                   <p className="leading-snug break-words">{msg.content}</p>

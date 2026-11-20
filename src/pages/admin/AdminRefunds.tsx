@@ -102,7 +102,10 @@ const AdminRefunds = () => {
 
   return (
     <div>
-      <h1 className="mb-2 font-heading text-2xl font-bold">Refunds 💰</h1>
+      <h1 className="mb-1 font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+        <i className="fa-solid fa-money-bill-transfer text-primary text-lg" />
+        <span>Refund Management</span>
+      </h1>
       <p className="mb-6 text-sm text-muted-foreground">{pendingRefunds} pending refund request{pendingRefunds !== 1 ? 's' : ''}</p>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

@@ -62,10 +62,10 @@ const VendorSettings = () => {
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Store Profile</p>
-          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Store Profile</p>
+          <h1 className="mt-1 font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             Vendor Settings
           </h1>
         </div>
@@ -114,7 +114,7 @@ const VendorSettings = () => {
         <Card className="mt-6 border-blue-500/20 bg-blue-500/5">
           <CardContent className="p-5 space-y-2">
             <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-              <span>💳</span> Vendor Order & Delivery Charges
+              <i className="fa-solid fa-receipt text-blue-500" /> Vendor Order & Delivery Charges
             </h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Belly-Chow charges a flat <strong className="text-primary font-bold">₦200 per delivery</strong> deducted directly from order payouts. Your food subtotal minus ₦200 is automatically credited to your vendor balance upon customer receipt.
@@ -127,7 +127,10 @@ const VendorSettings = () => {
           <CardContent className="p-6 space-y-4">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Boost Store Visibility</span>
-              <h2 className="font-heading text-lg font-bold">Featured Vendor Promotions 🌟</h2>
+              <h2 className="font-heading text-lg font-bold flex items-center gap-2 mt-0.5">
+                <i className="fa-solid fa-crown text-amber-500 text-sm" />
+                <span>Featured Vendor Promotions</span>
+              </h2>
               <p className="text-xs text-muted-foreground mt-1">Get featured at the top of campus food searches and increase daily orders.</p>
             </div>
 

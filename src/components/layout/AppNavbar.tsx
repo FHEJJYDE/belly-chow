@@ -30,8 +30,8 @@ const AppNavbar = () => {
           <div className="h-9 w-9 rounded-xl overflow-hidden border border-primary/30 shadow-md shadow-orange-500/10 group-hover:scale-105 transition-transform duration-300">
             <img src={logo} alt="Belly-Chow" className="h-full w-full object-contain bg-background" />
           </div>
-          <span className="font-heading text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">
-            Belly-Chow
+          <span className="font-heading text-xl font-bold tracking-tight text-foreground">
+            Belly<span className="text-primary">-Chow</span>
           </span>
         </Link>
 
@@ -43,13 +43,13 @@ const AppNavbar = () => {
               {role === 'student' && (
                 <div className="hidden md:flex items-center gap-1">
                   <Link to="/orders">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
-                      <Package className="h-4.5 w-4.5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground" title="My Orders">
+                      <i className="fa-solid fa-bag-shopping text-sm" />
                     </Button>
                   </Link>
                   <Link to="/cart" className="relative">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
-                      <ShoppingCart className="h-4.5 w-4.5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground" title="My Tray">
+                      <i className="fa-solid fa-basket-shopping text-sm" />
                       {itemCount > 0 && (
                         <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
                           {itemCount > 99 ? '99+' : itemCount}
@@ -60,14 +60,14 @@ const AppNavbar = () => {
                 </div>
               )}
               <Link to="/profile" className="hidden md:inline-flex">
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground">
-                  <User className="h-4.5 w-4.5" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground" title="Account">
+                  <i className="fa-solid fa-user text-sm" />
                 </Button>
               </Link>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                    <LogOut className="h-4.5 w-4.5" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Sign Out">
+                    <i className="fa-solid fa-right-from-bracket text-sm" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-2xl">

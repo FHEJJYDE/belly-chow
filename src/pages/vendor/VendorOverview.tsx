@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { getOrCreateVendor } from '@/lib/vendorUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Clock, DollarSign, TrendingUp, Star, ShoppingBag } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import LivePulse from '@/components/LivePulse';
 import VendorStatusToggle from '@/components/VendorStatusToggle';
@@ -114,23 +113,32 @@ const VendorOverview = () => {
   if (!vendor) return <p className="py-20 text-center text-muted-foreground">Setting up your vendor profile...</p>;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Dashboard Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Merchant Portal</p>
+          <div className="flex items-center gap-3 mt-1">
+            <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               {vendor.name}
             </h1>
             <LivePulse />
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <Badge variant={vendor.is_approved ? 'default' : 'secondary'} className="text-xs font-semibold px-2.5 py-0.5">
-              {vendor.is_approved ? 'Approved' : 'Pending Verification'}
+          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+            <Badge variant={vendor.is_approved ? 'default' : 'secondary'} className="text-xs font-medium px-2.5 py-0.5 gap-1.5">
+              <i className={`fa-solid ${vendor.is_approved ? 'fa-circle-check' : 'fa-clock'} text-[11px]`} />
+              {vendor.is_approved ? 'Verified Merchant' : 'Pending Verification'}
             </Badge>
-            <Badge variant={vendor.is_active ? 'outline' : 'secondary'} className={`text-xs font-semibold px-2.5 py-0.5 ${vendor.is_active ? 'border-green-500 text-green-500 bg-green-500/5' : ''}`}>
-              {vendor.is_active ? 'Open & Accepting Orders' : 'Closed'}
+            <Badge variant="outline" className={`text-xs font-medium px-2.5 py-0.5 gap-1.5 ${vendor.is_active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : ''}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${vendor.is_active ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
+              {vendor.is_active ? 'Accepting Orders' : 'Kitchen Closed'}
             </Badge>
+            {vendor.rating && Number(vendor.rating) > 0 ? (
+              <Badge variant="outline" className="text-xs font-semibold gap-1 border-amber-500/30 text-amber-600 bg-amber-500/10">
+                <i className="fa-solid fa-star text-[10px] text-amber-500" />
+                {Number(vendor.rating).toFixed(1)}
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -143,19 +151,20 @@ const VendorOverview = () => {
       {/* Metrics Cards Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Pending Orders', value: pending, icon: Package, colorClass: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
-          { label: 'Active Orders', value: active, icon: Clock, colorClass: 'text-sky-500 bg-sky-500/10 border-sky-500/20' },
-          { label: 'Total Revenue', value: `₦${revenue.toLocaleString()}`, icon: DollarSign, colorClass: 'text-primary bg-primary/10 border-primary/20' },
-          { label: 'Completed Sales', value: orders.length, icon: ShoppingBag, colorClass: 'text-green-500 bg-green-500/10 border-green-500/20' },
+          { label: 'Awaiting Action', value: pending, sub: 'New incoming orders', icon: 'fa-solid fa-bell-concierge', colorClass: 'text-amber-600 bg-amber-500/10 border-amber-500/20' },
+          { label: 'In Kitchen', value: active, sub: 'Preparing & ready', icon: 'fa-solid fa-fire-burner', colorClass: 'text-sky-600 bg-sky-500/10 border-sky-500/20' },
+          { label: 'Gross Revenue', value: `₦${revenue.toLocaleString()}`, sub: `${delivered.length} delivered orders`, icon: 'fa-solid fa-sack-dollar', colorClass: 'text-primary bg-primary/10 border-primary/20' },
+          { label: 'Total Orders', value: orders.length, sub: 'All-time volume', icon: 'fa-solid fa-receipt', colorClass: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
         ].map(s => (
-          <Card key={s.label} className="premium-card bg-card/30 border-border/40">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl border ${s.colorClass}`}>
-                <s.icon className="h-6 w-6" />
+          <Card key={s.label} className="border-border/60 shadow-sm">
+            <CardContent className="flex items-start justify-between p-5">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
+                <p className="font-heading text-2xl font-bold mt-1.5 tracking-tight text-foreground">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{s.sub}</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground truncate uppercase tracking-wider">{s.label}</p>
-                <p className="font-heading text-2xl font-bold mt-1 tracking-tight truncate">{s.value}</p>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${s.colorClass}`}>
+                <i className={`${s.icon} text-sm`} />
               </div>
             </CardContent>
           </Card>
@@ -164,10 +173,10 @@ const VendorOverview = () => {
 
       {/* Chart Visualizations Grid */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <Card className="premium-card bg-card/30 border-border/40">
+        <Card className="border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 text-primary" /> Revenue Flow · Last 7 Days
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <i className="fa-solid fa-chart-area text-primary" /> Revenue Flow (7 Days)
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
@@ -192,10 +201,10 @@ const VendorOverview = () => {
           </CardContent>
         </Card>
 
-        <Card className="premium-card bg-card/30 border-border/40">
+        <Card className="border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-primary" /> Busy Hours Statistics
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <i className="fa-solid fa-clock text-primary" /> Peak Kitchen Hours
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
@@ -205,7 +214,7 @@ const VendorOverview = () => {
                 <XAxis dataKey="hour" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border) / 0.5)', borderRadius: '12px' }} />
-                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.8} />
+                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.85} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -214,17 +223,19 @@ const VendorOverview = () => {
 
       {/* Popular Items & Status Breakdown */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <Card className="premium-card bg-card/30 border-border/40">
+        <Card className="border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Top Performing Dishes</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <i className="fa-solid fa-ranking-star text-primary" /> Top Performing Dishes
+            </CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
             {popularItems.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">No dishes sold yet. Make some sales! 🍛</div>
+              <div className="py-12 text-center text-sm text-muted-foreground">No dishes sold yet. Add items to your menu to begin selling.</div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {popularItems.map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between p-2 rounded-xl hover:bg-muted/10 transition-colors">
+                  <div key={item.name} className="flex items-center justify-between p-2.5 rounded-xl border border-border/40 bg-muted/20">
                     <div className="flex items-center gap-3">
                       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">#{i + 1}</span>
                       <span className="text-sm font-semibold">{item.name}</span>

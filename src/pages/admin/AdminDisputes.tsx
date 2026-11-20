@@ -81,7 +81,10 @@ const AdminDisputes = () => {
 
   return (
     <div>
-      <h1 className="mb-2 font-heading text-2xl font-bold">Disputes ⚠️</h1>
+      <h1 className="mb-1 font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+        <i className="fa-solid fa-scale-balanced text-primary text-lg" />
+        <span>Order Disputes</span>
+      </h1>
       <p className="mb-6 text-sm text-muted-foreground">{openCount} open dispute{openCount !== 1 ? 's' : ''} requiring attention</p>
 
       <div className="mb-6">

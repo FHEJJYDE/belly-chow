@@ -416,10 +416,11 @@ const AdminLocations = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">
-            Delivery Zones & Campus Locations 📍
+          <h1 className="font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+            <i className="fa-solid fa-map-location-dot text-primary text-lg" />
+            <span>Delivery Zones & Campus Locations</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             Set your own delivery zones & prices, manage campus buildings, and moderate student-added slang.
           </p>
         </div>

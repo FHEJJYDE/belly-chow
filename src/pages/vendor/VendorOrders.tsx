@@ -153,11 +153,11 @@ const VendorOrders = () => {
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {order.status === 'pending' && (
                 <>
-                  <Button size="sm" onClick={() => updateStatus(order.id, 'preparing')} className="font-semibold gap-1">
-                    Accept & Start Cooking 🍳
+                  <Button size="sm" onClick={() => updateStatus(order.id, 'preparing')} className="font-semibold gap-1.5">
+                    <i className="fa-solid fa-fire-burner text-xs" /> Accept & Start Cooking
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1 border-primary/40 text-primary hover:bg-primary/10">
-                    Quick Ready 🍱
+                  <Button size="sm" variant="outline" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
+                    <i className="fa-solid fa-check text-xs" /> Quick Ready
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => updateStatus(order.id, 'rejected')} className="font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive border-destructive/30">
                     Reject
@@ -165,8 +165,8 @@ const VendorOrders = () => {
                 </>
               )}
               {['accepted', 'preparing'].includes(order.status) && (
-                <Button size="sm" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Mark Ready for Rider Pickup 🍱
+                <Button size="sm" onClick={() => updateStatus(order.id, 'ready')} className="font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <i className="fa-solid fa-box-open text-xs" /> Mark Ready for Rider Pickup
                 </Button>
               )}
             </div>
@@ -209,7 +209,10 @@ const VendorOrders = () => {
 
           {/* Order items toggle */}
           <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground hover:bg-muted/10 py-1.5" onClick={() => toggleExpand(order.id)}>
-            <span className="font-semibold">📦 {totalLineItems} item{totalLineItems !== 1 ? 's' : ''} listed</span>
+            <span className="font-semibold flex items-center gap-2">
+              <i className="fa-solid fa-box text-primary" />
+              {totalLineItems} item{totalLineItems !== 1 ? 's' : ''} listed
+            </span>
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
 
@@ -223,7 +226,9 @@ const VendorOrders = () => {
               ))}
               {drinkItems.map((drink, idx) => (
                 <div key={`drink-${idx}`} className="flex justify-between text-xs font-medium p-1">
-                  <span className="text-muted-foreground">🥤 {drink.name} × {drink.quantity}</span>
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <i className="fa-solid fa-bottle-water text-primary text-[11px]" /> {drink.name} × {drink.quantity}
+                  </span>
                   <span>₦{(Number(drink.price) * Number(drink.quantity)).toLocaleString()}</span>
                 </div>
               ))}
@@ -282,10 +287,10 @@ const VendorOrders = () => {
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Manage Orders</p>
-          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Kitchen Operations</p>
+          <h1 className="mt-1 font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             Orders Pipeline
           </h1>
         </div>

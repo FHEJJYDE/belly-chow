@@ -80,7 +80,10 @@ const AdminPromoCodes = () => {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold">Promo Codes 🏷️</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+          <i className="fa-solid fa-ticket text-primary text-lg" />
+          <span>Promo Codes</span>
+        </h1>
         <Button onClick={() => setShowCreate(true)} className="gap-2"><Plus className="h-4 w-4" /> Create Code</Button>
       </div>
 

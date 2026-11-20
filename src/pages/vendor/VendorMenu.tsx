@@ -132,11 +132,11 @@ const VendorMenu = () => {
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Menu Catalog</p>
-          <h1 className="mt-1 font-heading text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-            {items.length} dishes listed
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Menu Catalog</p>
+          <h1 className="mt-1 font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            {items.length} Dishes Listed
           </h1>
         </div>
         <div className="flex items-center gap-3 shrink-0 flex-wrap">

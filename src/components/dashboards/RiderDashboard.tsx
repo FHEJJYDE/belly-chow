@@ -768,7 +768,7 @@ const RiderDashboard = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button className="flex-1 h-12 text-base gap-2" disabled={uploadingProof}>
-                    <CheckCircle2 className="h-5 w-5" /> {uploadingProof ? 'Uploading...' : 'End Ride (Arrived) 🏁'}
+                    <CheckCircle2 className="h-5 w-5" /> {uploadingProof ? 'Uploading...' : 'End Ride (Arrived)'}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -778,7 +778,7 @@ const RiderDashboard = () => {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeliverWithProof(activeOrder.id)}>Yes, Arrived 🏁</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleDeliverWithProof(activeOrder.id)}>Yes, Arrived</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -810,88 +810,115 @@ const RiderDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppNavbar />
-      <div className="container py-6">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="container max-w-4xl py-6">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
           <div>
-            <h1 className="font-heading text-2xl font-bold">Rider Dashboard 🏍️</h1>
-            <p className="text-sm text-muted-foreground">
-              {isOnline ? '🟢 Online' : '🔴 Offline'}
-              {position && <span className="ml-2">· GPS active</span>}
-              {geoError && <span className="ml-2 text-destructive">· Location error</span>}
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Dispatch Console</p>
+            <div className="flex items-center gap-3 mt-1">
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Rider Operations</h1>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
+                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+                {isOnline ? 'Online & Dispatchable' : 'Offline'}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+              {position ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                  <i className="fa-solid fa-satellite-dish text-[11px]" /> GPS Telemetry Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                  <i className="fa-solid fa-location-crosshairs text-[11px]" /> Waiting for GPS Lock
+                </span>
+              )}
+              {geoError && <span className="text-destructive">· {geoError}</span>}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-sm">Online</Label>
-            <Switch checked={isOnline} onCheckedChange={setIsOnline} />
+          <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-2.5 shadow-sm self-start sm:self-center">
+            <i className={`fa-solid fa-power-off text-xs ${isOnline ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+            <Label className="text-xs font-semibold cursor-pointer" htmlFor="rider-online-switch">
+              {isOnline ? 'Accepting Trips' : 'Go Online'}
+            </Label>
+            <Switch id="rider-online-switch" checked={isOnline} onCheckedChange={setIsOnline} />
           </div>
         </div>
 
         {/* Rider Location Setup & Verification Card */}
-        <Card className="mb-6 border-primary/30 bg-gradient-to-r from-primary/5 via-orange-500/5 to-background">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-heading font-bold text-sm flex items-center gap-1.5">
-                    <Locate className="h-4 w-4 text-primary animate-pulse" />
-                    Live Rider GPS Status:
-                  </span>
+        <Card className="mb-6 border-border/70 shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${position ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                <i className="fa-solid fa-location-crosshairs text-sm" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-heading font-semibold text-sm">Live Dispatch Telemetry</span>
                   <Badge variant={position ? 'default' : geoError ? 'destructive' : 'secondary'} className="text-[10px]">
-                    {position ? '🟢 Active GPS Signal' : geoError ? '🔴 Permission Required' : '⏳ Acquiring GPS...'}
+                    {position ? 'Signal Locked' : geoError ? 'Permission Needed' : 'Acquiring...'}
                   </Badge>
                 </div>
                 {position ? (
                   <p className="text-xs text-muted-foreground font-mono">
-                    Lat: {position.lat.toFixed(5)} · Lng: {position.lng.toFixed(5)} (Accuracy: ~{Math.round(position.accuracy || 10)}m)
+                    {position.lat.toFixed(5)}, {position.lng.toFixed(5)} (±{Math.round(position.accuracy || 10)}m)
                   </p>
                 ) : (
-                  <p className="text-xs text-destructive font-medium">
-                    {geoError || 'Allow location permissions in your browser settings for order dispatch.'}
+                  <p className="text-xs text-muted-foreground">
+                    Enable location access in your browser so nearby campus orders are matched to you first.
                   </p>
                 )}
               </div>
-              <Button size="sm" variant="outline" onClick={() => getPosition()} className="gap-1.5 text-xs font-semibold shrink-0">
-                <Navigation className="h-3.5 w-3.5 text-primary" /> Verify Location Now
-              </Button>
             </div>
-
-            <div className="rounded-lg bg-muted/40 p-3 text-xs space-y-1.5">
-              <p className="font-semibold text-foreground flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> How to Keep Your Location Active All Day:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-1 pl-1">
-                <li><strong className="text-foreground">Browser Permission:</strong> When prompted, select <em>"Always Allow Location"</em> or <em>"Allow while using app"</em> in Chrome/Safari.</li>
-                <li><strong className="text-foreground">Online Switch:</strong> Keep the <span className="text-primary font-bold">Online</span> toggle ON during work hours so vendor orders match your proximity.</li>
-                <li><strong className="text-foreground">Background Battery Settings:</strong> Disable "Battery Saver" throttling for your browser on Android/iOS to ensure continuous GPS updates when screen locks.</li>
-              </ul>
-            </div>
+            <Button size="sm" variant="outline" onClick={() => getPosition()} className="gap-1.5 text-xs font-semibold shrink-0">
+              <i className="fa-solid fa-rotate text-primary text-[11px]" /> Refresh Signal
+            </Button>
           </CardContent>
         </Card>
 
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="premium-card bg-primary/5 border-primary/20"><CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground">Today</p>
-            <p className="text-lg font-bold text-primary">₦{earnings.today.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground">{earnings.todayCount} deliveries</p>
-          </CardContent></Card>
-          <Card className="premium-card"><CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground">This Week</p>
-            <p className="text-lg font-bold">₦{earnings.week.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground">{earnings.weekCount} deliveries</p>
-          </CardContent></Card>
-          <Card className="premium-card"><CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground">This Month</p>
-            <p className="text-lg font-bold">₦{earnings.month.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground">{earnings.monthCount} deliveries</p>
-          </CardContent></Card>
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Today's Earnings</p>
+                <p className="font-heading text-xl font-bold text-primary mt-1">₦{earnings.today.toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.todayCount} completed trips</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                <i className="fa-solid fa-sack-dollar text-sm" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">This Week</p>
+                <p className="font-heading text-xl font-bold mt-1">₦{earnings.week.toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.weekCount} completed trips</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
+                <i className="fa-solid fa-calendar-week text-sm" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/60 shadow-sm">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">This Month</p>
+                <p className="font-heading text-xl font-bold mt-1">₦{earnings.month.toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{earnings.monthCount} completed trips</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
+                <i className="fa-solid fa-chart-line text-sm" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-4">
-            <TabsTrigger value="home" className="gap-1 text-xs"><Home className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Home</span></TabsTrigger>
-            <TabsTrigger value="history" className="gap-1 text-xs"><History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">History</span></TabsTrigger>
-            <TabsTrigger value="earnings" className="gap-1 text-xs"><Wallet className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Earnings</span></TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1 text-xs"><Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Settings</span></TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 mb-5 bg-muted/40 p-1 rounded-xl border border-border/50">
+            <TabsTrigger value="home" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-motorcycle text-[11px]" /> <span>Dispatch</span></TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-clock-rotate-left text-[11px]" /> <span>History</span></TabsTrigger>
+            <TabsTrigger value="earnings" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-wallet text-[11px]" /> <span>Payouts</span></TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5 text-xs rounded-lg"><i className="fa-solid fa-sliders text-[11px]" /> <span>Vehicle</span></TabsTrigger>
           </TabsList>
 
           {/* ═══════ HOME TAB ═══════ */}
@@ -926,7 +953,7 @@ const RiderDashboard = () => {
               {!isOnline ? (
                 <Card><CardContent className="py-10 text-center text-muted-foreground">Go online to see available orders</CardContent></Card>
               ) : sortedAvailableOrders.length === 0 ? (
-                <Card><CardContent className="py-10 text-center text-muted-foreground">No orders available right now. Hang tight! 🍕</CardContent></Card>
+                <Card><CardContent className="py-10 text-center text-muted-foreground">No orders awaiting pickup right now. New dispatches will appear here automatically.</CardContent></Card>
               ) : (
                 <div className="space-y-3">
                   {sortedAvailableOrders.map(order => {
@@ -991,7 +1018,7 @@ const RiderDashboard = () => {
           <TabsContent value="history" className="space-y-3">
             <h2 className="font-heading text-lg font-semibold flex items-center gap-2"><History className="h-5 w-5 text-muted-foreground" /> Delivery History</h2>
             {deliveryHistory.length === 0 ? (
-              <Card><CardContent className="py-10 text-center text-muted-foreground">No completed deliveries yet. Start riding! 🏍️</CardContent></Card>
+              <Card><CardContent className="py-10 text-center text-muted-foreground">No completed deliveries yet.</CardContent></Card>
             ) : (
               deliveryHistory.map(order => (
                 <Card key={order.id}>
@@ -1077,9 +1104,9 @@ const RiderDashboard = () => {
                 <Select value={riderSettings.vehicle_type} onValueChange={v => setRiderSettings(s => ({ ...s, vehicle_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="motorcycle">Motorcycle 🏍️</SelectItem>
-                    <SelectItem value="bicycle">Bicycle 🚲</SelectItem>
-                    <SelectItem value="car">Car 🚗</SelectItem>
+                    <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                    <SelectItem value="bicycle">Bicycle</SelectItem>
+                    <SelectItem value="car">Car</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input placeholder="Plate Number" value={riderSettings.plate_number} onChange={e => setRiderSettings(s => ({ ...s, plate_number: e.target.value }))} />

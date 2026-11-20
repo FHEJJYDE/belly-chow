@@ -1,4 +1,3 @@
-import { LayoutDashboard, Package, Settings, UtensilsCrossed, Wallet } from 'lucide-react';
 import logo from '@/assets/belly_chow_logo.png';
 import { NavLink } from '@/components/NavLink';
 import {
@@ -14,11 +13,11 @@ import {
 } from '@/components/ui/sidebar';
 
 const items = [
-  { title: 'Overview', url: '/vendor-panel', icon: LayoutDashboard },
-  { title: 'Orders', url: '/vendor-panel/orders', icon: Package },
-  { title: 'Menu', url: '/vendor-panel/menu', icon: UtensilsCrossed },
-  { title: 'Payouts', url: '/vendor-panel/payouts', icon: Wallet },
-  { title: 'Settings', url: '/vendor-panel/settings', icon: Settings },
+  { title: 'Store Overview', url: '/vendor-panel', icon: 'fa-solid fa-chart-pie' },
+  { title: 'Kitchen Orders', url: '/vendor-panel/orders', icon: 'fa-solid fa-receipt' },
+  { title: 'Menu & Dishes', url: '/vendor-panel/menu', icon: 'fa-solid fa-utensils' },
+  { title: 'Wallet & Payouts', url: '/vendor-panel/payouts', icon: 'fa-solid fa-building-columns' },
+  { title: 'Store Settings', url: '/vendor-panel/settings', icon: 'fa-solid fa-store' },
 ];
 
 export function VendorSidebar() {
@@ -26,26 +25,35 @@ export function VendorSidebar() {
   const collapsed = state === 'collapsed';
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarContent>
-        <div className="flex items-center gap-2 px-4 py-4">
-          <img src={logo} alt="Belly-Chow" className="h-8 w-8 shrink-0 rounded-lg object-contain" />
-          {!collapsed && <span className="font-heading text-lg font-bold">Vendor Panel</span>}
+    <Sidebar collapsible="icon" className="border-r border-border/60">
+      <SidebarContent className="bg-card">
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50">
+          <img src={logo} alt="Belly-Chow" className="h-9 w-9 shrink-0 rounded-xl object-contain border border-border/60 p-0.5 bg-background shadow-sm" />
+          {!collapsed && (
+            <div className="min-w-0">
+              <span className="font-heading text-base font-bold tracking-tight block leading-none">Belly-Chow</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mt-1 block">Merchant Portal</span>
+            </div>
+          )}
         </div>
-        <SidebarGroup>
-          <SidebarGroupLabel>Management</SidebarGroupLabel>
+        <SidebarGroup className="py-3">
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 px-4 mb-1">
+              Store Operations
+            </SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === '/vendor-panel'}
-                      className="hover:bg-primary/5 rounded-md w-full py-2 px-3 transition-colors"
-                      activeClassName="bg-primary/10 text-primary font-semibold border-l-4 border-primary rounded-l-none"
+                      className="flex items-center gap-3 rounded-lg mx-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      activeClassName="bg-primary/10 text-primary font-semibold"
                     >
-                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                      <i className={`${item.icon} w-4 text-center text-[13px] shrink-0`} />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

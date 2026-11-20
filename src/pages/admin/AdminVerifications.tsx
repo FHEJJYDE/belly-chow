@@ -108,7 +108,10 @@ const AdminVerifications = () => {
 
   return (
     <div>
-      <h1 className="mb-2 font-heading text-2xl font-bold">Verifications 🛡️</h1>
+      <h1 className="mb-1 font-heading text-2xl font-bold tracking-tight flex items-center gap-2.5">
+        <i className="fa-solid fa-id-card-clip text-primary text-lg" />
+        <span>Identity Verifications</span>
+      </h1>
       <p className="mb-6 text-sm text-muted-foreground">{pendingCount} pending verification{pendingCount !== 1 ? 's' : ''}</p>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
