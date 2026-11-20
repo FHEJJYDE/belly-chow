@@ -267,7 +267,10 @@ const StudentOrderTracking = ({ order, onBack, onCancelled }: StudentOrderTracki
   const handleConfirmDelivery = async () => {
     if (!user) return;
     setConfirmingDelivery(true);
-    const { error } = await supabase.from('orders').update({ status: 'delivered' } as any).eq('id', liveOrder.id);
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'delivered', payment_status: 'confirmed' } as any)
+      .eq('id', liveOrder.id);
     if (!error) {
       await (supabase.rpc as any)('release_order_escrow', { p_order_id: liveOrder.id });
     }

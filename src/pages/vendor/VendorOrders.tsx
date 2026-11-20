@@ -201,6 +201,24 @@ const VendorOrders = () => {
                   <i className="fa-solid fa-box-open text-xs" /> Mark Ready for Rider Pickup
                 </Button>
               )}
+              {order.status === 'arrived' && (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    await updateStatus(order.id, 'delivered');
+                    await supabase.from('orders').update({ payment_status: 'confirmed' as any }).eq('id', order.id);
+                    await (supabase.rpc as any)('release_order_escrow', { p_order_id: order.id });
+                  }}
+                  className="font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <i className="fa-solid fa-circle-check text-xs" /> Mark Fulfilled & Delivered
+                </Button>
+              )}
+              {order.status === 'delivered' && (
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 gap-1 text-xs font-semibold">
+                  <i className="fa-solid fa-circle-check text-[11px]" /> Fulfilled
+                </Badge>
+              )}
             </div>
           </div>
 

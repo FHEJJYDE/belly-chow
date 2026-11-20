@@ -22,6 +22,7 @@ import {
   Camera, Upload, X, Banknote, ShieldCheck
 } from 'lucide-react';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useCampusLocations } from '@/hooks/useCampusLocations';
 import DeliveryChat from '@/components/chat/DeliveryChat';
 import DeliveryMap from '@/components/maps/DeliveryMap';
 import LivePulse from '@/components/LivePulse';
@@ -82,6 +83,7 @@ const RiderDashboard = () => {
   const [activeDeliveryId, setActiveDeliveryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home');
   const { position, error: geoError, getPosition } = useGeolocation(true);
+  const { locations: campusLocations } = useCampusLocations();
 
   // Delivery proof state
   const [deliveryProof, setDeliveryProof] = useState<File | null>(null);
@@ -506,35 +508,93 @@ const RiderDashboard = () => {
     return urlData.publicUrl || path;
   };
 
-  const handleDeliverWithProof = async (orderId: string) => {
+  const handleDeliverWithProof = async (orderId: string, finalDelivered = false) => {
     const targetOrder = myOrders.find(o => o.id === orderId);
     let proofUrl: string | null = null;
     if (deliveryProof) {
       proofUrl = await uploadDeliveryProof(orderId);
     }
-    const updateData: any = { status: 'arrived' };
+
+    const nextStatus = finalDelivered ? 'delivered' : 'arrived';
+    const updateData: any = {
+      status: nextStatus,
+      ...(finalDelivered ? { payment_status: 'confirmed' } : {}),
+    };
     if (proofUrl) updateData.delivery_proof_url = proofUrl;
-    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
+
+    let { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
+
+    // Fallback: if the database enum doesn't have 'arrived' yet, complete directly to 'delivered'
+    if (error && !finalDelivered && error.message?.toLowerCase().includes('order_status')) {
+      const fallbackRes = await supabase
+        .from('orders')
+        .update({
+          status: 'delivered' as any,
+          payment_status: 'confirmed' as any,
+          ...(proofUrl ? { delivery_proof_url: proofUrl } : {}),
+        })
+        .eq('id', orderId);
+      error = fallbackRes.error;
+      if (!error) {
+        finalDelivered = true;
+      }
+    }
+
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
 
-    setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'arrived' } : o));
+    if (finalDelivered) {
+      await (supabase.rpc as any)('release_order_escrow', { p_order_id: orderId });
+      setMyOrders(prev => prev.filter(o => o.id !== orderId));
+      if (targetOrder) {
+        setDeliveryHistory(prev => [{ ...targetOrder, status: 'delivered', payment_status: 'confirmed' }, ...prev.filter(o => o.id !== orderId)]);
+      }
+      setActiveDeliveryId(null);
 
-    if (targetOrder?.student_id) {
-      await supabase.from('notifications').insert({
-        user_id: targetOrder.student_id,
-        title: 'Your Rider Has Arrived!',
-        message: `Your rider has arrived at your drop-off location for order #${orderId.slice(0, 8)}. Please meet them and confirm delivery receipt.`,
-        type: 'success',
-        order_id: orderId,
+      if (targetOrder?.student_id) {
+        await supabase.from('notifications').insert({
+          user_id: targetOrder.student_id,
+          title: 'Order Delivered & Fulfilled!',
+          message: `Your order #${orderId.slice(0, 8)} has been delivered by your rider. Enjoy your meal!`,
+          type: 'success',
+          order_id: orderId,
+        });
+      }
+      if (targetOrder?.vendor_user_id) {
+        await supabase.from('notifications').insert({
+          user_id: targetOrder.vendor_user_id,
+          title: 'Order Delivered & Fulfilled!',
+          message: `Order #${orderId.slice(0, 8)} has been delivered to the customer and earnings have been credited to your wallet.`,
+          type: 'success',
+          order_id: orderId,
+        });
+      }
+
+      toast({
+        title: 'Order Fulfilled & Delivered!',
+        description: `₦${riderFee.toLocaleString()} has been credited to your earnings.`,
       });
+    } else {
+      setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'arrived' } : o));
+
+      if (targetOrder?.student_id) {
+        await supabase.from('notifications').insert({
+          user_id: targetOrder.student_id,
+          title: 'Your Rider Has Arrived!',
+          message: `Your rider has arrived at your drop-off location for order #${orderId.slice(0, 8)}. Please meet them to collect your meal.`,
+          type: 'success',
+          order_id: orderId,
+        });
+      }
+
+      toast({ title: 'Customer notified of your arrival! Tap "Complete Delivery" once handed over.' });
     }
 
-    toast({ title: 'Ride ended! Waiting for customer confirmation.' });
     setDeliveryProof(null);
     setDeliveryProofPreview(null);
+    fetchOrders();
   };
 
   // Withdrawal
@@ -613,7 +673,20 @@ const RiderDashboard = () => {
       { key: 'delivered', label: 'Confirmed', icon: CheckCircle2 },
     ];
     const currentStepIndex = statusSteps.findIndex(s => s.key === activeOrder.status);
-    const studentSharingLocation = !!activeOrder.delivery_lat && !!activeOrder.delivery_lng;
+    const effectiveRiderLat = position?.lat ?? activeOrder.rider_lat ?? null;
+    const effectiveRiderLng = position?.lng ?? activeOrder.rider_lng ?? null;
+
+    // Resolve drop-off coordinates from order or matched campus building so rider ALWAYS gets live turn-by-turn directions
+    const matchedCampusSpot = campusLocations.find(
+      (loc) =>
+        loc.lat != null &&
+        loc.lng != null &&
+        activeOrder.delivery_location?.toLowerCase().includes(loc.name.toLowerCase())
+    );
+    const effectiveCustomerLat =
+      activeOrder.delivery_lat ?? (matchedCampusSpot?.lat ? Number(matchedCampusSpot.lat) : null);
+    const effectiveCustomerLng =
+      activeOrder.delivery_lng ?? (matchedCampusSpot?.lng ? Number(matchedCampusSpot.lng) : null);
     const chatParticipants = [
       { id: activeOrder.student_id, name: activeOrder.customer_name, role: 'student' },
       ...(activeOrder.vendor_user_id ? [{ id: activeOrder.vendor_user_id, name: activeOrder.vendor_name, role: 'vendor' }] : []),
@@ -635,42 +708,53 @@ const RiderDashboard = () => {
 
         <div className="relative">
           <DeliveryMap
-            riderLat={position?.lat}
-            riderLng={position?.lng}
-            customerLat={activeOrder.delivery_lat}
-            customerLng={activeOrder.delivery_lng}
+            riderLat={effectiveRiderLat}
+            riderLng={effectiveRiderLng}
+            customerLat={effectiveCustomerLat}
+            customerLng={effectiveCustomerLng}
             vendorLat={activeOrder.vendor_lat}
             vendorLng={activeOrder.vendor_lng}
-            riderLabel="You"
-            customerLabel="Customer"
+            riderLabel="You (Live GPS)"
+            customerLabel={activeOrder.delivery_location?.split(' • ')[0] || 'Customer Drop-off'}
             vendorLabel={activeOrder.vendor_name}
-            height="320px"
+            showDirectionsBanner={true}
+            height="360px"
             className="rounded-none border-x-0"
           />
         </div>
 
         {/* Rider Active Trip Telemetry & Quick Navigation Bar */}
         <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-3">
-            {studentSharingLocation ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 px-2.5 py-0.5 font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                Customer GPS Active
+          <div className="flex items-center gap-2.5">
+            {effectiveRiderLat && effectiveRiderLng ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 px-2.5 py-0.5 font-semibold">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Your GPS Pin Active
               </span>
             ) : (
-              <span className="text-slate-400">Drop-off: {activeOrder.delivery_location}</span>
+              <button
+                type="button"
+                onClick={() => getPosition()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 px-2.5 py-0.5 font-semibold"
+              >
+                <i className="fa-solid fa-location-crosshairs animate-spin text-[10px]" />
+                Tap to Lock Your GPS Pin
+              </button>
             )}
+            <span className="text-slate-300 truncate max-w-[200px] sm:max-w-xs">
+              → {activeOrder.delivery_location || 'Customer Drop-off'}
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 ml-auto">
-            {activeOrder.delivery_lat && activeOrder.delivery_lng && (
+          <div className="flex items-center gap-2 ml-auto">
+            {effectiveCustomerLat && effectiveCustomerLng && (
               <Button
                 size="sm"
                 className="h-7 text-xs gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold"
-                onClick={() => openInGoogleMaps(activeOrder.delivery_lat!, activeOrder.delivery_lng!)}
+                onClick={() => openInGoogleMaps(effectiveCustomerLat, effectiveCustomerLng)}
               >
                 <i className="fa-solid fa-diamond-turn-right text-[11px]" />
-                <span>Open Turn-by-Turn GPS</span>
+                <span>Voice GPS</span>
               </Button>
             )}
           </div>
@@ -766,58 +850,106 @@ const RiderDashboard = () => {
           )}
 
           {activeOrder.status === 'arrived' && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center space-y-1">
-              <div className="flex items-center justify-center gap-2 font-semibold text-sm text-amber-700 dark:text-amber-400">
-                <Clock className="h-4 w-4 animate-pulse" />
-                <span>Arrived — Waiting for Customer Confirmation ⏳</span>
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 font-semibold text-sm text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Arrived at Drop-off — Hand Package to Customer</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Ride ended. The customer is currently confirming delivery receipt.
+                Once you hand the meal to the customer, tap Complete Delivery below to fulfill the order and credit your wallet.
               </p>
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2.5">
             {activeOrder.status === 'picked_up' && (
               <Button className="flex-1 h-12 text-base gap-2" onClick={() => updateStatus(activeOrder.id, 'delivering')}>
                 <Truck className="h-5 w-5" /> I'm On the Way
               </Button>
             )}
             {activeOrder.status === 'delivering' && (
+              <>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 text-sm font-semibold gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                  disabled={uploadingProof}
+                  onClick={() => handleDeliverWithProof(activeOrder.id, false)}
+                >
+                  <i className="fa-solid fa-bell text-xs" />
+                  <span>Notify Customer I've Arrived</span>
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button className="flex-1 h-12 text-sm font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={uploadingProof}>
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span>{uploadingProof ? 'Uploading...' : 'Complete Delivery (Handed Over)'}</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirm Order Delivered & Fulfilled?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Confirm that you have handed the meal to {activeOrder.customer_name}. This will mark the order as fulfilled and credit ₦{riderFee.toLocaleString()} to your wallet.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Not Yet</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeliverWithProof(activeOrder.id, true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        Yes, Order Delivered
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+            {activeOrder.status === 'arrived' && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button className="flex-1 h-12 text-base gap-2" disabled={uploadingProof}>
-                    <CheckCircle2 className="h-5 w-5" /> {uploadingProof ? 'Uploading...' : 'End Ride (Arrived)'}
+                  <Button className="w-full h-12 text-base font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={uploadingProof}>
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span>{uploadingProof ? 'Completing...' : 'Complete Delivery (Handed to Customer)'}</span>
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>End Ride & Notify Customer</AlertDialogTitle>
-                    <AlertDialogDescription>Have you arrived at the customer's location? Ending the ride will notify the customer to confirm delivery receipt.</AlertDialogDescription>
+                    <AlertDialogTitle>Confirm Order Delivered & Fulfilled?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Confirm that you have handed the package to {activeOrder.customer_name}. This will mark the order as fulfilled and release earnings to you and the vendor.
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeliverWithProof(activeOrder.id)}>Yes, Arrived</AlertDialogAction>
+                    <AlertDialogAction
+                      onClick={() => handleDeliverWithProof(activeOrder.id, true)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      Yes, Fulfill & Complete
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             )}
           </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive gap-1"><XCircle className="h-4 w-4" /> Cancel Delivery</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancel this delivery?</AlertDialogTitle>
-                <AlertDialogDescription>The order will be returned to the available pool for another rider.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep Delivery</AlertDialogCancel>
-                <AlertDialogAction onClick={() => cancelDelivery(activeOrder.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes, Cancel</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {activeOrder.status !== 'arrived' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive gap-1"><XCircle className="h-4 w-4" /> Cancel Delivery</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel this delivery?</AlertDialogTitle>
+                  <AlertDialogDescription>The order will be returned to the available pool for another rider.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Delivery</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => cancelDelivery(activeOrder.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes, Cancel</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
     );
@@ -988,6 +1120,65 @@ const RiderDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* ═══════ HOME / DISPATCH TAB ═══════ */}
           <TabsContent value="home" className="space-y-5 mt-0">
+            {/* 0. Rider Live Position & Nearby Campus Radar Map */}
+            {isOnline && (
+              <Card className="overflow-hidden border-border/70 shadow-sm">
+                <div className="bg-card px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${position ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    <span className="font-heading text-xs font-bold text-foreground">
+                      {position ? 'Your Live GPS Position on Campus' : 'Acquiring Your GPS Position...'}
+                    </span>
+                  </div>
+                  {position && (
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
+                    </span>
+                  )}
+                </div>
+                <DeliveryMap
+                  riderLat={position?.lat ?? myOrders[0]?.rider_lat ?? null}
+                  riderLng={position?.lng ?? myOrders[0]?.rider_lng ?? null}
+                  customerLat={
+                    myOrders[0]?.delivery_lat ??
+                    sortedAvailableOrders[0]?.delivery_lat ??
+                    null
+                  }
+                  customerLng={
+                    myOrders[0]?.delivery_lng ??
+                    sortedAvailableOrders[0]?.delivery_lng ??
+                    null
+                  }
+                  vendorLat={
+                    myOrders[0]?.vendor_lat ??
+                    sortedAvailableOrders[0]?.vendor_lat ??
+                    null
+                  }
+                  vendorLng={
+                    myOrders[0]?.vendor_lng ??
+                    sortedAvailableOrders[0]?.vendor_lng ??
+                    null
+                  }
+                  riderLabel="You (Live GPS)"
+                  customerLabel={
+                    myOrders[0]
+                      ? myOrders[0].delivery_location?.split(' • ')[0] || 'Active Drop-off'
+                      : sortedAvailableOrders[0]
+                      ? sortedAvailableOrders[0].delivery_location?.split(' • ')[0] || 'Next Drop-off'
+                      : 'Drop-off'
+                  }
+                  vendorLabel={
+                    myOrders[0]?.vendor_name ||
+                    sortedAvailableOrders[0]?.vendor_name ||
+                    'Kitchen'
+                  }
+                  showDirectionsBanner={Boolean(myOrders[0] || sortedAvailableOrders[0])}
+                  height="240px"
+                  className="rounded-none border-0"
+                />
+              </Card>
+            )}
+
             {/* 1. Active Assigned Deliveries */}
             {myOrders.length > 0 && (
               <div className="space-y-3">

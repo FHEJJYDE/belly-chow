@@ -69,7 +69,7 @@ const VendorOverview = () => {
 
   const delivered = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders]);
   const pending = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
-  const active = useMemo(() => orders.filter(o => ['accepted', 'preparing', 'ready'].includes(o.status)).length, [orders]);
+  const active = useMemo(() => orders.filter(o => ['accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'arrived'].includes(o.status)).length, [orders]);
   const revenue = useMemo(() => delivered.reduce((s, o) => s + Number(o.total), 0), [delivered]);
 
   const revenueByDay = useMemo(() => {

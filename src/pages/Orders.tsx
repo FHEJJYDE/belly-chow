@@ -125,7 +125,10 @@ const Orders = () => {
   };
 
   const handleConfirmDelivery = async (orderId: string) => {
-    const { error } = await supabase.from('orders').update({ status: 'delivered' as any }).eq('id', orderId);
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'delivered' as any, payment_status: 'confirmed' as any })
+      .eq('id', orderId);
     if (!error) {
       await (supabase.rpc as any)('release_order_escrow', { p_order_id: orderId });
     }

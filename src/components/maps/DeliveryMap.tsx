@@ -130,9 +130,43 @@ export interface DeliveryMapProps {
   riderLabel?: string;
   customerLabel?: string;
   vendorLabel?: string;
+  /** When true, displays a live turn-by-turn navigation banner at the top of the map */
+  showDirectionsBanner?: boolean;
+  /** When true, camera follows the rider's live GPS position */
+  followRider?: boolean;
   className?: string;
   height?: string;
 }
+
+export interface RouteStep {
+  instruction: string;
+  distanceMeters: number;
+  maneuverType: string;
+  maneuverModifier?: string;
+}
+
+const formatManeuverInstruction = (step: any): string => {
+  const type = step?.maneuver?.type || 'continue';
+  const mod = step?.maneuver?.modifier || '';
+  const road = step?.name ? ` onto ${step.name}` : '';
+
+  if (type === 'depart') return `Head ${mod || 'forward'}${road}`;
+  if (type === 'arrive') return 'Arrive at customer drop-off point';
+  if (type === 'turn') return `Turn ${mod || 'ahead'}${road}`;
+  if (type === 'roundabout' || type === 'rotary') return `Take the roundabout${road}`;
+  if (type === 'fork') return `Keep ${mod || 'ahead'} at the fork${road}`;
+  if (type === 'merge') return `Merge ${mod || ''}${road}`;
+  if (type === 'new name' || type === 'continue') return `Continue ${mod ? `${mod} ` : ''}${road || 'straight'}`;
+  return `Proceed ${mod}${road}`.trim();
+};
+
+const getManeuverIcon = (type: string, mod?: string): string => {
+  if (type === 'arrive') return 'fa-solid fa-flag-checkered';
+  if (mod?.includes('left')) return 'fa-solid fa-turn-up -scale-x-100';
+  if (mod?.includes('right')) return 'fa-solid fa-turn-up';
+  if (type === 'roundabout' || type === 'rotary') return 'fa-solid fa-circle-notch';
+  return 'fa-solid fa-arrow-up';
+};
 
 const DeliveryMap = ({
   riderLat,
@@ -144,6 +178,8 @@ const DeliveryMap = ({
   riderLabel = 'Dispatch Rider',
   customerLabel = 'Delivery Point',
   vendorLabel = 'Vendor Kitchen',
+  showDirectionsBanner = false,
+  followRider = false,
   className = '',
   height = '320px',
 }: DeliveryMapProps) => {
@@ -163,8 +199,11 @@ const DeliveryMap = ({
 
   const [mapStyle, setMapStyle] = useState<MapStyleMode>('google_streets');
   const [showCampusPOIs, setShowCampusPOIs] = useState(true);
+  const [isFollowingRider, setIsFollowingRider] = useState(followRider);
   const [routeCoords, setRouteCoords] = useState<L.LatLngExpression[] | null>(null);
   const [routeStats, setRouteStats] = useState<{ distanceKm: number; durationMins: number } | null>(null);
+  const [routeSteps, setRouteSteps] = useState<RouteStep[]>([]);
+  const [showAllSteps, setShowAllSteps] = useState(false);
 
   // Haversine fallback distance
   const computeStraightDistanceKm = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -191,7 +230,7 @@ const DeliveryMap = ({
     }
   }, [riderLat, riderLng, customerLat, customerLng, vendorLat, vendorLng]);
 
-  // ── OSRM Street Routing & Live Distance/ETA ────────────────────────────────
+  // ── OSRM Street Routing, Turn-by-Turn Steps & Live Distance/ETA ────────────
   useEffect(() => {
     let active = true;
     const startLat = riderLat ?? vendorLat;
@@ -200,13 +239,14 @@ const DeliveryMap = ({
     if (!startLat || !startLng || !customerLat || !customerLng) {
       setRouteCoords(null);
       setRouteStats(null);
+      setRouteSteps([]);
       return;
     }
 
     const getRoute = async () => {
       try {
         const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${customerLng},${customerLat}?overview=full&geometries=geojson`
+          `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${customerLng},${customerLat}?overview=full&geometries=geojson&steps=true`
         );
         if (!res.ok) throw new Error('OSRM route network error');
         const data = await res.json();
@@ -217,23 +257,49 @@ const DeliveryMap = ({
           const distKm = Number((r.distance / 1000).toFixed(2));
           const mins = Math.max(1, Math.round(r.duration / 60));
           setRouteStats({ distanceKm: distKm, durationMins: mins });
+
+          // Parse live turn-by-turn steps from OSRM legs
+          const rawSteps: any[] = r.legs?.[0]?.steps || [];
+          const parsedSteps: RouteStep[] = rawSteps
+            .filter((s) => s.distance > 5 || s.maneuver?.type === 'arrive')
+            .map((s) => ({
+              instruction: formatManeuverInstruction(s),
+              distanceMeters: Math.round(s.distance || 0),
+              maneuverType: s.maneuver?.type || 'continue',
+              maneuverModifier: s.maneuver?.modifier,
+            }));
+          setRouteSteps(parsedSteps);
         } else if (active) {
           setRouteCoords([[startLat, startLng], [customerLat, customerLng]]);
           const d = computeStraightDistanceKm(startLat, startLng, customerLat, customerLng);
           setRouteStats({ distanceKm: Number(d.toFixed(2)), durationMins: Math.max(2, Math.round(d * 3)) });
+          setRouteSteps([
+            {
+              instruction: `Head directly toward ${customerLabel}`,
+              distanceMeters: Math.round(d * 1000),
+              maneuverType: 'continue',
+            },
+          ]);
         }
       } catch {
         if (active) {
           setRouteCoords([[startLat, startLng], [customerLat, customerLng]]);
           const d = computeStraightDistanceKm(startLat, startLng, customerLat, customerLng);
           setRouteStats({ distanceKm: Number(d.toFixed(2)), durationMins: Math.max(2, Math.round(d * 3)) });
+          setRouteSteps([
+            {
+              instruction: `Head directly toward ${customerLabel}`,
+              distanceMeters: Math.round(d * 1000),
+              maneuverType: 'continue',
+            },
+          ]);
         }
       }
     };
 
     getRoute();
     return () => { active = false; };
-  }, [riderLat, riderLng, vendorLat, vendorLng, customerLat, customerLng, computeStraightDistanceKm]);
+  }, [riderLat, riderLng, vendorLat, vendorLng, customerLat, customerLng, customerLabel, computeStraightDistanceKm]);
 
   // ── Initialise map once ────────────────────────────────────────────────────
   useEffect(() => {
@@ -398,15 +464,74 @@ const DeliveryMap = ({
       }
     }
 
-    fitBounds(map);
-  }, [riderLat, riderLng, customerLat, customerLng, vendorLat, vendorLng, riderLabel, customerLabel, vendorLabel, routeCoords, fitBounds]);
+    if (isFollowingRider && riderLat && riderLng) {
+      map.panTo([riderLat, riderLng], { animate: true });
+    } else {
+      fitBounds(map);
+    }
+  }, [riderLat, riderLng, customerLat, customerLng, vendorLat, vendorLng, riderLabel, customerLabel, vendorLabel, routeCoords, isFollowingRider, fitBounds]);
+
+  const currentStep = routeSteps[0] || null;
 
   return (
     <div className={`relative w-full rounded-2xl overflow-hidden border border-border/70 bg-slate-100 dark:bg-slate-900 shadow-sm ${className}`} style={{ height }}>
       <div ref={mapRef} className="h-full w-full" />
 
-      {/* Top-Left Live Distance & ETA Telemetry Pill */}
-      {routeStats && (
+      {/* Live In-App Turn-by-Turn Navigation Banner (For Riders) */}
+      {showDirectionsBanner && currentStep && (
+        <div className="absolute top-3 left-3 right-3 sm:right-auto sm:max-w-sm z-[1005] rounded-2xl bg-slate-900/95 text-white backdrop-blur-md p-3 shadow-xl border border-white/15">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+                <i className={`${getManeuverIcon(currentStep.maneuverType, currentStep.maneuverModifier)} text-sm`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold text-orange-400">
+                    {currentStep.distanceMeters < 1000
+                      ? `${currentStep.distanceMeters}m`
+                      : `${(currentStep.distanceMeters / 1000).toFixed(1)} km`}
+                  </span>
+                  {routeStats && (
+                    <span className="text-[11px] text-white/70">
+                      • {routeStats.distanceKm < 1 ? `${Math.round(routeStats.distanceKm * 1000)}m` : `${routeStats.distanceKm} km`} left (~{routeStats.durationMins} min)
+                    </span>
+                  )}
+                </div>
+                <p className="font-heading text-xs sm:text-sm font-bold leading-tight truncate mt-0.5">
+                  {currentStep.instruction}
+                </p>
+              </div>
+            </div>
+            {routeSteps.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSteps(!showAllSteps)}
+                className="rounded-lg bg-white/10 hover:bg-white/20 px-2 py-1 text-[10px] font-semibold shrink-0"
+              >
+                {showAllSteps ? 'Hide' : `${routeSteps.length} steps`}
+              </button>
+            )}
+          </div>
+
+          {showAllSteps && routeSteps.length > 1 && (
+            <div className="mt-2.5 max-h-36 overflow-y-auto border-t border-white/15 pt-2 space-y-1.5 text-[11px]">
+              {routeSteps.map((st, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2 text-white/85">
+                  <span className="truncate">
+                    <strong className="text-orange-400 mr-1.5">{idx + 1}.</strong>
+                    {st.instruction}
+                  </span>
+                  <span className="font-mono text-[10px] text-white/60 shrink-0">{st.distanceMeters}m</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Top-Left Live Distance & ETA Telemetry Pill (Shown when turn-by-turn banner is off) */}
+      {!showDirectionsBanner && routeStats && (
         <div className="pointer-events-none absolute top-3 left-3 z-[1000] flex items-center gap-2 rounded-xl bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 text-xs font-semibold shadow-lg border border-white/15">
           <i className="fa-solid fa-route text-orange-400 text-[11px]" />
           <span>
@@ -493,15 +618,40 @@ const DeliveryMap = ({
         )}
       </div>
 
-      {/* Bottom-Right Recenter Button */}
-      <button
-        type="button"
-        onClick={() => mapInstanceRef.current && fitBounds(mapInstanceRef.current)}
-        title="Re-center map on route"
-        className="absolute bottom-24 right-2.5 z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-white/95 text-slate-900 shadow-md border border-slate-900/10 hover:bg-slate-50 hover:text-primary transition-colors"
-      >
-        <i className="fa-solid fa-location-crosshairs text-xs" />
-      </button>
+      {/* Bottom-Right Follow Rider & Recenter Controls */}
+      <div className="absolute bottom-24 right-2.5 z-[1000] flex flex-col gap-1.5">
+        {riderLat && riderLng && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isFollowingRider;
+              setIsFollowingRider(next);
+              if (next && mapInstanceRef.current) {
+                mapInstanceRef.current.setView([riderLat, riderLng], 18, { animate: true });
+              }
+            }}
+            title={isFollowingRider ? 'Following your GPS (tap to unlock)' : 'Center & follow my live GPS'}
+            className={`flex h-[34px] w-[34px] items-center justify-center rounded-xl shadow-md border transition-colors ${
+              isFollowingRider
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white/95 text-slate-900 border-slate-900/10 hover:bg-slate-50 hover:text-primary'
+            }`}
+          >
+            <i className="fa-solid fa-location-arrow text-xs" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setIsFollowingRider(false);
+            if (mapInstanceRef.current) fitBounds(mapInstanceRef.current);
+          }}
+          title="Fit entire route on map"
+          className="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-white/95 text-slate-900 shadow-md border border-slate-900/10 hover:bg-slate-50 hover:text-primary transition-colors"
+        >
+          <i className="fa-solid fa-expand text-xs" />
+        </button>
+      </div>
     </div>
   );
 };

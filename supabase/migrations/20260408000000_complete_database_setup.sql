@@ -865,6 +865,21 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Ensure the order is marked delivered and payment is confirmed
+    UPDATE public.orders
+    SET status = 'delivered'::public.order_status,
+        payment_status = 'confirmed'::public.payment_status
+    WHERE id = p_order_id;
+
+    -- Idempotency guard: prevent double-crediting if both rider and student confirm
+    IF EXISTS (
+        SELECT 1 FROM public.wallet_transactions
+        WHERE reference = 'ESCROW_VENDOR_' || p_order_id
+           OR reference = 'ESCROW_RIDER_' || p_order_id
+    ) THEN
+        RETURN;
+    END IF;
+
     SELECT * INTO v_vendor FROM public.vendors WHERE id = v_order.vendor_id;
 
     v_vendor_net := GREATEST(0, (v_order.total::NUMERIC) - v_vendor_charge);
